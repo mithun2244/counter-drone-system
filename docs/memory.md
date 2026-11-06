@@ -5,9 +5,9 @@
 
 ## Current status
 
-- **Current phase:** Phase 1 — Messages, bus, clock, simulator (not started)
-- **Last session:** 2026-11-06, finished Phase 0
-- **Next step:** plan Phase 1 and get approval, starting with the Pydantic schemas from `architecture.md` §4
+- **Current phase:** Phase 2 — Station AI (not started)
+- **Last session:** 2026-11-06, finished Phase 1
+- **Next step:** plan Phase 2 and get approval, including the new dependencies and dataset licences it needs (`rules.md` §4, §5)
 - **Start sessions from `cuas-demo/`**, or `CLAUDE.md` will not auto-load
 
 ## Decisions log
@@ -22,12 +22,13 @@
 | 2026-11-06 | Detect and report only; no mitigation code | Legal scope in Saudi Arabia; authorities act |
 | 2026-11-06 | Git root is `cuas-demo/`; project named `cuas`; `uv_build` backend | `uv` needs a build backend to install `src/cuas`, or `import cuas` fails |
 | 2026-11-06 | `.gitignore` uses `data/*` plus `!data/README.md` | `rules.md` §5 keeps data out of git but requires that README; a plain `data/` rule would block it |
-| 2026-11-06 | Develop on Python 3.11 (`.python-version`); `requires-python >=3.11` | Follows `phases.md` and tests the lowest supported version; numpy 2.5 needs 3.12, so 3.11 locks numpy 2.4.6 |
+| 2026-11-06 | Develop on exactly Python 3.11.16 (`.python-version`); `requires-python >=3.11` | Follows `phases.md` and tests the lowest supported version; numpy 2.5 needs 3.12, so 3.11 locks numpy 2.4.6 |
 | 2026-11-06 | S2, a fictional stadium, opens the client walkthrough; geometry, zone IDs and weights are shared, display labels live in scenario metadata | Client walkthrough choice; one site file serves every scenario, with no fallback that could show industrial labels at the stadium |
 | 2026-11-06 | Ground truth stays in `cuas.sim`, and only `cuas.metrics` reads it; it never goes on the bus | An evaluator must be able to score the pipeline without the pipeline seeing the answers |
 | 2026-11-06 | `zoom_per_station` is 0, 1 or 2, default 1, in `site.yaml` with a `--zoom-per-station` override; unused until Phase 4 | The paired S3 comparison in Phase 4 needs runs that differ only in this value |
 | 2026-11-06 | Scenario `seed` drives sensor noise, target `seed` fixes the flight path, one named random stream per sensor and target | Paired runs fly the same routes, and a change to one sensor cannot disturb another's noise |
-| 2026-11-06 | `site.yaml` read as plain YAML; camera specs and `base_range` not added yet | Typed `SiteConfig` and those values wait for Phase 1, the first phase to use them |
+| 2026-11-06 | S3 and S4 use stadium labels; scenario titles never describe targets | S4 is S2 in dust and S3 follows S2 in the walkthrough; metadata goes to components that must not see truth |
+| 2026-11-06 | Stations have 360-degree sensors; friendly drone is modelled but in no scenario | The docs give no camera layout; PRD S1–S4 have no friendly drone, and adding one could break Phase 3's "exactly 3 tracks" |
 | 2026-11-06 | Folders only in Phase 0: no `clock.py`, `control/*.py` or `download_data.py` yet | They arrive in their own phases, with tests (`rules.md` §1, §3) |
 
 ## Mocks and stubs in use
@@ -36,13 +37,17 @@
 - Pickets: simulated
 - Zoom camera: crop from high-resolution clip
 - Hand-off: JSON export only
+- Bearing `class_probs` and `snapshot_ref`: empty until Phase 2
+- Picket engine guess and loudness: noisy simulated values (`sim/picket.py`) until Phase 2
+- Sensor health: simulated sensors never report a fault
 - National air picture: not in the demo
 
 ## Known issues and risks
 
 - YOLO (Ultralytics) is AGPL-3.0: licence or swap before client delivery
 - Dataset licences not yet checked
-- All speeds, ranges and thresholds are start values to tune; so are the `site.yaml` mast heights and zone sizes, which the docs do not specify
+- All speeds, ranges and thresholds are start values to tune; so are the `site.yaml` mast heights, zone sizes, `p0` values, base ranges, tick and picket settings, which the docs do not specify
+- Determinism is proven for the same lockfile on the same machine, not byte for byte across machines; Phase 6's second-machine check should compare behaviour
 - `nvidia-smi` is not available on the dev machine, so it probably has no NVIDIA GPU; this affects Phase 2 training and the open GPU question
 - Phase 2: `design.md` A2 has the station pick a clip "of the same class". The simulator must pick the clip and pass only the clip, or ground truth leaks into `station/`
 - Phase 3: `Track.status` has no `sector` value though `design.md` A6 needs one; A6 also uses `scipy`, which is not in the `architecture.md` stack, so expect a dependency request
@@ -56,6 +61,12 @@
 - [ ] GPU laptop available for the live demo?
 
 ## Session log (newest first)
+
+### 2026-11-06 — Phase 1
+- Done: typed messages, in-process bus, simulated clock, typed site config, four fictional scenarios, trajectories, station and picket models, engine, evaluator and `run_demo.py --scenario`. All `phases.md` checks pass, 307 tests, and 8 of 8 sabotage checks were caught.
+- Decisions: see the log above. S2 opens the walkthrough. Ground truth reaches only the evaluator. `zoom_per_station` is carried for Phase 4.
+- Issues / mocks added: see the lists above. No new dependencies.
+- Next step: plan Phase 2 on a new branch, without starting code until approved.
 
 ### 2026-11-06 — Phase 0
 - Done: installed `uv` with winget, created the git repo, folder layout, `pyproject.toml`, `uv.lock`, `site.yaml`, `run_demo.py` and the smoke test. All `phases.md` checks pass.
