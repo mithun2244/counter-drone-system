@@ -25,3 +25,13 @@ Detect and report only. Never write mitigation code.
 2. Plan, get approval, then code in small commits.
 3. Run tests and lint before saying a task is done.
 4. Update memory.md at the end of the session.
+
+## Workflow rules with Superpowers
+- Use `docs/phases.md` and `docs/rules.md` as the project's workflow.
+- Plan one phase at a time in Plan Mode, and wait for approval before implementation.
+- Use one branch per phase.
+- Ask before creating a separate worktree or using subagents.
+- Use Superpowers for focused debugging, testing and code review when useful.
+- Skip Superpowers brainstorming and writing-plans for this project. Use our existing phase plan and approval process in Plan Mode.
+- Keep plans in the existing project docs.
+- Follow the repo's existing test rules.
