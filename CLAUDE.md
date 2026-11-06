@@ -17,7 +17,8 @@ Detect and report only. Never write mitigation code.
 - Install: `uv sync`
 - Tests: `uv run pytest`
 - Lint: `uv run ruff check . && uv run ruff format --check .`
-- Run a scenario: `uv run python scripts/run_demo.py --scenario s1`
+- Run a scenario in real time: `uv run python scripts/run_demo.py --scenario s1`
+- Run a scenario as fast as possible: add `--fast`
 
 ## Workflow
 1. Read memory.md and the current phase in phases.md.
