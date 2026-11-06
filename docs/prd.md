@@ -112,5 +112,5 @@ These are simulator numbers. They do not prove real-world performance.
 
 - [x] Which site type should the demo show first: oil and gas (S1) or stadium (S2)? **Decided 2026-11-06: stadium. S2, on a fictional stadium, opens the client walkthrough.**
 - [ ] Does the client want the dashboard in Arabic, English or both?
-- [ ] Which detector licence is acceptable for a client demo? (Ultralytics YOLO is AGPL-3.0.)
+- [x] Which detector licence is acceptable for a client demo? (Ultralytics YOLO is AGPL-3.0.) **Decided 2026-11-06, for now: permissive only, starting with BSD-3-Clause SSDLite. The starting weights have no separate licence, so counsel should review before delivery.**
 - [ ] Is a GPU laptop available for the live demo?

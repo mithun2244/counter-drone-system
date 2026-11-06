@@ -48,7 +48,7 @@ Done when:
 
 Tasks:
 - [ ] `scripts/download_data.py` plus `data/README.md` (dataset, URL, licence)
-- [ ] Video detector wrapper (YOLO11n to start), ByteTrack, M-of-N confirmation (`design.md` A3)
+- [ ] Video detector wrapper (SSDLite320, see `architecture.md` §6), ByteTrack-style tracker, M-of-N confirmation (`design.md` A3)
 - [ ] Fine-tune or evaluate the detector on drone vs bird clips; save weights in `models/`
 - [ ] Audio classifier: mel-spectrogram plus small CNN (drone / no-drone, engine type); train and save
 - [ ] SNR mixing by distance and wind (`design.md` A2)

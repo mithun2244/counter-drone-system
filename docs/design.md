@@ -36,7 +36,7 @@ Each scenario also carries metadata: title, venue and a display label per zone. 
 - Bearing noise (standard deviation): RGB 0.05°, thermal 0.1°, acoustic 5° *(start values)*.
 - Only targets inside the camera's field of view and above the horizon mask count.
 
-**Hybrid with real AI.** When a simulated target is detected, the station picks a real clip of the same class (drone, bird) from `data/`. The **real video detector** runs on it to produce the "look" confidence and a snapshot. The **real audio classifier** runs on a matching sound clip, mixed with background noise. The noise is louder (lower SNR) with distance and wind. Geometry comes from the simulator, while look and sound come from real models.
+**Hybrid with real AI.** When a simulated target is detected, the simulator picks a held-out clip of the same class (drone, bird) and of a distance bin matching the true range, and passes the station decoded frames only, with no label, path or target ID. The **real video detector** runs on it to produce the "look" confidence and a snapshot. The **real audio classifier** runs on a matching sound clip, mixed with background noise. The noise is louder (lower SNR) with distance and wind. Geometry comes from the simulator, while look and sound come from real models.
 
 **Pickets:** trigger when a target with an engine passes within the hearing radius (attack drone about 1500 m, quadcopter about 300 m *(start values)*, reduced by wind). They report a coarse bearing (±20°), loudness and an engine-type guess, with a 1–2 s delay.
 
