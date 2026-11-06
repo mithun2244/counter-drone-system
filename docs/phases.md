@@ -87,7 +87,8 @@ Tasks:
 - [ ] Behaviour features and rules (`design.md` A7)
 - [ ] Log-odds fusion of look, move and sound
 - [ ] Threat ranking with zones, TTI, approved flights and reasons (`design.md` A8)
-- [ ] Zoom scheduler with dwell and pre-emption (`design.md` A9)
+- [ ] Zoom scheduler with dwell and pre-emption (`design.md` A9), using `zoom_per_station` from `site.yaml`
+- [ ] Paired S3 comparison: same seed at `zoom_per_station` 0, 1 and 2, reported by the metrics script
 - [ ] Visibility model and coverage % (`design.md` A10)
 
 Done when:

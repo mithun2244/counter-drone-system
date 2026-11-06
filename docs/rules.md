@@ -18,6 +18,7 @@
 - Use the single simulated clock (`cuas.clock`) inside the pipeline. Never call `time.time()` there.
 - Use the `logging` module, not `print`, except in scripts.
 - Use the units from `architecture.md`: metres, seconds, degrees, ENU frame.
+- Only `cuas.sim` and `cuas.metrics` may touch simulation ground truth. It never goes on the bus.
 
 ## 3. Tests
 

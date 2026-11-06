@@ -19,7 +19,9 @@ d = ( sin(az)·cos(el),  cos(az)·cos(el),  sin(el) )
 
 ### A2. Simulator
 
-**Scenario file** (`config/scenarios/*.yaml`) lists targets. Each target has a type (`attack_drone`, `quadcopter`, `bird`, `friendly_drone`), start time, waypoints, speed and seed.
+**Scenario file** (`config/scenarios/*.yaml`) lists targets. Each target has a type (`attack_drone`, `quadcopter`, `bird`, `friendly_drone`), start time, waypoints, speed and seed. The target's seed fixes its flight path. The scenario's seed (or `--seed`) drives sensor noise, with one named random stream per sensor and target, so changing one cannot disturb another.
+
+Each scenario also carries metadata: title, venue and a display label per zone. Site geometry, zone IDs and weights come only from `site.yaml`.
 
 **Trajectories:**
 
@@ -29,7 +31,7 @@ d = ( sin(az)·cos(el),  cos(az)·cos(el),  sin(el) )
 
 **Station detection model** (per sensor, per frame):
 
-- Max range `R = base_range[sensor][target_type] × visibility_factor` *(start values in `site.yaml`)*.
+- Max range `R = base_range[sensor][target_type] × range_factor` *(start values in `site.yaml`)*. For cameras `range_factor` is `visibility_factor`. For acoustic sensors it is `1 − wind_range_loss_per_mps × wind_mps` (see A10).
 - Probability of detection at range `r`: `p = p0 × (1 − (r / R)²)` for `r < R`, else 0.
 - Bearing noise (standard deviation): RGB 0.05°, thermal 0.1°, acoustic 5° *(start values)*.
 - Only targets inside the camera's field of view and above the horizon mask count.
@@ -37,6 +39,8 @@ d = ( sin(az)·cos(el),  cos(az)·cos(el),  sin(el) )
 **Hybrid with real AI.** When a simulated target is detected, the station picks a real clip of the same class (drone, bird) from `data/`. The **real video detector** runs on it to produce the "look" confidence and a snapshot. The **real audio classifier** runs on a matching sound clip, mixed with background noise. The noise is louder (lower SNR) with distance and wind. Geometry comes from the simulator, while look and sound come from real models.
 
 **Pickets:** trigger when a target with an engine passes within the hearing radius (attack drone about 1500 m, quadcopter about 300 m *(start values)*, reduced by wind). They report a coarse bearing (±20°), loudness and an engine-type guess, with a 1–2 s delay.
+
+**Ground truth** (true positions, target IDs and target types) goes to a `TruthLog` that only the evaluator in `cuas.metrics` reads. It never goes on the bus. Until Phase 2, bearings carry empty `class_probs` and no `snapshot_ref`, and the picket engine guess is a mock: a noisy draw from the true engine type, so that it cannot act as a perfect label.
 
 ### A3. Station node
 
@@ -139,6 +143,8 @@ Runs every 0.5 s:
 2. For each track, pick the nearest free zoom camera that can see it (in range, in view, visibility OK).
 3. Keep a camera on its track for at least 3 s (dwell). Re-task early only if a new track scores at least 0.2 higher.
 4. After 1.5 s or more of zoom on a track, use the zoom crop's detector confidence as `p_look`.
+
+`zoom_per_station` in `site.yaml` sets the zoom cameras per station: 0, 1 or 2, default 1, overridable with `--zoom-per-station`.
 
 ### A10. Visibility model
 

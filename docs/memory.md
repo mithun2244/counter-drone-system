@@ -23,7 +23,10 @@
 | 2026-11-06 | Git root is `cuas-demo/`; project named `cuas`; `uv_build` backend | `uv` needs a build backend to install `src/cuas`, or `import cuas` fails |
 | 2026-11-06 | `.gitignore` uses `data/*` plus `!data/README.md` | `rules.md` §5 keeps data out of git but requires that README; a plain `data/` rule would block it |
 | 2026-11-06 | Develop on Python 3.11 (`.python-version`); `requires-python >=3.11` | Follows `phases.md` and tests the lowest supported version; numpy 2.5 needs 3.12, so 3.11 locks numpy 2.4.6 |
-| 2026-11-06 | `site.yaml` zone names are oil and gas | `design.md` A8 uses "Processing Unit"; only names depend on the open site-type question |
+| 2026-11-06 | S2, a fictional stadium, opens the client walkthrough; geometry, zone IDs and weights are shared, display labels live in scenario metadata | Client walkthrough choice; one site file serves every scenario, with no fallback that could show industrial labels at the stadium |
+| 2026-11-06 | Ground truth stays in `cuas.sim`, and only `cuas.metrics` reads it; it never goes on the bus | An evaluator must be able to score the pipeline without the pipeline seeing the answers |
+| 2026-11-06 | `zoom_per_station` is 0, 1 or 2, default 1, in `site.yaml` with a `--zoom-per-station` override; unused until Phase 4 | The paired S3 comparison in Phase 4 needs runs that differ only in this value |
+| 2026-11-06 | Scenario `seed` drives sensor noise, target `seed` fixes the flight path, one named random stream per sensor and target | Paired runs fly the same routes, and a change to one sensor cannot disturb another's noise |
 | 2026-11-06 | `site.yaml` read as plain YAML; camera specs and `base_range` not added yet | Typed `SiteConfig` and those values wait for Phase 1, the first phase to use them |
 | 2026-11-06 | Folders only in Phase 0: no `clock.py`, `control/*.py` or `download_data.py` yet | They arrive in their own phases, with tests (`rules.md` §1, §3) |
 
@@ -41,11 +44,13 @@
 - Dataset licences not yet checked
 - All speeds, ranges and thresholds are start values to tune; so are the `site.yaml` mast heights and zone sizes, which the docs do not specify
 - `nvidia-smi` is not available on the dev machine, so it probably has no NVIDIA GPU; this affects Phase 2 training and the open GPU question
-- S2 is set in a stadium but `site.yaml` uses oil-and-gas zone names; settle this in the Phase 1 plan
+- Phase 2: `design.md` A2 has the station pick a clip "of the same class". The simulator must pick the clip and pass only the clip, or ground truth leaks into `station/`
+- Phase 3: `Track.status` has no `sector` value though `design.md` A6 needs one; A6 also uses `scipy`, which is not in the `architecture.md` stack, so expect a dependency request
+- Phase 4: `design.md` A10 does not say which range or grid coverage uses, and S4's result depends on it. Paper calculation at S4's visibility 0.5: `important` zone with quadcopter RGB range gives 100% clear and 55% in dust (works); perimeter with attack drone RGB stays at 100% (warning never fires); perimeter with quadcopter RGB is 45% even in clear air (warning always on)
 
 ## Open questions (copy of `prd.md` §10, tick when answered)
 
-- [ ] First site type for the demo: oil and gas or stadium?
+- [x] First site type for the demo: oil and gas or stadium? **Stadium: S2, a fictional stadium, opens the walkthrough (2026-11-06)**
 - [ ] Dashboard language: English, Arabic or both?
 - [ ] Acceptable detector licence for the client demo?
 - [ ] GPU laptop available for the live demo?

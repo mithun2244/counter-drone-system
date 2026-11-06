@@ -58,9 +58,11 @@ Use real AI models on real recordings, plus a simulator for the parts that need 
 | ID | Scenario | What it proves |
 | --- | --- | --- |
 | S1 | Wave of 3 attack drones toward the processing unit | Early warning from pickets, multi-target tracking, red alerts ranked by time-to-impact |
-| S2 | One quadcopter over a stadium | Small-target detection, zoom confirmation, triangulation |
+| S2 | One quadcopter over a fictional stadium | Small-target detection, zoom confirmation, triangulation |
 | S3 | Flock of birds plus one quadcopter | Birds rejected, only the drone alerted |
 | S4 | S2 during a dust storm | Visibility model lowers coverage and the dashboard warns the operator |
+
+The client walkthrough opens with S2. All scenario sites are fictional. They share one site geometry, zone IDs and zone weights; display labels come from each scenario's metadata (industrial for S1, stadium for S2, S3 and S4).
 
 ## 6. Functional requirements
 
@@ -75,7 +77,7 @@ Use real AI models on real recordings, plus a simulator for the parts that need 
 | FR-7 | The tracker triangulates targets seen by 2 or more stations and keeps one track per target |
 | FR-8 | The classifier fusion outputs P(drone), P(bird), P(attack drone) per track |
 | FR-9 | Threat ranking outputs a score from 0 to 1 and a level per track, sorted highest first |
-| FR-10 | The zoom scheduler assigns at most 2 zoom cameras per station, highest threat first |
+| FR-10 | The zoom scheduler assigns zoom cameras per station, highest threat first (`zoom_per_station`: 0, 1 or 2; default 1) |
 | FR-11 | The dashboard updates live (at least 2 times per second) |
 | FR-12 | Every red or amber alert is stored with a clip, metadata and a hash |
 | FR-13 | One command runs any scenario end to end |
@@ -108,7 +110,7 @@ These are simulator numbers. They do not prove real-world performance.
 
 ## 10. Open questions
 
-- [ ] Which site type should the demo show first: oil and gas (S1) or stadium (S2)?
+- [x] Which site type should the demo show first: oil and gas (S1) or stadium (S2)? **Decided 2026-11-06: stadium. S2, on a fictional stadium, opens the client walkthrough.**
 - [ ] Does the client want the dashboard in Arabic, English or both?
 - [ ] Which detector licence is acceptable for a client demo? (Ultralytics YOLO is AGPL-3.0.)
 - [ ] Is a GPU laptop available for the live demo?
