@@ -1,7 +1,7 @@
 # Fictional scenario. Opens the client walkthrough: one quadcopter over a fictional stadium.
 metadata:
   id: s2
-  title: Quadcopter over the stadium
+  title: Stadium watch
   venue: Fictional Stadium
   zone_labels:
     critical: Pitch and Stands

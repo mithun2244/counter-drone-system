@@ -1,7 +1,7 @@
 # Fictional scenario. A wave of three one-way attack drones heading for the processing unit.
 metadata:
   id: s1
-  title: Attack drone wave
+  title: Processing plant watch
   venue: Fictional Processing Plant
   zone_labels:
     critical: Processing Unit

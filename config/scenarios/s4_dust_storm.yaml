@@ -1,7 +1,7 @@
 # Fictional scenario. S2 during a dust storm: same flight, same seed, reduced sensor range.
 metadata:
   id: s4
-  title: Quadcopter over the stadium in a dust storm
+  title: Stadium watch in a dust storm
   venue: Fictional Stadium
   zone_labels:
     critical: Pitch and Stands

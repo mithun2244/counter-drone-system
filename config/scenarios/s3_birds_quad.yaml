@@ -1,7 +1,7 @@
 # Fictional scenario. A flock of birds plus one quadcopter: only the drone should raise an alert.
 metadata:
   id: s3
-  title: Birds and a quadcopter at the stadium
+  title: Stadium watch, second period
   venue: Fictional Stadium
   zone_labels:
     critical: Pitch and Stands

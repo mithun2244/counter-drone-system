@@ -1,4 +1,5 @@
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -122,6 +123,17 @@ def test_stadium_scenarios_never_mention_industrial_labels(
     text = scenario_file(config_dir, scenario_id).read_text(encoding="utf-8")
     for label in INDUSTRIAL.values():
         assert label not in text
+
+
+@pytest.mark.parametrize("scenario_id", ALL_IDS)
+def test_metadata_does_not_give_away_the_targets(
+    config_dir: Path, scenario_id: str
+) -> None:
+    """Metadata goes to components that must not see truth, so it cannot describe the targets."""
+    metadata = load_scenario(config_dir, scenario_id).metadata
+    assert not re.search(
+        "drone|quad|bird|flock|attack|wave", metadata.model_dump_json(), re.IGNORECASE
+    )
 
 
 @pytest.mark.parametrize("key", ["stations", "pickets", "zones"])
