@@ -28,17 +28,17 @@ Done when:
 **Goal:** fake targets fly over the site and stations produce bearings.
 
 Tasks:
-- [ ] Pydantic schemas for every message in `architecture.md` §4
-- [ ] Bus interface plus an in-process `asyncio.Queue` implementation
-- [ ] Simulated clock (real-time or fast mode)
-- [ ] Scenario loader and trajectory models (attack drone, quadcopter, bird, friendly drone)
-- [ ] Station simulation: field of view, range, detection probability, bearing noise (`design.md` A2)
-- [ ] Picket simulation (`design.md` A2)
-- [ ] Scenario files `s1`–`s4` (`prd.md` §5)
+- [x] Pydantic schemas for every message in `architecture.md` §4
+- [x] Bus interface plus an in-process `asyncio.Queue` implementation
+- [x] Simulated clock (real-time or fast mode)
+- [x] Scenario loader and trajectory models (attack drone, quadcopter, bird, friendly drone)
+- [x] Station simulation: field of view, range, detection probability, bearing noise (`design.md` A2)
+- [x] Picket simulation (`design.md` A2)
+- [x] Scenario files `s1`–`s4` (`prd.md` §5)
 
 Done when:
-- [ ] Unit tests: bearing from a known position equals the expected angles; nothing is detected outside the range
-- [ ] Running S1 in fast mode prints bearings from 3 stations and picket alerts, and is the same every run with the same seed
+- [x] Unit tests: bearing from a known position equals the expected angles; nothing is detected outside the range
+- [x] Running S1 in fast mode prints bearings from 3 stations and picket alerts, and is the same every run with the same seed
 
 ---
 
@@ -88,6 +88,7 @@ Tasks:
 - [ ] Log-odds fusion of look, move and sound
 - [ ] Threat ranking with zones, TTI, approved flights and reasons (`design.md` A8)
 - [ ] Zoom scheduler with dwell and pre-emption (`design.md` A9)
+- [ ] Paired S3 comparison: same seed at `zoom_per_station` 0, 1 and 2, reported by the metrics script
 - [ ] Visibility model and coverage % (`design.md` A10)
 
 Done when:

@@ -79,7 +79,9 @@ cuas-demo/
 │   ├── schemas/              # Pydantic message models (one file per message type)
 │   ├── bus/                  # message bus interface + in-process implementation
 │   ├── clock.py              # single simulated clock
-│   ├── sim/                  # scenario loader, trajectories, station + picket simulation
+│   ├── config.py             # typed site config, truth-free scenario metadata
+│   ├── geometry.py           # bearing calculation, shared by simulator and tracker
+│   ├── sim/                  # scenario loader, trajectories, station + picket simulation, ground truth log
 │   ├── station/              # video detector, audio classifier, bearing builder, recorder
 │   ├── gateway/              # validation, time alignment, rejection log
 │   ├── control/
@@ -90,7 +92,7 @@ cuas-demo/
 │   │   └── scheduler.py      # zoom camera assignment
 │   ├── evidence/             # store, hashing, tamper-evident log, hand-off export
 │   ├── dashboard/            # FastAPI app, WebSocket, static HTML/JS
-│   └── metrics/              # run report
+│   └── metrics/              # run report, evaluator (the only reader of ground truth)
 ├── scripts/
 │   ├── run_demo.py           # python scripts/run_demo.py --scenario s1
 │   └── download_data.py      # fetch public datasets into data/
@@ -121,12 +123,13 @@ Rules:
 - Times are seconds on the single simulated clock (`clock.py`), never wall-clock inside the pipeline.
 - Positions use a local **ENU** frame (east, north, up) in metres, origin at the site centre.
 - Angles: azimuth 0° = north, clockwise; elevation 0° = horizon.
+- Ground truth (true positions, target IDs and target types) never goes on the bus. It stays in `cuas.sim`, and only `cuas.metrics` reads it.
 
 ## 5. Process model
 
 - One Python process, `asyncio`.
 - Each component is an async task that subscribes to topics on the bus and publishes results.
-- The bus interface has `publish(topic, msg)` and `subscribe(topic)`. The in-process version uses `asyncio.Queue`. An MQTT version can be added later without touching components.
+- The bus interface has `publish(topic, msg)`, `subscribe(topic)` and `close()`. `subscribe("#")` receives every message in publish order. The in-process version uses `asyncio.Queue`. An MQTT version can be added later without touching components.
 - The simulator drives the clock. It can run faster than real time for tests, or at real time for the live demo.
 
 ## 6. Tech stack

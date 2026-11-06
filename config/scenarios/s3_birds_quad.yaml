@@ -1,0 +1,37 @@
+# Fictional scenario. A flock of birds plus one quadcopter: only the drone should raise an alert.
+metadata:
+  id: s3
+  title: Stadium watch, second period
+  venue: Fictional Stadium
+  zone_labels:
+    critical: Pitch and Stands
+    important: Stadium Grounds
+    perimeter: Event Perimeter
+
+seed: 3003
+duration_s: 90.0
+environment:
+  visibility_factor: 1.0
+  wind_mps: 2.0
+
+targets:
+  - id: flock-1
+    type: bird
+    seed: 31
+    start_s: 0.0
+    count: 12
+    home_enu_m: [350.0, 250.0, 80.0]
+    spread_m: 60.0
+    altitude_spread_m: 15.0
+    roam_radius_m: 150.0
+    speed_range_mps: [8.0, 16.0]
+    turn_sigma_deg_per_sqrt_s: 25.0
+    turn_back_deg_per_s: 40.0
+  - id: quad-1
+    type: quadcopter
+    seed: 32
+    start_s: 3.0
+    speed_mps: 10.0
+    waypoints:
+      - {position_enu_m: [-500.0, 400.0, 70.0]}
+      - {position_enu_m: [0.0, 50.0, 70.0], hover_s: 15.0}

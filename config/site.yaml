@@ -1,5 +1,13 @@
 # Fictional demo site. All values are start values to tune.
 # Local ENU frame in metres (x = east, y = north, z = up), origin at the site centre.
+# This is the baseline every scenario shares. Display labels live in scenario metadata.
+
+zoom_per_station: 1  # 0, 1 or 2. Not used until the Phase 4 zoom scheduler.
+
+simulation:
+  tick_s: 0.2
+  status_period_s: 1.0
+  wind_range_loss_per_mps: 0.02
 
 stations:  # equilateral triangle, 500 m sides, on 15 m masts
   - {id: st1, position_enu_m: [0.0, 288.7, 15.0]}
@@ -18,14 +26,48 @@ pickets:  # 3 km ring, every 45 degrees clockwise from north, 3 m high
 
 zones:  # nested squares; polygon corners are [x, y]; weights from design.md A8
   - id: critical
-    name: Processing Unit
     weight: 1.0
     polygon_enu_m: [[-100.0, -100.0], [100.0, -100.0], [100.0, 100.0], [-100.0, 100.0]]
   - id: important
-    name: Plant Area
     weight: 0.6
     polygon_enu_m: [[-350.0, -350.0], [350.0, -350.0], [350.0, 350.0], [-350.0, 350.0]]
   - id: perimeter
-    name: Site Perimeter
     weight: 0.3
     polygon_enu_m: [[-1000.0, -1000.0], [1000.0, -1000.0], [1000.0, 1000.0], [-1000.0, 1000.0]]
+
+sensors:  # the same suite on every station; 360-degree views because the docs give no camera layout
+  rgb:
+    p0: 0.95
+    sigma_deg: 0.05
+    boresight_az_deg: 0.0
+    hfov_deg: 360.0
+    min_elevation_deg: 0.5
+    max_elevation_deg: 85.0
+    base_range_m: {attack_drone: 3000.0, quadcopter: 800.0, friendly_drone: 800.0, bird: 800.0}
+  thermal:
+    p0: 0.90
+    sigma_deg: 0.1
+    boresight_az_deg: 0.0
+    hfov_deg: 360.0
+    min_elevation_deg: 0.5
+    max_elevation_deg: 85.0
+    base_range_m: {attack_drone: 3000.0, quadcopter: 600.0, friendly_drone: 600.0, bird: 500.0}
+  acoustic:
+    p0: 0.80
+    sigma_deg: 5.0
+    boresight_az_deg: 0.0
+    hfov_deg: 360.0
+    min_elevation_deg: -90.0
+    max_elevation_deg: 90.0
+    base_range_m: {attack_drone: 1500.0, quadcopter: 300.0, friendly_drone: 300.0, bird: 0.0}
+
+picket_settings:
+  engines:  # birds have no engine, so pickets cannot hear them
+    attack_drone: {type: piston, hearing_radius_m: 1500.0}
+    quadcopter: {type: electric, hearing_radius_m: 300.0}
+    friendly_drone: {type: electric, hearing_radius_m: 300.0}
+  bearing_error_deg: 20.0
+  delay_s: [1.0, 2.0]
+  report_period_s: 2.0
+  engine_guess_accuracy: 0.8
+  loudness_sigma: 0.05
