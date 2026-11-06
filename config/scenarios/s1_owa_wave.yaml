@@ -1,0 +1,44 @@
+# Fictional scenario. A wave of three one-way attack drones heading for the processing unit.
+metadata:
+  id: s1
+  title: Attack drone wave
+  venue: Fictional Processing Plant
+  zone_labels:
+    critical: Processing Unit
+    important: Plant Area
+    perimeter: Site Perimeter
+
+seed: 1001
+duration_s: 120.0
+environment:
+  visibility_factor: 1.0
+  wind_mps: 3.0
+
+targets:  # from 5000 m out at azimuths 115, 135 and 155 degrees, ending at the site centre
+  - id: atk-1
+    type: attack_drone
+    seed: 11
+    start_s: 0.0
+    speed_mps: 50.0
+    jitter: {amplitude_m: 5.0, period_s: 20.0}
+    waypoints:
+      - {position_enu_m: [4531.5, -2113.1, 80.0]}
+      - {position_enu_m: [0.0, 0.0, 80.0]}
+  - id: atk-2
+    type: attack_drone
+    seed: 12
+    start_s: 5.0
+    speed_mps: 50.0
+    jitter: {amplitude_m: 5.0, period_s: 20.0}
+    waypoints:
+      - {position_enu_m: [3535.5, -3535.5, 100.0]}
+      - {position_enu_m: [0.0, 0.0, 100.0]}
+  - id: atk-3
+    type: attack_drone
+    seed: 13
+    start_s: 10.0
+    speed_mps: 50.0
+    jitter: {amplitude_m: 5.0, period_s: 20.0}
+    waypoints:
+      - {position_enu_m: [2113.1, -4531.5, 120.0]}
+      - {position_enu_m: [0.0, 0.0, 120.0]}
