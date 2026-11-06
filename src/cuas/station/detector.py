@@ -45,6 +45,9 @@ def build_model(
         weights_backbone=None,
         num_classes=num_classes or len(settings.classes) + 1,
     )
+    model.score_thresh = settings.min_score
+    model.topk_candidates = settings.max_candidates
+    model.detections_per_img = settings.max_detections
     model.anchor_generator = DefaultBoxGenerator(
         [list(ASPECT_RATIOS) for _ in range(FEATURE_MAPS)],
         scales=list(settings.anchor_scales),

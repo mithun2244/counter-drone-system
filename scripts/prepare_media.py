@@ -18,6 +18,7 @@ import yaml
 from cuas.config import SplitSettings, load_site
 from cuas.hashing import sha256_of
 from cuas.media_manifest import MANIFEST_NAME
+from cuas.metrics.mat_labels import read_label_file
 from cuas.metrics.splits import (
     Clip,
     Group,
@@ -47,6 +48,12 @@ MODALITIES = {"IR": "thermal", "V": "rgb"}
 AUDIO_CLASSES = {"DRONE": "electric_drone", "BACKGROUND": "background"}
 EXCLUDED_AUDIO_REASON = "helicopter audio may come from third-party YouTube videos"
 EXCLUDED_VIDEO_REASON = "third-party internet source, rights unverified"
+EXCLUDED_LABELS_REASON = "label file layout could not be read"
+REQUIRED_CLIPS = tuple(
+    (modality, label)
+    for modality in MODALITIES.values()
+    for label in ("drone", "bird", "airplane", "helicopter")
+) + tuple(("audio", label) for label in AUDIO_CLASSES.values())
 
 
 def read_description(path: Path) -> list[dict[str, str]]:
@@ -93,18 +100,30 @@ def difference_hash(gray: np.ndarray) -> np.ndarray:
     return (grid[:, 1:] > grid[:, :-1]).ravel()
 
 
-def clip_signature(path: Path) -> np.ndarray:
-    """A hash of frames across the clip. One frame mostly captures the camera framing."""
+def inspect_clip(path: Path) -> tuple[np.ndarray, int]:
+    """A hash of frames across the clip, and its length. One frame mostly captures framing."""
     with av.open(str(path)) as container:
         frames = list(container.decode(video=0))
     picks = [frames[int(q * (len(frames) - 1))] for q in SIGNATURE_POSITIONS]
-    return np.concatenate([difference_hash(f.to_ndarray(format="gray")) for f in picks])
+    signature = np.concatenate(
+        [difference_hash(f.to_ndarray(format="gray")) for f in picks]
+    )
+    return signature, len(frames)
+
+
+def labels_readable(path: Path, count: int) -> bool:
+    try:
+        read_label_file(path, count)
+    except ValueError:
+        return False
+    return True
 
 
 def build_video(
     rows: list[dict[str, str]],
     settings: SplitSettings,
     signatures: dict[str, np.ndarray],
+    unreadable: frozenset[str] = frozenset(),
 ) -> tuple[list[dict], list[dict]]:
     """Group by scene within each sensor and class, and split those groups."""
     excluded = []
@@ -114,6 +133,9 @@ def build_video(
         path = video_path(row)
         if "youtube" in row.get(SOURCE_COLUMN, "").lower():
             excluded.append({"path": path, "reason": EXCLUDED_VIDEO_REASON})
+            continue
+        if path in unreadable:
+            excluded.append({"path": path, "reason": EXCLUDED_LABELS_REASON})
             continue
         kept.append(row)
         source = f"{row['DISTANCE BIN']}|{row.get(SOURCE_COLUMN, '')}"
@@ -224,18 +246,29 @@ def summarise(entries: list[dict]) -> dict[tuple[str, str], Counter[str]]:
 def main() -> int:
     settings = load_site(CONFIG_DIR).station_ai.split
     rows = read_description(DATA_DIR / SVANSTROM / "Video_dataset_description.xlsx")
-    signatures = {
-        video_path(row): clip_signature(DATA_DIR / video_path(row))
+    usable = [
+        video_path(row)
         for row in rows
         if "youtube" not in row.get(SOURCE_COLUMN, "").lower()
-    }
-    video, excluded_video = build_video(rows, settings, signatures)
+    ]
+    inspected = {path: inspect_clip(DATA_DIR / path) for path in usable}
+    signatures = {path: found[0] for path, found in inspected.items()}
+    unreadable = frozenset(
+        path
+        for path, found in inspected.items()
+        if not labels_readable(DATA_DIR / path.replace(".mp4", "_LABELS.mat"), found[1])
+    )
+    video, excluded_video = build_video(rows, settings, signatures, unreadable)
     audio, excluded_audio = build_audio(settings)
     entries, copies = drop_exact_copies(video + audio)
     excluded = excluded_video + excluded_audio + copies
     counts = summarise(entries)
     for key, tally in sorted(counts.items()):
         print(f"{key[0]:8} {key[1]:15} {dict(sorted(tally.items()))}")
+    missing = [pair for pair in REQUIRED_CLIPS if pair not in counts]
+    if missing:
+        print("no clips left for:", *missing, sep="\n  ")
+        return 1
     thin = splits_too_thin(counts, "test", settings.min_test_clips)
     if thin:
         print("too few held-out clips:", *thin, sep="\n  ")

@@ -84,6 +84,8 @@ station_ai:  # real models on recorded media; all start values
     input_size: 640
     anchor_scales: [0.03, 0.06, 0.12, 0.24, 0.45, 0.7, 0.95]  # torchvision's default starts at 0.2
     min_score: 0.05
+    max_candidates: 100  # boxes kept per class before overlap removal
+    max_detections: 30
     threads: 4
   look:  # M-of-N confirmation (design.md A3), measured at the look rate
     m: 3
@@ -91,3 +93,16 @@ station_ai:  # real models on recorded media; all start values
     max_step_fraction: 0.15
     max_missed: 4
     period_s: 0.5
+  training:  # sized for a CPU-only laptop with 7.7 GB of RAM
+    seed: 7
+    batch_size: 8
+    learning_rate: 0.0005
+    weight_decay: 0.0001
+    epochs: 20
+    max_minutes: 120
+    freeze_backbone: true
+    train_frames_per_clip: 8
+    val_frames_per_clip: 10
+  evaluation:
+    iou_hit: 0.3
+    iou_strict: 0.5

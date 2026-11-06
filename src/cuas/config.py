@@ -82,6 +82,8 @@ class DetectorSettings(ConfigModel):
     input_size: Annotated[int, Field(gt=0)]
     anchor_scales: tuple[Positive, ...]
     min_score: Probability
+    max_candidates: Annotated[int, Field(ge=1)]
+    max_detections: Annotated[int, Field(ge=1)]
     threads: Annotated[int, Field(ge=1)]
 
 
@@ -94,10 +96,29 @@ class LookSettings(ConfigModel):
     period_s: Positive
 
 
+class TrainingSettings(ConfigModel):
+    seed: Annotated[int, Field(ge=0)]
+    batch_size: Annotated[int, Field(ge=1)]
+    learning_rate: Positive
+    weight_decay: NonNegative
+    epochs: Annotated[int, Field(ge=1)]
+    max_minutes: Positive
+    freeze_backbone: bool
+    train_frames_per_clip: Annotated[int, Field(ge=1)]
+    val_frames_per_clip: Annotated[int, Field(ge=1)]
+
+
+class EvaluationSettings(ConfigModel):
+    iou_hit: Probability
+    iou_strict: Probability
+
+
 class StationAiSettings(ConfigModel):
     split: SplitSettings
     detector: DetectorSettings
     look: LookSettings
+    training: TrainingSettings
+    evaluation: EvaluationSettings
 
 
 class SiteConfig(ConfigModel):

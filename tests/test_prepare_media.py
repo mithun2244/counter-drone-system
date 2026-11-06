@@ -78,3 +78,23 @@ def test_internet_clips_are_excluded_from_splits(module: ModuleType) -> None:
             "reason": module.EXCLUDED_VIDEO_REASON,
         }
     ]
+
+
+def test_every_modality_and_class_is_required(module: ModuleType) -> None:
+    assert ("rgb", "drone") in module.REQUIRED_CLIPS
+    assert ("thermal", "bird") in module.REQUIRED_CLIPS
+    assert ("audio", "background") in module.REQUIRED_CLIPS
+
+
+def test_unreadable_labels_are_excluded_with_a_reason(module: ModuleType) -> None:
+    row = {
+        "SENSOR": "V",
+        "CLASS": "AIRPLANE",
+        "NUMBER": "2",
+        "DISTANCE BIN": "CLOSE",
+    }
+    path = "svanstrom/Data/Video_V/V_AIRPLANE_002.mp4"
+    settings = module.load_site(module.CONFIG_DIR).station_ai.split
+    entries, excluded = module.build_video([row], settings, {}, frozenset({path}))
+    assert entries == []
+    assert excluded == [{"path": path, "reason": module.EXCLUDED_LABELS_REASON}]

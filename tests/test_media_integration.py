@@ -7,6 +7,8 @@ import pytest
 
 from cuas.config import load_site
 from cuas.media_manifest import MANIFEST_NAME, MediaManifest, load_manifest
+from cuas.metrics.mat_labels import read_label_file
+from cuas.recordings import frame_count
 from cuas.station.detector import build_model, load_starting_weights
 
 pytestmark = pytest.mark.media
@@ -46,7 +48,11 @@ def test_no_group_spans_two_splits(manifest: MediaManifest) -> None:
 def test_all_third_party_clips_are_excluded(manifest: MediaManifest) -> None:
     excluded = {entry.path for entry in manifest.excluded}
     assert not excluded & {clip.path for clip in manifest.clips}
-    video = [p for p in excluded if p.endswith(".mp4")]
+    video = [
+        e.path
+        for e in manifest.excluded
+        if "third-party" in e.reason and e.path.endswith(".mp4")
+    ]
     assert len(video) == 49
     assert Counter("HELICOPTER" in p for p in video) == {True: 38, False: 11}
 
@@ -106,3 +112,30 @@ def test_real_starting_weights_load_with_only_the_class_head_skipped() -> None:
     skipped = load_starting_weights(model, COCO_WEIGHTS)
     assert skipped
     assert all(name.startswith("head.classification_head") for name in skipped)
+
+
+def clip_named(manifest: MediaManifest, name: str):
+    return next(c for c in manifest.clips if c.path.endswith(name))
+
+
+def test_labels_line_up_with_frames_and_the_clip_label(manifest: MediaManifest) -> None:
+    for name in ("IR_DRONE_001.mp4", "V_BIRD_001.mp4", "V_HELICOPTER_001.mp4"):
+        clip = clip_named(manifest, name)
+        count = frame_count(DATA_DIR / clip.path)
+        frames = read_label_file(DATA_DIR / clip.labels_path, count)
+        assert len(frames) == count
+        assert any(box.class_name == clip.label for frame in frames for box in frame)
+
+
+def test_two_drone_frames_keep_both_boxes(manifest: MediaManifest) -> None:
+    clip = clip_named(manifest, "IR_DRONE_143.mp4")
+    count = frame_count(DATA_DIR / clip.path)
+    frames = read_label_file(DATA_DIR / clip.labels_path, count)
+    assert max(len(frame) for frame in frames) >= 2
+
+
+def test_every_kept_label_file_is_readable(manifest: MediaManifest) -> None:
+    videos = [c for c in manifest.clips if c.labels_path]
+    assert len(videos) == 600
+    excluded = {e.path: e.reason for e in manifest.excluded}
+    assert "label" in excluded["svanstrom/Data/Video_V/V_AIRPLANE_002.mp4"]

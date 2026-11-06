@@ -17,6 +17,8 @@ This records published terms and is not legal advice. Have counsel review before
   - 49 visible clips (38 helicopter, 11 airplane) that the description spreadsheet attributes to https://www.youtube.com/user/SK678387.
   - All 30 helicopter audio clips, because the article does not say whether they came from those videos.
 - **Excluded, duplicate:** `BACKGROUND_019.wav` is a byte-for-byte copy of `BACKGROUND_010.wav`.
+- **Excluded, unreadable labels:** `V_AIRPLANE_002`, whose label file does not follow the layout of the other 649.
+- **Labels:** read by `cuas.metrics.mat_labels`. The third-party `mcos-decoder` package was not used: it treats a two-box cell as an empty frame, which would misreport the 12 two-drone clips.
 - **Requested citations:**
   - Svanström F. (2020), *Drone Detection and Classification using Machine Learning and Sensor Fusion*, thesis.
   - Svanström F., Englund C., Alonso-Fernandez F. (2020), *Real-Time Drone Detection and Tracking With Visible, Thermal and Acoustic Sensors*, ICPR.
