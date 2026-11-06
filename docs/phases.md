@@ -10,16 +10,16 @@
 **Goal:** an empty but working project skeleton.
 
 Tasks:
-- [ ] Create the folder layout from `architecture.md` §3
-- [ ] `pyproject.toml` with `uv`, Python 3.11, `ruff`, `pytest`, `pytest-asyncio`, `pydantic`, `numpy`, `pyyaml`
-- [ ] `.gitignore` for `data/`, `models/`, `runs/`, `.venv/`
-- [ ] `config/site.yaml` with 3 stations (about 500 m apart), 8 pickets on a 3 km ring, 3 zones (critical, important, perimeter)
-- [ ] `scripts/run_demo.py` that prints "hello" and loads `site.yaml`
+- [x] Create the folder layout from `architecture.md` §3
+- [x] `pyproject.toml` with `uv`, Python 3.11, `ruff`, `pytest`, `pytest-asyncio`, `pydantic`, `numpy`, `pyyaml`
+- [x] `.gitignore` for `data/`, `models/`, `runs/`, `.venv/`
+- [x] `config/site.yaml` with 3 stations (about 500 m apart), 8 pickets on a 3 km ring, 3 zones (critical, important, perimeter)
+- [x] `scripts/run_demo.py` that prints "hello" and loads `site.yaml`
 
 Done when:
-- [ ] `uv run pytest` passes (one smoke test)
-- [ ] `uv run ruff check .` is clean
-- [ ] `uv run python scripts/run_demo.py` loads the site config
+- [x] `uv run pytest` passes (one smoke test)
+- [x] `uv run ruff check .` is clean
+- [x] `uv run python scripts/run_demo.py` loads the site config
 
 ---
 

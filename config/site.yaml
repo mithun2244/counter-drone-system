@@ -1,0 +1,31 @@
+# Fictional demo site. All values are start values to tune.
+# Local ENU frame in metres (x = east, y = north, z = up), origin at the site centre.
+
+stations:  # equilateral triangle, 500 m sides, on 15 m masts
+  - {id: st1, position_enu_m: [0.0, 288.7, 15.0]}
+  - {id: st2, position_enu_m: [250.0, -144.3, 15.0]}
+  - {id: st3, position_enu_m: [-250.0, -144.3, 15.0]}
+
+pickets:  # 3 km ring, every 45 degrees clockwise from north, 3 m high
+  - {id: pk1, position_enu_m: [0.0, 3000.0, 3.0]}
+  - {id: pk2, position_enu_m: [2121.3, 2121.3, 3.0]}
+  - {id: pk3, position_enu_m: [3000.0, 0.0, 3.0]}
+  - {id: pk4, position_enu_m: [2121.3, -2121.3, 3.0]}
+  - {id: pk5, position_enu_m: [0.0, -3000.0, 3.0]}
+  - {id: pk6, position_enu_m: [-2121.3, -2121.3, 3.0]}
+  - {id: pk7, position_enu_m: [-3000.0, 0.0, 3.0]}
+  - {id: pk8, position_enu_m: [-2121.3, 2121.3, 3.0]}
+
+zones:  # nested squares; polygon corners are [x, y]; weights from design.md A8
+  - id: critical
+    name: Processing Unit
+    weight: 1.0
+    polygon_enu_m: [[-100.0, -100.0], [100.0, -100.0], [100.0, 100.0], [-100.0, 100.0]]
+  - id: important
+    name: Plant Area
+    weight: 0.6
+    polygon_enu_m: [[-350.0, -350.0], [350.0, -350.0], [350.0, 350.0], [-350.0, 350.0]]
+  - id: perimeter
+    name: Site Perimeter
+    weight: 0.3
+    polygon_enu_m: [[-1000.0, -1000.0], [1000.0, -1000.0], [1000.0, 1000.0], [-1000.0, 1000.0]]
