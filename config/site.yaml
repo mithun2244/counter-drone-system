@@ -79,3 +79,15 @@ station_ai:  # real models on recorded media; all start values
     min_test_clips: 3
     audio_block_clips: 5
     scene_max_hamming: 32  # of 256 signature bits; at most this far apart counts as one scene
+  detector:
+    classes: [drone, bird, airplane, helicopter]
+    input_size: 640
+    anchor_scales: [0.03, 0.06, 0.12, 0.24, 0.45, 0.7, 0.95]  # torchvision's default starts at 0.2
+    min_score: 0.05
+    threads: 4
+  look:  # M-of-N confirmation (design.md A3), measured at the look rate
+    m: 3
+    n: 5
+    max_step_fraction: 0.15
+    max_missed: 4
+    period_s: 0.5

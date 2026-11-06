@@ -77,8 +77,27 @@ class SplitSettings(ConfigModel):
     scene_max_hamming: Annotated[int, Field(ge=0)]
 
 
+class DetectorSettings(ConfigModel):
+    classes: tuple[str, ...]
+    input_size: Annotated[int, Field(gt=0)]
+    anchor_scales: tuple[Positive, ...]
+    min_score: Probability
+    threads: Annotated[int, Field(ge=1)]
+
+
+class LookSettings(ConfigModel):
+    m: Annotated[int, Field(ge=1)]
+    n: Annotated[int, Field(ge=1)]
+    max_step_fraction: Positive
+    """How far a target may move between looks, as a share of the frame width."""
+    max_missed: Annotated[int, Field(ge=0)]
+    period_s: Positive
+
+
 class StationAiSettings(ConfigModel):
     split: SplitSettings
+    detector: DetectorSettings
+    look: LookSettings
 
 
 class SiteConfig(ConfigModel):

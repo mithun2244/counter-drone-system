@@ -7,12 +7,16 @@ import pytest
 
 from cuas.config import load_site
 from cuas.media_manifest import MANIFEST_NAME, MediaManifest, load_manifest
+from cuas.station.detector import build_model, load_starting_weights
 
 pytestmark = pytest.mark.media
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR = ROOT / "config"
 DATA_DIR = ROOT / "data"
+COCO_WEIGHTS = (
+    ROOT / "models" / "pretrained" / "ssdlite320_mobilenet_v3_large_coco-a79551df.pth"
+)
 
 
 @pytest.fixture(scope="module")
@@ -93,3 +97,12 @@ def test_opaque_ids_reveal_no_label(manifest: MediaManifest) -> None:
         assert len(clip.id) == 16
         assert clip.sha256.startswith(clip.id)
         assert clip.label.lower() not in clip.id
+
+
+def test_real_starting_weights_load_with_only_the_class_head_skipped() -> None:
+    if not COCO_WEIGHTS.exists():
+        pytest.skip("starting weights not downloaded")
+    model = build_model(load_site(CONFIG_DIR).station_ai.detector)
+    skipped = load_starting_weights(model, COCO_WEIGHTS)
+    assert skipped
+    assert all(name.startswith("head.classification_head") for name in skipped)
