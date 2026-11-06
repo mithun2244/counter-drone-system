@@ -141,7 +141,7 @@ def train(
             loss.backward()
             optimizer.step()
             batches += 1
-            losses.append(float(loss))
+            losses.append(loss.item())
             if batches % LOG_EVERY_BATCHES == 0:
                 recent = float(np.mean(losses[-LOG_EVERY_BATCHES:]))
                 minutes = (time.perf_counter() - started) / 60
