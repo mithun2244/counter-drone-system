@@ -1,0 +1,164 @@
+# Architecture — C-UAS Detection Demo
+
+> **How the demo is built**: components, data flow, folders, messages and tech stack.
+> Algorithms and the UI are explained in `design.md`.
+
+## 1. Big picture
+
+The demo copies the real system's architecture. The only difference is that some parts are **simulated** instead of real hardware.
+
+```mermaid
+flowchart TB
+  subgraph Sensors
+    SIM[Scenario simulator<br/>flight paths, stations, pickets]
+    VID[Recorded video clips<br/>RGB + thermal]
+    AUD[Recorded audio clips]
+  end
+  subgraph Station["Station node (x3, one per station)"]
+    DET[Video detector + tracker]
+    ACL[Audio classifier]
+    BRG[Bearing builder]
+    REC[Local recorder + hash]
+  end
+  PK[Picket node<br/>early warning]
+  GW[Ingest gateway<br/>validate + one clock]
+  subgraph Control["Shared control"]
+    VIS[Visibility model]
+    TRK[Shared tracker<br/>triangulation + EKF]
+    CLS[Classifier fusion]
+    THR[Threat ranking]
+    ZS[Zoom scheduler]
+  end
+  subgraph Outputs
+    DASH[Dashboard]
+    EVD[Evidence store]
+    HO[Mock hand-off JSON]
+  end
+  SIM --> BRG
+  SIM --> PK
+  VID --> DET --> BRG
+  AUD --> ACL --> BRG
+  BRG --> GW
+  PK --> GW
+  REC --> EVD
+  GW --> VIS --> TRK
+  GW --> TRK --> CLS --> THR --> ZS
+  ZS -. cue .-> Station
+  THR --> DASH
+  THR --> EVD
+  THR --> HO
+```
+
+## 2. Real vs simulated
+
+| Part | In the demo | In the real system later |
+| --- | --- | --- |
+| Flight paths | Simulator (YAML scenarios) | Real drones |
+| Station geometry and bearings | Simulator computes bearing + noise | Real cameras and microphone arrays |
+| Video detection | **Real model** on recorded clips | Same model on live camera streams |
+| Audio classification | **Real model** on recorded clips | Same model on live microphones |
+| Acoustic direction (DOA) | Simulator computes bearing + noise | GCC-PHAT on real microphone array |
+| Pickets | Simulator triggers by distance | Real picket units |
+| Zoom camera | Crop from high-resolution clip | Real PTZ camera |
+| Time sync | One simulated clock | PTP hardware |
+| Message bus | In-process async queues | Network bus (MQTT or SAPIENT) |
+| Hand-off | JSON file export | Link to MOI / PSS / MoD operations room |
+
+**Key rule:** every simulated part sits behind an interface. Real hardware later replaces the implementation, not the interface.
+
+## 3. Folder layout
+
+```
+cuas-demo/
+├── CLAUDE.md                 # loaded by Claude Code every session
+├── docs/                     # prd, architecture, design, rules, phases, memory
+├── config/
+│   ├── site.yaml             # stations, pickets, zones, camera specs
+│   └── scenarios/            # s1_owa_wave.yaml, s2_stadium_quad.yaml, ...
+├── src/cuas/
+│   ├── schemas/              # Pydantic message models (one file per message type)
+│   ├── bus/                  # message bus interface + in-process implementation
+│   ├── clock.py              # single simulated clock
+│   ├── sim/                  # scenario loader, trajectories, station + picket simulation
+│   ├── station/              # video detector, audio classifier, bearing builder, recorder
+│   ├── gateway/              # validation, time alignment, rejection log
+│   ├── control/
+│   │   ├── visibility.py
+│   │   ├── tracker.py        # triangulation, EKF, association
+│   │   ├── classify.py       # fusion of look + movement + sound
+│   │   ├── threat.py         # zones, time-to-impact, score, level
+│   │   └── scheduler.py      # zoom camera assignment
+│   ├── evidence/             # store, hashing, tamper-evident log, hand-off export
+│   ├── dashboard/            # FastAPI app, WebSocket, static HTML/JS
+│   └── metrics/              # run report
+├── scripts/
+│   ├── run_demo.py           # python scripts/run_demo.py --scenario s1
+│   └── download_data.py      # fetch public datasets into data/
+├── tests/                    # pytest, mirrors src/ layout
+├── data/                     # datasets (gitignored)
+├── models/                   # trained weights (gitignored)
+└── runs/                     # outputs per run: evidence, logs, metrics (gitignored)
+```
+
+## 4. Messages
+
+All parts talk only through typed messages on the bus. This mirrors the real system's ingest gateway and keeps parts independent. Field names are inspired by the SAPIENT (BSI Flex 335) style: detections and tracks, not raw video.
+
+| Message | From → To | Key fields |
+| --- | --- | --- |
+| `SensorStatus` | station, picket → gateway | sensor_id, ok, visibility_factor, t |
+| `BearingDetection` | station → gateway | station_id, sensor (rgb, thermal, acoustic), t, azimuth_deg, elevation_deg, sigma_deg, class_probs, snapshot_ref |
+| `PicketAlert` | picket → gateway | picket_id, t, bearing_deg (coarse), loudness, engine_type_probs |
+| `Track` | tracker → classify, threat, dashboard | track_id, t, position_enu_m, velocity_mps, covariance, n_stations, status (tentative, confirmed, lost) |
+| `TrackClass` | classify → threat | track_id, p_drone, p_bird, p_attack_drone, evidence (look, move, sound) |
+| `ThreatAssessment` | threat → scheduler, dashboard, evidence | track_id, score, level, zone, time_to_impact_s, reasons |
+| `ZoomTask` | scheduler → station | station_id, camera_id, track_id, azimuth_deg, elevation_deg |
+| `EvidenceRecord` | evidence → dashboard | alert_id, track_id, clip_path, sha256, prev_hash |
+| `RejectedMessage` | gateway → log | reason, raw |
+
+Rules:
+
+- Times are seconds on the single simulated clock (`clock.py`), never wall-clock inside the pipeline.
+- Positions use a local **ENU** frame (east, north, up) in metres, origin at the site centre.
+- Angles: azimuth 0° = north, clockwise; elevation 0° = horizon.
+
+## 5. Process model
+
+- One Python process, `asyncio`.
+- Each component is an async task that subscribes to topics on the bus and publishes results.
+- The bus interface has `publish(topic, msg)` and `subscribe(topic)`. The in-process version uses `asyncio.Queue`. An MQTT version can be added later without touching components.
+- The simulator drives the clock. It can run faster than real time for tests, or at real time for the live demo.
+
+## 6. Tech stack
+
+| Need | Choice | Why |
+| --- | --- | --- |
+| Language | Python 3.11+ | ML ecosystem; team skill |
+| Env and deps | `uv` (or pip + venv) | Fast, reproducible lock file |
+| Messages | Pydantic v2 | Typed, validated messages |
+| Video detection | Ultralytics YOLO11n (demo) | Fast to start. **AGPL-3.0**: needs a licence or a swap before client delivery |
+| Video tracking | ByteTrack (via `supervision`) | Simple, MIT licence |
+| Audio | `librosa` mel-spectrogram + small PyTorch CNN | Light and trainable on a laptop |
+| Tracking maths | `numpy`, `filterpy` (EKF) | Standard, small |
+| Config | YAML + Pydantic settings | One place for site and scenario values |
+| Dashboard | FastAPI + WebSocket + plain HTML/JS canvas | Real-time, no heavy frontend build |
+| Evidence | SQLite + files + SHA-256 hash chain | Simple, tamper-evident |
+| Tests | `pytest`, `pytest-asyncio` | Standard |
+| Lint/format | `ruff` | One fast tool |
+
+## 7. Data
+
+- Public video: an RGB + thermal anti-drone dataset (for example Anti-UAV). Check the licence first.
+- Public audio: a drone audio dataset plus background and bird sounds. Check the licence first.
+- Bird videos for the false-alarm scenario (S3).
+- All data lives in `data/` (gitignored), fetched by `scripts/download_data.py`.
+- No client or Saudi site footage is used in the demo.
+
+## 8. Path from demo to real system
+
+1. Replace `sim/station` bearings with real camera and microphone nodes publishing the same `BearingDetection` messages.
+2. Replace the in-process bus with a network bus.
+3. Replace the simulated clock with PTP-synced timestamps.
+4. Add real hand-off, NCA security controls and Camera Law-compliant evidence storage.
+
+No changes are needed in `control/` if the messages stay the same.
