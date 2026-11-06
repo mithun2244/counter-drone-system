@@ -1,3 +1,5 @@
+import pytest
+
 from cuas.metrics.evaluator import summarize
 from cuas.sim.truth import BearingTruth, PicketTruth, TargetState, TruthLog
 
@@ -64,3 +66,16 @@ def test_summaries_are_per_target_in_id_order() -> None:
 
 def test_an_empty_log_gives_no_summaries() -> None:
     assert summarize(TruthLog()) == []
+
+
+@pytest.mark.parametrize("seed", [1001, 7])
+async def test_s1_warning_meets_the_prd_target_for_every_drone(
+    record, seed: int
+) -> None:
+    """A simulator result, measured by the evaluator: prd.md section 8 asks for at least 45 s."""
+    _, truth = await record("s1", seed=seed)
+    summaries = summarize(truth)
+    assert [s.target_id for s in summaries] == ["atk-1", "atk-2", "atk-3"]
+    for summary in summaries:
+        assert summary.warning_s is not None
+        assert summary.warning_s >= 45.0
