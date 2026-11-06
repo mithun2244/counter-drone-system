@@ -4,7 +4,6 @@ Downloads are pinned and hashed. ``--verify`` re-checks everything already on di
 """
 
 import argparse
-import hashlib
 import io
 import shutil
 import sys
@@ -13,6 +12,8 @@ import zipfile
 from pathlib import Path
 
 import yaml
+
+from cuas.hashing import sha256_of
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
@@ -31,16 +32,6 @@ SVANSTROM_KEEP = ("Data/", "LICENSE", "README.md")
 SSDLITE_NAME = "ssdlite320_mobilenet_v3_large_coco-a79551df.pth"
 SSDLITE_URL = f"https://download.pytorch.org/models/{SSDLITE_NAME}"
 SSDLITE_SHA256_PREFIX = "a79551df"
-
-CHUNK_BYTES = 1 << 20
-
-
-def sha256_of(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as file:
-        while chunk := file.read(CHUNK_BYTES):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def safe_extract(archive: zipfile.ZipFile, keep: tuple[str, ...], dest: Path) -> int:

@@ -69,6 +69,18 @@ class PicketSettings(ConfigModel):
     loudness_sigma: NonNegative
 
 
+class SplitSettings(ConfigModel):
+    fractions: dict[str, Probability]
+    salt: str
+    min_test_clips: Annotated[int, Field(ge=1)]
+    audio_block_clips: Annotated[int, Field(ge=1)]
+    scene_max_hamming: Annotated[int, Field(ge=0)]
+
+
+class StationAiSettings(ConfigModel):
+    split: SplitSettings
+
+
 class SiteConfig(ConfigModel):
     """The baseline every scenario shares."""
 
@@ -79,6 +91,7 @@ class SiteConfig(ConfigModel):
     zones: tuple[Zone, ...]
     sensors: dict[SensorKind, SensorSettings]
     picket_settings: PicketSettings
+    station_ai: StationAiSettings
 
 
 class ZoneLabels(ConfigModel):

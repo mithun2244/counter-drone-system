@@ -33,7 +33,7 @@
 | 2026-11-06 | Phase 2 detector is SSDLite320 (BSD-3-Clause), not YOLO11n; YOLOX-Nano is the fallback | The vendor says AGPL-3.0 covers fine-tuned models and internal use, and retraining later costs more than choosing now |
 | 2026-11-06 | Own ByteTrack-style tracker and numpy mel, not `supervision` or `librosa` | `supervision` 0.31.5 dropped ByteTrack, and current `librosa` needs Python 3.12 |
 | 2026-11-06 | Recordings: Svanström dataset, excluding its 49 YouTube clips and helicopter audio; FSD50K CC0 `Engine` clips as a proxy | Their rights are unverified; the Drone Audio Dataset bars defence and surveillance use (`data/README.md`) |
-| 2026-11-06 | Split by group: contiguous clip numbers sharing sensor, class, bin and drone type | The dataset has no session IDs, so this is a stand-in that cannot prove two groups are separate flights |
+| 2026-11-06 | Split by scene group: neighbouring clip numbers sharing bin and drone type, joined with clips whose signatures are within 32 of 256 bits | The dataset has no session IDs, and neighbouring numbers alone left 15 of 38 RGB test clips with a near-identical training clip. Still a stand-in that cannot prove two groups are separate flights |
 | 2026-11-06 | Clips are matched to simulated range; M-of-N does not drop bearings | Mixing all bins would overstate results; keeping geometry leaves Phase 1 bearings identical |
 | 2026-11-06 | Use Superpowers (official marketplace version) for focused debugging, testing and code review when useful; skip its brainstorming and writing-plans; ask before separate worktrees or subagents (rules in `CLAUDE.md`) | `docs/phases.md`, `docs/rules.md` and approval in Plan Mode stay the one project workflow |
 

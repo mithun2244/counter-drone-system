@@ -71,3 +71,11 @@ picket_settings:
   report_period_s: 2.0
   engine_guess_accuracy: 0.8
   loudness_sigma: 0.05
+
+station_ai:  # real models on recorded media; all start values
+  split:
+    fractions: {train: 0.7, test: 0.15, val: 0.15}  # ties go to the earlier split
+    salt: cuas-split-v1
+    min_test_clips: 3
+    audio_block_clips: 5
+    scene_max_hamming: 32  # of 256 signature bits; at most this far apart counts as one scene
