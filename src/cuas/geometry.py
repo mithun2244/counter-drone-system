@@ -8,12 +8,17 @@ from collections.abc import Sequence
 
 FULL_CIRCLE_DEG = 360.0
 HALF_CIRCLE_DEG = 180.0
+RIGHT_ANGLE_DEG = 90.0
 
 
 def wrap_azimuth(azimuth_deg: float) -> float:
     """Wrap to [0, 360). A tiny negative input rounds to exactly 360 under ``%``, so fold that."""
     wrapped = azimuth_deg % FULL_CIRCLE_DEG
     return 0.0 if wrapped == FULL_CIRCLE_DEG else wrapped
+
+
+def clamp_elevation(elevation_deg: float) -> float:
+    return max(-RIGHT_ANGLE_DEG, min(RIGHT_ANGLE_DEG, elevation_deg))
 
 
 def angle_difference_deg(a_deg: float, b_deg: float) -> float:
