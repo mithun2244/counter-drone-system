@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+# Dataset contents stay out of git; data/README.md records name, URL and licence (rules.md §5).
+data/*
+!data/README.md
+models/
+runs/
