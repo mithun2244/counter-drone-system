@@ -1,9 +1,9 @@
 """Demo entry point. With no arguments, load the site config and report what it holds.
 
-With ``--scenario``, run that scenario and print what the sensors report. The output depends only
-on the scenario, seed and config, so two runs with the same inputs are byte-identical, in fast mode
-or real time. Ground truth reaches only the evaluator; its ``[evaluator]`` lines are the only
-output that names targets.
+With ``--scenario``, run that scenario and print what the sensors report, then what the gateway
+and the shared tracker made of it. The output depends only on the scenario, seed and config, so
+two runs with the same inputs are byte-identical, in fast mode or real time. Ground truth reaches
+only the evaluator; its ``[evaluator]`` lines are the only output that names targets.
 """
 
 import argparse
@@ -17,7 +17,9 @@ from cuas.bus import WILDCARD, InProcessBus
 from cuas.clock import SimClock
 from cuas.config import SiteConfig, load_site
 from cuas.metrics.evaluator import TargetSummary, summarize
-from cuas.schemas import BearingDetection, Message, PicketAlert
+from cuas.pipeline import start_pipeline
+from cuas.schemas import BearingDetection, Message, PicketAlert, SectorTrack, Track
+from cuas.schemas.topics import GATEWAY_REJECTED
 from cuas.sim.engine import run_scenario
 from cuas.sim.scenario import Scenario, available_scenarios, load_scenario
 from cuas.sim.station import LookSource
@@ -112,6 +114,54 @@ async def print_observations(subscription: AsyncIterator[Message]) -> None:
     print(f"digest: sha256:{digest.hexdigest()}")
 
 
+async def collect(subscription: AsyncIterator[Message]) -> list[Message]:
+    return [message async for message in subscription]
+
+
+def describe_control(message: Message, shown: dict[str, str]) -> str | None:
+    """A line when a track or sector starts or changes status, so the output stays short."""
+    if isinstance(message, Track):
+        if shown.get(message.track_id) == message.status:
+            return None
+        shown[message.track_id] = message.status
+        x, y, z = message.position_enu_m
+        return (
+            f"t={message.t:.3f} track {message.track_id} {message.status} "
+            f"pos=({x:.1f},{y:.1f},{z:.1f}) stations={message.n_stations}"
+        )
+    if isinstance(message, SectorTrack):
+        if shown.get(message.sector_id) == message.status:
+            return None
+        shown[message.sector_id] = message.status
+        return (
+            f"t={message.t:.3f} sector {message.sector_id} {message.sensor_id} "
+            f"{message.status} bearing={message.bearing_deg:.1f} "
+            f"half_width={message.half_width_deg:.1f}"
+        )
+    return None
+
+
+def print_control(messages: list[Message], rejected: list[Message]) -> None:
+    """Printed after the run, so fast and real-time runs print the same lines in the same order."""
+    digest = hashlib.sha256()
+    shown: dict[str, str] = {}
+    for message in messages:
+        digest.update(
+            f"{type(message).__name__} {message.model_dump_json()}\n".encode()
+        )
+        if line := describe_control(message, shown):
+            print(line)
+    tracks = [m for m in messages if isinstance(m, Track)]
+    confirmed = {t.track_id for t in tracks if t.status == "confirmed"}
+    sectors = {m.sector_id for m in messages if isinstance(m, SectorTrack)}
+    print(
+        f"control: {len({t.track_id for t in tracks})} tracks started, "
+        f"{len(confirmed)} confirmed, {len(sectors)} sectors, "
+        f"{len(rejected)} messages rejected"
+    )
+    print(f"control digest: sha256:{digest.hexdigest()}")
+
+
 def print_header(scenario: Scenario, site: SiteConfig, seed: int) -> None:
     labels = scenario.metadata.zone_labels
     print(f"scenario {scenario.metadata.id}: {scenario.metadata.title}")
@@ -160,13 +210,22 @@ async def run(args: argparse.Namespace, site: SiteConfig) -> None:
     scenario = load_scenario(CONFIG_DIR, args.scenario)
     seed = scenario.seed if args.seed is None else args.seed
     print_header(scenario, site, seed)
-    bus = InProcessBus()
+    sensor_bus, ingest_bus, control_bus = InProcessBus(), InProcessBus(), InProcessBus()
     clock = SimClock(site.simulation.tick_s, pace=None if args.fast else REAL_TIME_PACE)
-    printer = asyncio.create_task(print_observations(bus.subscribe(WILDCARD)))
+    printer = asyncio.create_task(print_observations(sensor_bus.subscribe(WILDCARD)))
+    outputs = asyncio.create_task(collect(control_bus.subscribe(WILDCARD)))
+    rejected = asyncio.create_task(collect(ingest_bus.subscribe(GATEWAY_REJECTED)))
+    pipeline = start_pipeline(
+        sensor_bus, ingest_bus, control_bus, site, lambda: clock.now
+    )
     media = build_media(args, site, scenario.environment.wind_mps, seed)
-    truth = await run_scenario(scenario, site, bus, clock, seed=seed, media=media)
-    await bus.close()
+    truth = await run_scenario(
+        scenario, site, sensor_bus, clock, seed=seed, media=media
+    )
+    await sensor_bus.close()
     await printer
+    await pipeline
+    print_control(await outputs, await rejected)
     print_evaluation(summarize(truth))
 
 
