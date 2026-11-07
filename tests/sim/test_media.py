@@ -4,15 +4,27 @@ The fake deliberately gets things wrong: if ``class_probs`` followed the label r
 model, these tests would notice.
 """
 
+import json
+import re
+from pathlib import Path
+
 import numpy as np
 import pytest
+import torch
 
 from cuas.config import SiteConfig
 from cuas.media_manifest import ClipEntry
 from cuas.schemas import BearingDetection, PicketAlert
-from cuas.sim.media import LookModel, MediaLink, distance_bin, recording_saver
+from cuas.sim.media import (
+    LookModel,
+    MediaLink,
+    distance_bin,
+    load_look_models,
+    recording_saver,
+)
+from cuas.sim.sound_link import SoundLink
 from cuas.sim.station import Look
-from cuas.station.detector import Box
+from cuas.station.detector import Box, build_model
 from cuas.station.look import CachedDetector
 from cuas.station.recorder import verify_recordings
 
@@ -345,3 +357,112 @@ def test_recording_saver_keeps_each_clip_once_per_owner_with_an_opaque_name(
     assert (tmp_path / "run" / "station_st2" / f"{OPAQUE}.mp4").exists()
     assert verify_recordings(tmp_path / "run") == []
     assert "DRONE" not in saved.name
+
+
+# Real SSD weights with their last layers set by hand, so loading, inference, the tracker and M-of-N
+# all run as they do in a demo, with a known answer and no download.
+LAST_HEAD_LAYER = re.compile(r"head\.\w+_head\.module_list\.\d+\.1\.(weight|bias)")
+CERTAIN_LOGIT = 10.0
+CONFIDENT = 0.9
+RGB_THRESHOLD = 0.15
+THERMAL_THRESHOLD = 0.2
+RGB_CLIP = "aaaaaaaaaaaaaaaa"
+THERMAL_CLIP = "bbbbbbbbbbbbbbbb"
+SOUND_CLIP = "cccccccccccccccc"
+NOISE_CLIP = "dddddddddddddddd"
+HEARD_DRONE = 0.8
+
+
+def save_model_saying(
+    class_name: str, sensor: str, threshold: float, settings, folder: Path
+) -> None:
+    """A checkpoint that reports one class on every anchor, whatever the pixels show."""
+    state = build_model(settings).state_dict()
+    columns = len(settings.classes) + 1  # label 0 is background
+    target = settings.classes.index(class_name) + 1
+    for name, value in state.items():
+        if LAST_HEAD_LAYER.fullmatch(name):
+            value.zero_()
+            if "classification" in name and name.endswith("bias"):
+                value[target::columns] = CERTAIN_LOGIT
+    torch.save(state, folder / f"look_{sensor}.pt")
+    (folder / f"look_{sensor}.json").write_text(
+        json.dumps({"high_score": threshold}), encoding="utf-8"
+    )
+
+
+def saved_camera_models(
+    site: SiteConfig, folder: Path, rgb: str, thermal: str
+) -> dict[str, LookModel]:
+    settings = site.station_ai.detector
+    save_model_saying(rgb, "rgb", RGB_THRESHOLD, settings, folder)
+    save_model_saying(thermal, "thermal", THERMAL_THRESHOLD, settings, folder)
+    return load_look_models(folder, settings)
+
+
+def s2_media(
+    site: SiteConfig, models: dict[str, LookModel], sound: SoundLink | None = None
+) -> MediaLink:
+    clips = [entry(RGB_CLIP, "rgb"), entry(THERMAL_CLIP, "thermal")]
+    return MediaLink(clips, frames_for, models, site.station_ai.look, TICK, 7, sound)
+
+
+def sound_that_hears_a_drone(site: SiteConfig) -> SoundLink:
+    settings = site.station_ai.sound
+    clips = [
+        entry(SOUND_CLIP, "audio", "electric_drone"),
+        entry(NOISE_CLIP, "audio", "background"),
+    ]
+    return SoundLink(
+        clips,
+        lambda clip: np.random.default_rng(1).normal(0.0, 0.2, settings.window_samples),
+        lambda window: {
+            "electric_drone": HEARD_DRONE,
+            "engine": 0.1,
+            "background": 0.1,
+        },
+        settings,
+        round(site.station_ai.look.period_s / TICK),
+        0.0,
+        1,
+    )
+
+
+async def test_s2_carries_a_controlled_positive_from_every_sensor(
+    record, site, tmp_path: Path
+) -> None:
+    """Models built to say drone must reach the bus as non-zero, so all-zero output fails."""
+    models = saved_camera_models(site, tmp_path, rgb="drone", thermal="drone")
+    media = s2_media(site, models, sound_that_hears_a_drone(site))
+    messages, _ = await record("s2", seed=7, media=media)
+    bearings = [m for m in messages if isinstance(m, BearingDetection)]
+    expected = {
+        "rgb": ("drone", CONFIDENT),
+        "thermal": ("drone", CONFIDENT),
+        "acoustic": ("electric_drone", HEARD_DRONE),
+    }
+    for sensor, (class_name, least) in expected.items():
+        scores = [b.class_probs[class_name] for b in bearings if b.sensor == sensor]
+        assert scores, sensor
+        assert max(scores) >= least, sensor
+
+
+async def test_s2_thermal_bearings_come_from_the_thermal_model(
+    record, site, tmp_path: Path
+) -> None:
+    """Each camera's weights say a different class, so a swapped model shows in the output."""
+    models = saved_camera_models(site, tmp_path, rgb="bird", thermal="drone")
+    assert models["thermal"].high_score == THERMAL_THRESHOLD
+    assert models["rgb"].high_score == RGB_THRESHOLD
+    messages, _ = await record("s2", seed=7, media=s2_media(site, models))
+    bearings = [m for m in messages if isinstance(m, BearingDetection)]
+    expected = {
+        "thermal": ("drone", "bird", THERMAL_CLIP),
+        "rgb": ("bird", "drone", RGB_CLIP),
+    }
+    for sensor, (own, other, clip_id) in expected.items():
+        chosen = [b for b in bearings if b.sensor == sensor]
+        assert chosen, sensor
+        assert max(b.class_probs[own] for b in chosen) >= CONFIDENT, sensor
+        assert max(b.class_probs[other] for b in chosen) == 0.0, sensor
+        assert {b.snapshot_ref.split(":")[0] for b in chosen} == {clip_id}
