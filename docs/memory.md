@@ -5,10 +5,10 @@
 
 ## Current status
 
-- **Current phase:** Phase 2 — Station AI, in progress on `phase-2-station-ai`, not merged
+- **Current phase:** Phase 2 — Station AI, on `phase-2-station-ai`, not merged. All three models are trained and have test reports
 - **Last session:** 2026-11-07
-- **Blocked on:** the thermal detector is not trained. Claude Code's low-memory reaper killed the run at epoch 16 (82 min); it restarts only when the user asks
-- **Next step:** the user benchmarks a Colab T4 with `docs/colab_gpu.md`, then decides where to train thermal (locally: `uv run python scripts/train_detector.py --modality thermal`, about 105 min, laptop awake and other programs closed). Then run `uv run python scripts/evaluate_media.py --model look_thermal --split test` alone, then acceptance checks 6, 14, 16, 17, 18, 23, tick `phases.md`, merge. Sabotage checks and the other acceptance checks already pass
+- **Blocked on:** the user's review: whether to accept the limits under Known issues, and whether to add the two small tests listed there before merging
+- **Next step:** once cleared, tick `phases.md`, merge into `main` with `--no-ff` (do not push), then run check 23: clean tree, and checks 3, 5, 7, 8 again on `main`. Every other acceptance check passes on `ff71287`. Do not rerun the held-out evaluation. Phase 3 needs its own plan and approval
 - **Start sessions from `cuas-demo/`**, or `CLAUDE.md` will not auto-load
 
 ## Decisions log
@@ -39,6 +39,7 @@
 | 2026-11-06 | Clips are matched to simulated range; M-of-N does not drop bearings | Mixing all bins would overstate results; keeping geometry leaves Phase 1 bearings identical |
 | 2026-11-06 | FSD50K clips read by HTTP range requests with our own zip directory reader | Stores only the selected clips instead of downloading 6.2 GB; `zipfile` refuses a multi-part zip64 archive |
 | 2026-11-07 | Look period 0.6 s; the media link refuses a period that is not whole ticks | `round(0.5 / 0.2)` silently gave 0.4 s |
+| 2026-11-07 | Thermal detector trained on a Colab T4 (20 epochs, 7.3 min in the training loop, 0.086 s per batch) and evaluated once on this laptop's CPU; RGB and audio stay CPU-trained | The local CPU run was killed at epoch 16 and Colab's CPU was too slow. Evaluating here keeps CPU timings on the machine the plan measures |
 | 2026-11-07 | Opt-in `--device cuda` for detector training, with the CUDA build of torch installed on Colab only (`docs/colab_gpu.md`); CPU stays the default and `uv.lock` is unchanged | The user measured Colab's CPU at 3.5 s per batch, and 20 epochs inside the 120-minute budget need 1.4 s or less. The model returns to the CPU for saving and validation, so the weights and threshold suit the CPU evaluator |
 | 2026-11-07 | Detector training saves a checkpoint each epoch and resumes from it | A low-memory kill cost 82 minutes because weights were saved only at the end |
 | 2026-11-06 | Use Superpowers (official marketplace version) for focused debugging, testing and code review when useful; skip its brainstorming and writing-plans; ask before separate worktrees or subagents (rules in `CLAUDE.md`) | `docs/phases.md`, `docs/rules.md` and approval in Plan Mode stay the one project workflow |
@@ -62,11 +63,17 @@
 - Determinism is proven for the same lockfile on the same machine, not byte for byte across machines; Phase 6's second-machine check should compare behaviour
 - `nvidia-smi` is not available on the dev machine, so it probably has no NVIDIA GPU; this affects Phase 2 training and the open GPU question
 - SSDLite's coarse features may miss small targets; 85% of thermal drone clips show targets 15 px wide or smaller
-- False drone tracks on RGB: 7 of 19 non-drone test clips, even after M-of-N
-- RGB test results rest on few scenes: the 17 drone clips come from 3 scene groups, so the intervals are too narrow. The Distant drone miss rate is 0.085 on test but 0.817 on validation, so the test split is much easier there
+- False drone tracks survive M-of-N on both cameras: thermal 6 of 31 non-drone test clips (0.092 to 0.363), RGB 7 of 19 (0.191 to 0.590). The intervals overlap, so neither camera is shown to be better. They treat clips as independent, but thermal's 31 come from 13 scene groups, so the true range is wider. Thermal's report does not say which clips or classes produced the 6, and naming them would take another test run. Phase 3 should not treat one camera's confirmed track as proof of a drone
+- Test results rest on few scenes, so their intervals are too narrow: RGB's 17 drone clips come from 3 scene groups, thermal's 24 from 6
+- The Distant drone miss rate is not comparable between validation and test, and neither figure measures small targets in general. Thermal: 0.757 on validation (7 clips, 2 scene groups, 6 clips of Phantom 4 Pro, median box 9.7 px wide) against 0.072 on test (7 clips, 2 scene groups, all F450, 16.5 px). RGB: 0.817 (6 clips, 1 scene group, Phantom 4 Pro, 19.9 px) against 0.085 (4 clips, 1 scene group, F450, 27.4 px). Thermal's test Distant boxes are as wide as its validation Medium boxes (17.0 px, miss rate 0.05), and 46 of the 53 validation misses come from 5 clips of one scene (`IR_DRONE_151`). So the test figure reflects a larger drone and the validation figure mostly one scene. Clip counts, drone types and box sizes were counted from the manifest and labels with a one-off script, not the metrics script
+- False alarms on empty sky are unmeasured: 0 of thermal's 3,459 scored test frames lack a target, and 1 of RGB's 2,264 (counted from labels), so the report's `Any box on a frame with no target: 0` tests nothing
+- Thermal separates other aircraft poorly at frame level: airplane precision 0.307, recall 0.205; helicopter 0.284, 0.198; 391.7 false detections per 1,000 frames across all classes
+- S2's look evidence is narrow. Each sensor draws on one scene: RGB 2 clips of `V_DRONE_026`, thermal 3 of `IR_DRONE_096`, acoustic 2 of `audio_DRONE_006`, and both cameras use only F450 Distant clips while simulated range is 209 to 766 m. The Distant bin starts at 60 m and the dataset gives no exact distances, so S2's share of non-zero drone confidence is not a detection rate at those ranges
+- `test_s2_bearings_carry_real_output_and_the_same_geometry` caught 5 of 5 sabotages (missing thermal output, wrong-split clips, dropped clip references, changed geometry, dropped bearings), but still passes with every confidence set to zero and with the thermal camera running RGB weights; `load_look_models` has no test. The code loads the right file today. Two small tests would close this
+- CPU timing falls short of the plan's 1,000 frames for two stages: tracker 976 looks on thermal and 642 on RGB; decode has one value per clip (55 and 36). The inference rows meet it. Not worth another test run
 - The audio classifier does not beat its baseline: 0.750 clean against 0.773 for always answering `engine`, which is 34 of 44 test clips. Nine engine clips are called background
-- Sustained live inference is unproven: S2 keeps real time only through a per-frame memo. By calculation, 6 unmemoised streams at one look per 0.6 s need about 825 ms of CPU per simulated second
-- The CUDA path has not run on a real GPU yet: no GPU is available here, so tests use stand-ins. The user's T4 benchmark will be its first real run. Resuming on a GPU is not proven bit-identical
+- Sustained live inference is unproven: S2 with all three models keeps real time (125 s wall clock, check 18) only through a per-frame memo. By calculation, 6 unmemoised streams at one look per 0.6 s need about 864 ms of CPU per simulated second (RGB 82.5 ms and thermal 90.3 ms at 4 threads)
+- The CUDA path has run for real: the user's T4 completed 20 epochs, and its weights load and evaluate on this CPU. Whether that run resumed is not recorded, so resuming on a GPU stays unproven. No CPU run of thermal exists to compare with
 - The manifest hash depends on line endings: `bc49b46d` on Windows with `autocrlf`, `ba662739` for the committed bytes. A fresh Linux clone would have its weights refused by `evaluate_media.py`, so Colab must use a ZIP built with `git archive` on the Windows machine. Worth fixing before Phase 6's second-machine check
 - This laptop has 7.7 GB of RAM, and long training competes with everything else open. The training time budget is wall clock, so it also counts sleep
 - S4's dust reduces simulated range but is not applied to the frames
@@ -82,7 +89,12 @@
 
 - **RGB detector** (weights `7aa15d48`, threshold 0.15 from validation, second evaluation of these weights on test): drone clips confirmed 17 of 17 (95% interval 0.816 to 1.000); other clips with a false drone track 7 of 19 (0.191 to 0.590); median 1.2 s to confirm. Drone frames: precision 0.805, recall 0.837, and 0.673, 0.700 at IoU 0.5. Drone miss rate: close 0.283, medium 0.159, distant 0.085. Inference mean 82.5 ms at 4 threads, 102.4 ms at 1
 - **Audio classifier** (weights `2457d275`, first evaluation on test, 44 clips; the engine class is a proxy): accuracy 0.750 clean (0.606 to 0.854), then 0.750, 0.636, 0.523, 0.273 at +20, +10, 0, -10 dB. Misses 9, 9, 13, 18, 31; false detections 0 throughout. 4.1 ms per 1 s window
-- **Thermal detector:** not measured, because it is not trained yet
+- **Thermal detector** (weights `0fc7c5a1`, trained on a Tesla T4, threshold 0.2 from validation, first evaluation on test, run on this laptop's CPU): drone clips confirmed 24 of 24 (95% interval 0.862 to 1.000); other clips with a false drone track 6 of 31 (0.092 to 0.363); median 1.2 s to confirm. Drone frames: precision 0.792, recall 0.897, and 0.721, 0.817 at IoU 0.5. Drone miss rate: close 0.189, medium 0.065, distant 0.072 (validation: 0.275, 0.05, 0.757). False detections 1,355 in 3,459 frames, including 85 drone boxes on bird, airplane or helicopter clips. Inference mean 90.3 ms at 4 threads, 104.4 ms at 1
+
+### Hybrid S2 run (simulated geometry, real model output on held-out clips; not a detection rate)
+
+- Seed 7, all three models: digest `sha256:134cb33f6b12005771cf400130813388c678112cc3ed483c90833f0cda5299c0`. Two fast runs and one real-time run are byte-identical
+- Counted from the saved output with a one-off script, not the metrics script: bearings with non-zero drone confidence, RGB 1,121 of 1,127 and thermal 736 of 820. Acoustic top class on 80 bearings: `electric_drone` 64, `background` 12, `engine` 4
 
 ### Simulator (`cuas.metrics.evaluator`; simulator results, not real-world performance)
 
@@ -98,9 +110,9 @@
 ## Session log (newest first)
 
 ### 2026-11-06 to 11-07 — Phase 2, in progress
-- Done: RGB detector, tracker, M-of-N, audio classifier, SNR mixing, hybrid link, recorder, reports for RGB and sound, and all sabotage checks caught (the plan's 10 plus variants). 531 tests pass, 1 skips until thermal exists.
+- Done: RGB and thermal detectors, tracker, M-of-N, audio classifier, SNR mixing, hybrid link, recorder, opt-in CUDA training and all three test reports. Every check that can run before merging passes on `ff71287`: 544 tests pass with none skipped, and a fresh clone with no data or models gives 524 passed, 20 skipped. All planned sabotage checks were caught; 2 extra probes of the all-model S2 test were not (see Known issues).
 - Decisions: see the log above. Stricter scene-based splits replaced neighbouring clip numbers after a leak check.
-- Issues / mocks: see the lists above. Thermal training was killed by the low-memory reaper at epoch 16 and kept nothing, which led to per-epoch checkpoints.
+- Issues / mocks: see the lists above. Thermal training was killed by the low-memory reaper at epoch 16 and kept nothing, which led to per-epoch checkpoints and then training on a T4.
 - Next step: see Current status.
 
 ### 2026-11-06 — Between Phase 1 and Phase 2
