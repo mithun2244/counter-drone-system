@@ -5,10 +5,10 @@
 
 ## Current status
 
-- **Current phase:** Phase 2 — Station AI is done. Phase 3 has not started
+- **Current phase:** Phase 3 — Gateway and shared tracker, on `phase-3-tracker`, not merged. Every check that can run before the merge passes
 - **Last session:** 2026-11-07
-- **Blocked on:** nothing
-- **Next step:** when the user asks, plan Phase 3 in Plan Mode on a new branch, without starting code until approved. Do not rerun the held-out evaluations
+- **Blocked on:** the user's review of the results and of the third bus (the approved plan said two), and approval to merge
+- **Next step:** once approved, merge into `main` with `--no-ff` (do not push) and run check 19: clean tree, and checks 16, 2, 5 and 12 on `main`. Phase 4 then needs its own plan and approval. Do not rerun the held-out evaluations
 - **Start sessions from `cuas-demo/`**, or `CLAUDE.md` will not auto-load
 
 ## Decisions log
@@ -39,6 +39,13 @@
 | 2026-11-06 | Clips are matched to simulated range; M-of-N does not drop bearings | Mixing all bins would overstate results; keeping geometry leaves Phase 1 bearings identical |
 | 2026-11-06 | FSD50K clips read by HTTP range requests with our own zip directory reader | Stores only the selected clips instead of downloading 6.2 GB; `zipfile` refuses a multi-part zip64 archive |
 | 2026-11-07 | Look period 0.6 s; the media link refuses a period that is not whole ticks | `round(0.5 / 0.2)` silently gave 0.4 s |
+| 2026-11-07 | Shared tracker: a 2-station fix that other bearings could have paired with differently neither starts a track nor counts towards confirming one. Confirmation needs corroborated fixes: 3 stations, or nothing else unexplained (`design.md` A6) | Rays from different drones cross where nothing is. `design.md` as written confirmed such ghosts, and a throwaway prototype gave exactly 3 S1 tracks on only 2 of 10 seeds. With this rule the real code gives 3 on all 22 seeds tested |
+| 2026-11-07 | The bearing gate includes the track's own uncertainty; rays must also meet within 4 bearing sigmas; a fix within 30 m of a live track updates it | Prototype, S1 over 20 seeds: removing each of these gave exactly 3 tracks on 9, 19 and 0 seeds |
+| 2026-11-07 | `SectorTrack` is its own message, with no position, range or elevation field. Acoustic bearings never place a target in 3D | It cannot carry a 3D claim by construction, and it closes the old issue that `Track.status` had no `sector` value |
+| 2026-11-07 | Three in-process buses: sensor, ingest and control (`architecture.md` section 5) | The approved plan said two. With two, the tracker read the control bus and published to it, so closing it would drop the last batch. Each stage now reads one bus and writes the next |
+| 2026-11-07 | Dropped the `design.md` A4 check of a sensor's reported position | No message carries one. The tracker uses only `site.yaml` positions, so a false one cannot affect it, and adding the field would change every Phase 1 digest |
+| 2026-11-07 | Coasting tracks keep publishing a predicted position for up to 3 s, with `n_stations = 0` | Dropping them would break tracks at every brief gap. Phase 4 must not alert on `n_stations = 0` alone |
+| 2026-11-07 | No `filterpy`: our own constant-velocity filter in numpy. No new dependency in Phase 3 | About 25 lines, and `filterpy` was never installed |
 | 2026-11-07 | The user accepted the documented limits for the Phase 2 demo: false drone tracks, the Distant validation and test gap, unmeasured empty-sky false alarms, narrow S2 look evidence and the rest of Known issues | Phase 2 has no accuracy target, and results are reported as measured. This covers the Phase 2 demo only, and the limits stay listed because they are still true |
 | 2026-11-07 | The user approved an exception for the decode, tracker and audio timing shortfalls; exactly what was missed is under Exceptions to the Phase 2 plan | These stages are small next to camera inference: tracker 0.1 ms and decode 4 ms against 90 ms, and audio 4.1 ms per 1 s window |
 | 2026-11-07 | Thermal detector trained on a Colab T4 (20 epochs, 7.3 min in the training loop, 0.086 s per batch) and evaluated once on this laptop's CPU; RGB and audio stay CPU-trained | The local CPU run was killed at epoch 16 and Colab's CPU was too slow. Evaluating here keeps CPU timings on the machine the plan measures |
@@ -81,7 +88,14 @@
 - The simulator's 800 m RGB range for a quadcopter is a start value this footage cannot support: the dataset's Distant bin starts at 60 m
 - The engine class is mostly road vehicles: a proxy, not evidence of detecting a one-way attack drone
 - The dataset has no fixed-wing drone, so S1 camera bearings have no real look evidence
-- Phase 3: `Track.status` has no `sector` value though `design.md` A6 needs one; A6 also uses `scipy`, which has been locked since Phase 2 but is not yet in the `architecture.md` stack
+- **S3 tracks fragment, and Phase 4 depends on them.** Over 7 seeds: 19 to 30 confirmed tracks for 13 targets, 29 false tracks in total and 14 overlapping duplicates, all among the birds. The quadcopter kept one track on every seed. Phase 4's "birds never reach amber or red" must cope with ghost and fragment tracks; swarm tracking stays in Later
+- Tracking is shown only for the simulator, which has no sensor bias, clutter or timing error. In the throwaway prototype, a fixed 0.2° azimuth bias on one station dropped S1 to 19 of 20 seeds, and 0.5° to 9 of 20 (worst median 14 m). A real site needs mast calibration first
+- In S1, 3D tracks begin 1.6 to 1.8 km from the site centre, because of the 15° rule with 500 m baselines, though cameras see 3 km. In between there are only picket wedges
+- A track coasts for up to 3 s after its last fix: up to 150 m of extrapolation once an attack drone's flight has ended
+- S1 starts 3 to 6 tracks per seed for 3 confirmed. A tentative track left at rest falls behind, and the next fix lands more than 30 m away. These are never confirmed, but they are published as tentative
+- Sequential re-acquisition: S2 picks its target up again under a new ID on 2 of 22 seeds, and S4 on 1 of 7, after coverage gaps at the edge of range. They never overlap
+- Station acoustic wedges also appear near tracked targets: 3 in S1 seed 7. A likely cause, not checked case by case: a 3-sigma gate in two dimensions leaves about 1% of bearings outside
+- The test suite now takes about 5 to 8 minutes here (717 tests), mostly from the 44 seeded S1 and S2 acceptance runs and the real-media tests
 - Phase 4: `design.md` A10 does not say which range or grid coverage uses, and S4's result depends on it. Paper calculation at S4's visibility 0.5: `important` zone with quadcopter RGB range gives 100% clear and 55% in dust (works); perimeter with attack drone RGB stays at 100% (warning never fires); perimeter with quadcopter RGB is 45% even in clear air (warning always on)
 
 ## Exceptions to the Phase 2 plan
@@ -115,6 +129,10 @@ Approved by the user on 2026-11-07, for the Phase 2 demo. The plan's CPU time re
 ### Simulator (`cuas.metrics.evaluator`; simulator results, not real-world performance)
 
 - S2 seed 7: 2,027 bearings from 3 stations, quad-1 seen st1=853, st2=658, st3=516. Geometry is identical with and without recorded media
+- **Tracking, S1** (`cuas.metrics.track_evaluator`, 22 seeds: its own, 7 and 101 to 120, which the design prototype never ran): exactly 3 confirmed tracks on all 22, no false tracks and no duplicates. Median error 0.89 to 1.08 m, worst p95 7.13 m, worst target median 1.38 m. First confirmation 1,620 to 1,820 m from the site centre. No messages rejected
+- **Tracking, S2** (same 22 seeds): one confirmed track on 20 seeds, a sequential re-acquisition on 2. Median error 0.33 to 0.37 m, worst p95 1.61 m
+- **Tracking, S3 and S4** (7 seeds each, reported only): S3 as under Known issues, median 0.60 to 0.67 m but worst p95 142 m; S4 one track on 6 of 7 seeds, median 0.61 to 0.70 m
+- With the tracker: S1 ran in 121 s, S3 in 91 s and S2 with recorded media in 126 s, each byte-identical to its fast run. Recorded media leaves tracks byte-identical
 
 ## Open questions (copy of `prd.md` §10, tick when answered)
 
@@ -124,6 +142,12 @@ Approved by the user on 2026-11-07, for the Phase 2 demo. The plan's CPU time re
 - [ ] GPU laptop available for the live demo?
 
 ## Session log (newest first)
+
+### 2026-11-07 — Phase 3
+- Done: gateway, triangulation, filter, association, shared tracker, sector tracks, pipeline wiring and track evaluator. A throwaway in-memory prototype tested the design before any code. 717 tests pass, and a fresh clone with no data or models gives 696 passed, 21 skipped. 18 of 18 sabotage checks caught, one after a stronger test was added. Every acceptance check that can run before the merge passes; check 19 runs on `main` afterwards.
+- Decisions: see the log above.
+- Issues / mocks: see the lists above. No new mocks: sensor positions come from `site.yaml`.
+- Next step: see Current status.
 
 ### 2026-11-06 to 11-07 — Phase 2
 - Done: RGB and thermal detectors, tracker, M-of-N, audio classifier, SNR mixing, hybrid link, recorder, opt-in CUDA training and all three test reports. Every check that can run before merging passes. On the last code commit, `36bad0a`, 546 tests pass with none skipped, and a fresh clone with no data or models gives 526 passed, 20 skipped. Check 23 runs on `main` right after this commit merges, so its result is in the report to the user, not here. All planned sabotage checks were caught; 2 extra probes of the all-model S2 test were not, which led to two new tests that catch 9 of 9.

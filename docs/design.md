@@ -59,7 +59,9 @@ Rejects a message (and logs a `RejectedMessage`) if:
 
 - the schema is invalid,
 - the timestamp is more than 2 s in the future or more than 10 s old *(start values)*,
-- the sensor is unknown, or its reported position does not match `site.yaml`.
+- the sensor is unknown.
+
+Each message is checked from its JSON text, as a network gateway would receive it. Messages carry no sensor position, so there is nothing to compare with `site.yaml`; the tracker uses only `site.yaml` positions, so a false one cannot affect it (decided 2026-11-07).
 
 ### A5. Triangulation
 
@@ -71,18 +73,27 @@ b = Σ w_i (I − d_i d_iᵀ) s_i
 p = A⁻¹ b          with  w_i = 1 / sigma_i²
 ```
 
+Only camera bearings are triangulated. Acoustic bearings never place a target in 3D.
+
 Accept the point only if:
 
-- the angle between at least two rays is **≥ 15°**, since rays that are nearly parallel give a bad distance, and
-- the closest distance between the rays is **< 30 m** *(start value)*.
+- the rays come from at least 2 stations, since one station gives a direction, not a distance,
+- the angle between at least two of the lines is **≥ 15°**, since rays that are nearly parallel give a bad distance,
+- every ray points towards the point, since lines can also cross behind a station,
+- the closest distance between the rays is **< 30 m** *(start value)*, and
+- the rays also meet within 4 bearing sigmas at the point's range *(start value)*, since 30 m alone admits rays from different targets that happen to cross.
+
+The point's covariance weights each ray by its noise times its range, so it stretches along the line of sight.
+
+With this site's 500 m baselines, the 15° rule is first met about 1.6 to 1.8 km from the site centre, though cameras see an attack drone from 3 km.
 
 ### A6. Tracking
 
-- **Association:** predict each track forward, then compute the expected bearing from each station. A new bearing matches a track if its angle difference is within 3 sigma. Assign with the Hungarian algorithm (`scipy.optimize.linear_sum_assignment`).
-- **New tracks:** unmatched bearings from 2 or more stations whose rays nearly cross create a new triangulated point, which starts a new track.
-- **Filter:** constant-velocity Kalman filter on the triangulated position. State is `[x, y, z, vx, vy, vz]`. A bearing-level EKF or IMM is a later upgrade.
-- **Status:** `tentative`, then `confirmed` after 3 updates within 2 s, then `lost` after 3 s with no update *(start values)*.
-- **Acoustic-only tracks:** a picket or acoustic-only bearing creates a `sector` track (a wedge on the map). It cannot be triangulated well but triggers a pre-alert and cueing.
+- **Association:** predict each track forward, then compute the expected bearing from each station. A new bearing matches a track if it is within 3 sigma, where sigma combines the bearing's noise with the track's own position uncertainty seen from that station. Assign with the Hungarian algorithm (`scipy.optimize.linear_sum_assignment`), at most one bearing per station and sensor. Confirmed tracks claim bearings first.
+- **New tracks:** unmatched bearings from 2 or more stations whose rays nearly cross give a new triangulated point. A point within 30 m of a live track updates that track instead *(start value)*, which prevents duplicates. Otherwise it starts a tentative track, but only if it is **corroborated**: 3 or more stations, or no other camera bearing left unexplained, so nothing could have paired differently. Rays from different targets can cross where nothing is, and without this rule such ghosts were confirmed on most S1 seeds.
+- **Filter:** constant-velocity Kalman filter on the triangulated position, in numpy. State is `[x, y, z, vx, vy, vz]`. A bearing-level EKF or IMM is a later upgrade.
+- **Status:** `tentative`, then `confirmed` after 3 corroborated fixes within 2 s, then `lost` after 3 s with no fix *(start values)*. Bearings from one station never update or refresh a track: it coasts on its prediction with `n_stations = 0` until it is fixed again or lost.
+- **Acoustic-only tracks:** a picket alert, or a station acoustic bearing that no 3D track explains, creates a `SectorTrack` message: a wedge from the sensor, with no position, range or elevation field. It cannot be triangulated well but triggers a pre-alert and cueing (Phase 4).
 
 ### A7. Classifier fusion
 

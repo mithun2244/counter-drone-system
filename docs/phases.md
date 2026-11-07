@@ -67,15 +67,15 @@ Done when:
 **Goal:** bearings from several stations become 3D tracks.
 
 Tasks:
-- [ ] Gateway validation and rejection log (`design.md` A4)
-- [ ] Triangulation with the angle and closest-distance checks (`design.md` A5)
-- [ ] Association (Hungarian), track birth, Kalman filter, track status (`design.md` A6)
-- [ ] Acoustic-only sector tracks from pickets
+- [x] Gateway validation and rejection log (`design.md` A4)
+- [x] Triangulation with the angle and closest-distance checks (`design.md` A5)
+- [x] Association (Hungarian), track birth, Kalman filter, track status (`design.md` A6)
+- [x] Acoustic-only sector tracks from pickets
 
 Done when:
-- [ ] Unit test: two perfect rays give the exact point; near-parallel rays are rejected
-- [ ] S1: three attack drones give exactly 3 confirmed tracks, no duplicates
-- [ ] Median position error ≤ 20 m in S1 and S2 (from the metrics script)
+- [x] Unit test: two perfect rays give the exact point; near-parallel rays are rejected
+- [x] S1: three attack drones give exactly 3 confirmed tracks, no duplicates
+- [x] Median position error ≤ 20 m in S1 and S2 (from the metrics script)
 
 ---
 
