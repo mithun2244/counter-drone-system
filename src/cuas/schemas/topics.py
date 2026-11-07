@@ -3,3 +3,7 @@
 SENSOR_STATUS = "sensor.status"
 BEARING_DETECTION = "station.bearing"
 PICKET_ALERT = "picket.alert"
+GATEWAY_ACCEPTED = "gateway.accepted"
+GATEWAY_REJECTED = "gateway.rejected"
+TRACK = "tracker.track"
+SECTOR_TRACK = "tracker.sector"

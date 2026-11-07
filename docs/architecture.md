@@ -117,6 +117,7 @@ All parts talk only through typed messages on the bus. This mirrors the real sys
 | `BearingDetection` | station → gateway | station_id, sensor (rgb, thermal, acoustic), t, azimuth_deg, elevation_deg, sigma_deg, class_probs, snapshot_ref |
 | `PicketAlert` | picket → gateway | picket_id, t, bearing_deg (coarse), loudness, engine_type_probs |
 | `Track` | tracker → classify, threat, dashboard | track_id, t, position_enu_m, velocity_mps, covariance, n_stations, status (tentative, confirmed, lost) |
+| `SectorTrack` | tracker → classify, threat, dashboard | sector_id, t, sensor_id, origin_enu_m, bearing_deg, half_width_deg, status (active, lost) |
 | `TrackClass` | classify → threat | track_id, p_drone, p_bird, p_attack_drone, evidence (look, move, sound) |
 | `ThreatAssessment` | threat → scheduler, dashboard, evidence | track_id, score, level, zone, time_to_impact_s, reasons |
 | `ZoomTask` | scheduler → station | station_id, camera_id, track_id, azimuth_deg, elevation_deg |

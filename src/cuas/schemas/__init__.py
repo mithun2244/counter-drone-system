@@ -5,6 +5,7 @@ from cuas.schemas.bearing_detection import BearingDetection, SensorKind
 from cuas.schemas.evidence_record import EvidenceRecord
 from cuas.schemas.picket_alert import PicketAlert
 from cuas.schemas.rejected_message import RejectedMessage
+from cuas.schemas.sector_track import SectorTrack
 from cuas.schemas.sensor_status import SensorStatus
 from cuas.schemas.threat_assessment import ThreatAssessment
 from cuas.schemas.track import Track
@@ -18,6 +19,7 @@ __all__ = [
     "Message",
     "PicketAlert",
     "RejectedMessage",
+    "SectorTrack",
     "SensorKind",
     "SensorStatus",
     "ThreatAssessment",
