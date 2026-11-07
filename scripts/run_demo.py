@@ -17,6 +17,7 @@ from cuas.bus import WILDCARD, InProcessBus
 from cuas.clock import SimClock
 from cuas.config import SiteConfig, load_site
 from cuas.metrics.evaluator import TargetSummary, summarize
+from cuas.metrics.track_evaluator import TrackReport, evaluate_tracks
 from cuas.pipeline import start_pipeline
 from cuas.schemas import BearingDetection, Message, PicketAlert, SectorTrack, Track
 from cuas.schemas.topics import GATEWAY_REJECTED
@@ -186,6 +187,34 @@ def print_evaluation(summaries: list[TargetSummary]) -> None:
         )
 
 
+def print_track_evaluation(report: TrackReport) -> None:
+    drones, birds = report.drones_tracked, report.birds_tracked
+    print(
+        f"[evaluator] tracks: {report.confirmed} confirmed, {report.false_tracks} false, "
+        f"{report.overlapping_duplicates} overlapping and {report.sequential_duplicates} "
+        f"sequential duplicates; drones tracked {drones[0]} of {drones[1]}, "
+        f"birds {birds[0]} of {birds[1]}"
+    )
+    if report.median_error_m is None:
+        print("[evaluator] position error: no confirmed track to score")
+    else:
+        worst, worst_m = report.worst_target
+        print(
+            "[evaluator] position error on confirmed tracks while their target flies: "
+            f"median {report.median_error_m:.2f} m, p95 {report.p95_error_m:.2f} m, "
+            f"worst target {worst} at {worst_m:.2f} m; {report.scored} messages scored, "
+            f"{report.after_flight} after the flight ended"
+        )
+    for target, count in report.tracks_per_target.items():
+        first = report.first_confirmed.get(target)
+        when = (
+            ""
+            if first is None
+            else f", first confirmed at t={first[0]:.1f} s, {first[1]:.0f} m from the site centre"
+        )
+        print(f"[evaluator] {target}: {count} confirmed track(s){when}")
+
+
 def build_media(
     args: argparse.Namespace, site: SiteConfig, wind_mps: float, seed: int
 ) -> LookSource | None:
@@ -225,8 +254,11 @@ async def run(args: argparse.Namespace, site: SiteConfig) -> None:
     await sensor_bus.close()
     await printer
     await pipeline
-    print_control(await outputs, await rejected)
+    controlled = await outputs
+    print_control(controlled, await rejected)
     print_evaluation(summarize(truth))
+    tracks = [m for m in controlled if isinstance(m, Track)]
+    print_track_evaluation(evaluate_tracks(truth, tracks))
 
 
 def main() -> None:
