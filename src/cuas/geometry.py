@@ -26,6 +26,18 @@ def angle_difference_deg(a_deg: float, b_deg: float) -> float:
     return (a_deg - b_deg + HALF_CIRCLE_DEG) % FULL_CIRCLE_DEG - HALF_CIRCLE_DEG
 
 
+def bearing_direction(
+    azimuth_deg: float, elevation_deg: float
+) -> tuple[float, float, float]:
+    """Unit vector along a bearing: (sin az cos el, cos az cos el, sin el), design.md A1."""
+    azimuth, elevation = math.radians(azimuth_deg), math.radians(elevation_deg)
+    return (
+        math.sin(azimuth) * math.cos(elevation),
+        math.cos(azimuth) * math.cos(elevation),
+        math.sin(elevation),
+    )
+
+
 def bearing_to(
     origin: Sequence[float], target: Sequence[float]
 ) -> tuple[float, float, float]:

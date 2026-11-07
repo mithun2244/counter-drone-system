@@ -2,7 +2,12 @@ import math
 
 import pytest
 
-from cuas.geometry import angle_difference_deg, bearing_to, wrap_azimuth
+from cuas.geometry import (
+    angle_difference_deg,
+    bearing_direction,
+    bearing_to,
+    wrap_azimuth,
+)
 
 ORIGIN = (0.0, 0.0, 0.0)
 TOLERANCE = 1e-9
@@ -79,3 +84,35 @@ def test_angle_difference_takes_the_short_way_round(
     a: float, b: float, difference: float
 ) -> None:
     assert angle_difference_deg(a, b) == difference
+
+
+@pytest.mark.parametrize(
+    ("azimuth", "elevation", "direction"),
+    [
+        (0.0, 0.0, (0.0, 1.0, 0.0)),
+        (90.0, 0.0, (1.0, 0.0, 0.0)),
+        (180.0, 0.0, (0.0, -1.0, 0.0)),
+        (0.0, 90.0, (0.0, 0.0, 1.0)),
+    ],
+)
+def test_bearing_direction_known_answers(
+    azimuth: float, elevation: float, direction: tuple[float, float, float]
+) -> None:
+    assert bearing_direction(azimuth, elevation) == pytest.approx(
+        direction, abs=TOLERANCE
+    )
+
+
+@pytest.mark.parametrize(
+    "target",
+    [(120.0, -340.0, 80.0), (-2500.0, 10.0, 5.0), (3.0, 4.0, -12.0)],
+)
+def test_bearing_direction_points_back_at_the_target(
+    target: tuple[float, float, float],
+) -> None:
+    origin = (250.0, -144.3, 15.0)
+    azimuth, elevation, range_m = bearing_to(origin, target)
+    direction = bearing_direction(azimuth, elevation)
+    rebuilt = [o + range_m * d for o, d in zip(origin, direction, strict=True)]
+    assert rebuilt == pytest.approx(target, abs=1e-6)
+    assert math.hypot(*direction) == pytest.approx(1.0, abs=TOLERANCE)
