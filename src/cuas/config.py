@@ -110,6 +110,41 @@ class TrainingSettings(ConfigModel):
     val_frames_per_clip: Annotated[int, Field(ge=1)]
 
 
+class SoundTrainingSettings(ConfigModel):
+    seed: Annotated[int, Field(ge=0)]
+    batch_size: Annotated[int, Field(ge=1)]
+    learning_rate: Positive
+    weight_decay: NonNegative
+    epochs: Annotated[int, Field(ge=1)]
+    windows_per_clip: Annotated[int, Field(ge=1)]
+    clean_fraction: Probability
+    snr_range_db: tuple[float, float]
+
+
+class MixingSettings(ConfigModel):
+    reference_range_m: Positive
+    reference_snr_db: float
+    wind_loss_db_per_mps: NonNegative
+    min_snr_db: float
+    max_snr_db: float
+
+
+class SoundSettings(ConfigModel):
+    classes: tuple[str, ...]
+    sample_rate: Annotated[int, Field(gt=0)]
+    window_s: Positive
+    n_fft: Annotated[int, Field(gt=0)]
+    hop: Annotated[int, Field(gt=0)]
+    n_mels: Annotated[int, Field(gt=0)]
+    evaluation_snr_db: tuple[float, ...]
+    mixing: MixingSettings
+    training: SoundTrainingSettings
+
+    @property
+    def window_samples(self) -> int:
+        return round(self.window_s * self.sample_rate)
+
+
 class EvaluationSettings(ConfigModel):
     iou_hit: Probability
     iou_strict: Probability
@@ -121,6 +156,7 @@ class StationAiSettings(ConfigModel):
     look: LookSettings
     training: TrainingSettings
     evaluation: EvaluationSettings
+    sound: SoundSettings
 
 
 class SiteConfig(ConfigModel):
