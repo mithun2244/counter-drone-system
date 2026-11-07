@@ -78,7 +78,8 @@ class Classified:
     track: Track
     track_class: TrackClass
     features: Features | None
-    move_drone_like: bool
+    move_reason: str | None
+    """``hovering``, ``fast straight flight`` or ``bird-like flight``; ``None`` without history."""
     engine_heard: bool
 
 
@@ -215,7 +216,7 @@ class Classifier:
             track,
             message,
             evidence.move.latest,
-            clues["move"] == settings.move.drone_like,
+            evidence.move.reason(),
             bool(evidence.sounds),
         )
 

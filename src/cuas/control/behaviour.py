@@ -13,6 +13,11 @@ import numpy as np
 
 from cuas.config import MoveSettings
 
+HOVERING, FAST_STRAIGHT, BIRD_LIKE = (
+    "hovering",
+    "fast straight flight",
+    "bird-like flight",
+)
 MIN_FIXES = 4
 TINY_PATH_M = 1e-6
 SLOWEST_MEAN_MPS = 0.1  # keeps speed variation finite for a target at rest
@@ -98,14 +103,23 @@ class MoveClue:
         else:
             self._fast_s, self._last_fast_t = 0.0, None
 
-    def p_move(self) -> float | None:
-        """P(drone) from behaviour, or ``None`` while there is too little history."""
+    def reason(self) -> str | None:
+        """What the behaviour looks like, or ``None`` while there is too little history."""
         if self._latest is None:
             return None
+        if self._latest.hover_fraction >= self._settings.hover_fraction:
+            return HOVERING
+        if self._fast_s >= self._settings.fast_persistence_s:
+            return FAST_STRAIGHT
+        return BIRD_LIKE
+
+    def p_move(self) -> float | None:
+        """P(drone) from behaviour, or ``None`` while there is too little history."""
+        reason = self.reason()
+        if reason is None:
+            return None
         settings = self._settings
-        hovering = self._latest.hover_fraction >= settings.hover_fraction
-        fast_for_long = self._fast_s >= settings.fast_persistence_s
-        return settings.drone_like if hovering or fast_for_long else settings.bird_like
+        return settings.bird_like if reason == BIRD_LIKE else settings.drone_like
 
     def _is_fast(self, f: Features) -> bool:
         settings = self._settings
