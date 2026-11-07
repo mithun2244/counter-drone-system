@@ -88,6 +88,10 @@ def test_source_tree_obeys_the_import_rules() -> None:
         ("gateway/x.py", "import cuas.control.tracker"),
         ("station/x.py", "from cuas.media_manifest import load_manifest"),
         ("station/x.py", "import cuas.media_manifest"),
+        ("pipeline.py", "from cuas.sim.truth import TruthLog"),
+        ("pipeline.py", "from cuas.metrics.track_evaluator import evaluate_tracks"),
+        ("control/x.py", "from cuas.gateway.gateway import Gateway"),
+        ("gateway/x.py", "from cuas.control.layer import ControlLayer"),
     ],
 )
 def test_forbidden_imports_are_caught(path: str, source: str) -> None:
@@ -107,6 +111,9 @@ def test_forbidden_imports_are_caught(path: str, source: str) -> None:
         ("sim/x.py", "from cuas.recordings import decode_frames"),
         ("sim/x.py", "from cuas.media_manifest import load_manifest"),
         ("metrics/x.py", "from cuas.station.detector import Box"),
+        ("pipeline.py", "from cuas.gateway.gateway import Gateway"),
+        ("pipeline.py", "from cuas.control.layer import ControlLayer"),
+        ("metrics/x.py", "from cuas.schemas import Track"),
     ],
 )
 def test_allowed_imports_pass(path: str, source: str) -> None:

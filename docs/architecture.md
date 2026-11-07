@@ -84,16 +84,22 @@ cuas-demo/
 │   ├── geometry.py           # bearing calculation, shared by simulator and tracker
 │   ├── sim/                  # scenario loader, trajectories, station + picket simulation, ground truth log, hybrid media and sound links, SNR mixing
 │   ├── station/              # video detector, local tracker, M-of-N, mel and audio classifier, recorder
-│   ├── gateway/              # validation, time alignment, rejection log
+│   ├── gateway/              # validation and rejection log
+│   ├── pipeline.py           # wires the gateway and control layer between buses; never sees ground truth
 │   ├── control/
+│   │   ├── triangulation.py  # rays to a 3D point, with the A5 checks
+│   │   ├── kalman.py         # constant-velocity filter
+│   │   ├── association.py    # bearing gate and Hungarian assignment
+│   │   ├── tracker.py        # shared 3D tracker (A6)
+│   │   ├── sectors.py        # acoustic sector tracks: wedges, never a position
+│   │   ├── layer.py          # batches the gateway's output for the trackers
 │   │   ├── visibility.py
-│   │   ├── tracker.py        # triangulation, EKF, association
 │   │   ├── classify.py       # fusion of look + movement + sound
 │   │   ├── threat.py         # zones, time-to-impact, score, level
 │   │   └── scheduler.py      # zoom camera assignment
 │   ├── evidence/             # store, hashing, tamper-evident log, hand-off export
 │   ├── dashboard/            # FastAPI app, WebSocket, static HTML/JS
-│   └── metrics/              # run report, evaluator (the only reader of ground truth); splits, label reader, recorded-media report
+│   └── metrics/              # run report, evaluators (the only readers of ground truth): bearings and tracks; splits, label reader, recorded-media report
 ├── scripts/
 │   ├── run_demo.py           # python scripts/run_demo.py --scenario s1
 │   ├── download_data.py      # fetch public datasets into data/
@@ -117,6 +123,7 @@ All parts talk only through typed messages on the bus. This mirrors the real sys
 | `BearingDetection` | station → gateway | station_id, sensor (rgb, thermal, acoustic), t, azimuth_deg, elevation_deg, sigma_deg, class_probs, snapshot_ref |
 | `PicketAlert` | picket → gateway | picket_id, t, bearing_deg (coarse), loudness, engine_type_probs |
 | `Track` | tracker → classify, threat, dashboard | track_id, t, position_enu_m, velocity_mps, covariance, n_stations, status (tentative, confirmed, lost) |
+| `SectorTrack` | tracker → classify, threat, dashboard | sector_id, t, sensor_id, origin_enu_m, bearing_deg, half_width_deg, status (active, lost) |
 | `TrackClass` | classify → threat | track_id, p_drone, p_bird, p_attack_drone, evidence (look, move, sound) |
 | `ThreatAssessment` | threat → scheduler, dashboard, evidence | track_id, score, level, zone, time_to_impact_s, reasons |
 | `ZoomTask` | scheduler → station | station_id, camera_id, track_id, azimuth_deg, elevation_deg |
@@ -134,6 +141,7 @@ Rules:
 
 - One Python process, `asyncio`.
 - Each component is an async task that subscribes to topics on the bus and publishes results.
+- The demo runs three in-process buses: **sensor** (simulator to gateway), **ingest** (gateway to control layer) and **control** (tracks and sectors onward). Each stage reads one and writes the next, so nothing reaches the tracker without passing the gateway, the observation digests stay unchanged, and the stages shut down in order.
 - The bus interface has `publish(topic, msg)`, `subscribe(topic)` and `close()`. `subscribe("#")` receives every message in publish order. The in-process version uses `asyncio.Queue`. An MQTT version can be added later without touching components.
 - The simulator drives the clock. It can run faster than real time for tests, or at real time for the live demo.
 
@@ -148,7 +156,7 @@ Rules:
 | Video decoding | `av` (PyAV) | Reads the recorded clips |
 | Video tracking | Own two-stage association, ByteTrack's method | `supervision` 0.31.5 no longer includes ByteTrack, and its replacement pulls in many packages |
 | Audio | `numpy` mel-spectrogram + small PyTorch CNN | Light and trainable on a laptop; current `librosa` needs Python 3.12 |
-| Tracking maths | `numpy`, `filterpy` (EKF) | Standard, small |
+| Tracking maths | `numpy`, `scipy` (Hungarian assignment) | The constant-velocity filter is about 25 lines of numpy, so `filterpy` is not needed; `scipy` is already locked |
 | Config | YAML + Pydantic settings | One place for site and scenario values |
 | Dashboard | FastAPI + WebSocket + plain HTML/JS canvas | Real-time, no heavy frontend build |
 | Evidence | SQLite + files + SHA-256 hash chain | Simple, tamper-evident |

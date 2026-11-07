@@ -12,6 +12,7 @@ from cuas.schemas import (
     Message,
     PicketAlert,
     RejectedMessage,
+    SectorTrack,
     SensorStatus,
     ThreatAssessment,
     Track,
@@ -74,6 +75,16 @@ SAMPLES: list[Message] = [
         alert_id="a1", track_id="trk1", clip_path="c.mp4", sha256=HASH, prev_hash=None
     ),
     RejectedMessage(reason="unknown sensor", raw="{}"),
+    SectorTrack(
+        sector_id="sec-1",
+        t=4.0,
+        sensor_id="pk4",
+        origin_enu_m=(2121.3, -2121.3, 3.0),
+        bearing_deg=300.0,
+        half_width_deg=20.0,
+        reports=1,
+        status="active",
+    ),
 ]
 SAMPLE_IDS = [type(sample).__name__ for sample in SAMPLES]
 
@@ -93,7 +104,7 @@ def architecture_messages() -> dict[str, list[str]]:
 
 def test_every_architecture_message_and_key_field_has_a_schema() -> None:
     messages = architecture_messages()
-    assert len(messages) == 9
+    assert len(messages) == 10
     for name, fields in messages.items():
         model = getattr(schemas, name)
         assert issubclass(model, Message)
@@ -133,8 +144,8 @@ def models_in_schemas() -> list[type[BaseModel]]:
 
 def test_no_schema_has_a_ground_truth_field() -> None:
     assert (
-        len(models_in_schemas()) == 11
-    )  # 9 messages, ClueEvidence and the Message base
+        len(models_in_schemas()) == 12
+    )  # 10 messages, ClueEvidence and the Message base
     for model in models_in_schemas():
         for field in model.model_fields:
             assert not re.search("target|true|truth", field), (
@@ -164,6 +175,11 @@ def bearing_with(**changes: object) -> dict[str, object]:
 def test_bearing_rejects_bad_values(changes: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
         BearingDetection.model_validate(bearing_with(**changes))
+
+
+def test_a_sector_track_cannot_carry_a_3d_point() -> None:
+    fields = set(SectorTrack.model_fields)
+    assert not {f for f in fields if re.search("position|range|elevation|velocity", f)}
 
 
 def test_evidence_record_rejects_a_malformed_hash() -> None:

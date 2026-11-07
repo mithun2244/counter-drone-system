@@ -89,5 +89,35 @@ def test_zone_labels_cover_exactly_the_site_zone_ids(site: SiteConfig) -> None:
     assert set(ZoneLabels.model_fields) == {zone.id for zone in site.zones}
 
 
+def test_tracker_places_targets_with_cameras_only(site: SiteConfig) -> None:
+    assert site.tracker.position_sensors == ("rgb", "thermal")
+    assert site.tracker.min_ray_angle_deg == 15.0
+    assert site.tracker.max_ray_miss_m == 30.0
+    assert (site.gateway.max_future_s, site.gateway.max_age_s) == (2.0, 10.0)
+
+
+@pytest.mark.parametrize(
+    ("section", "changes"),
+    [
+        ("tracker", {"position_sensors": []}),
+        ("tracker", {"position_sensors": ["radar"]}),
+        ("tracker", {"min_ray_angle_deg": 0.0}),
+        ("tracker", {"min_ray_angle_deg": 91.0}),
+        ("tracker", {"confirm_fixes": 0}),
+        ("tracker", {"merge_radius_m": -1.0}),
+        ("gateway", {"max_age_s": 0.0}),
+        ("gateway", {"max_future_s": -1.0}),
+    ],
+    ids=str,
+)
+def test_bad_tracker_and_gateway_values_fail_on_load(
+    config_dir: Path, section: str, changes: dict[str, object]
+) -> None:
+    raw = raw_site(config_dir)
+    raw[section] = {**raw[section], **changes}
+    with pytest.raises(ValidationError):
+        SiteConfig.model_validate(raw)
+
+
 def test_scenario_metadata_holds_no_truth() -> None:
     assert set(ScenarioMetadata.model_fields) == {"id", "title", "venue", "zone_labels"}
