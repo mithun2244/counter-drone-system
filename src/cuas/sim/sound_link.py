@@ -26,6 +26,7 @@ HELD_OUT = "test"
 
 Classify = Callable[[np.ndarray], dict[str, float]]
 LoadAudio = Callable[[ClipEntry], np.ndarray]
+OnOpen = Callable[[str, ClipEntry], None]
 
 
 @dataclass
@@ -64,7 +65,9 @@ class SoundLink:
         look_every_ticks: int,
         wind_mps: float,
         seed: int,
+        on_open: OnOpen | None = None,
     ) -> None:
+        self._on_open = on_open
         self._load_audio = load_audio
         self._classify = classify
         self._settings = settings
@@ -103,6 +106,9 @@ class SoundLink:
         clip = clips[int(rng.integers(len(clips)))]
         noise = noises[int(rng.integers(len(noises)))]
         audio, noise_audio = self._load(clip), self._load(noise)
+        if self._on_open:
+            self._on_open(key[0], clip)
+            self._on_open(key[0], noise)
         return _SoundStream(
             clip,
             audio,
