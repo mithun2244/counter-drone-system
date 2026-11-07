@@ -104,6 +104,7 @@ def test_forbidden_imports_are_caught(path: str, source: str) -> None:
         ("control/x.py", "from cuas.config import ScenarioMetadata"),
         ("station/x.py", "from cuas.station.video import detect"),
         ("sim/x.py", "from cuas.station.look import LookStream"),
+        ("sim/x.py", "from cuas.recordings import decode_frames"),
         ("sim/x.py", "from cuas.media_manifest import load_manifest"),
         ("metrics/x.py", "from cuas.station.detector import Box"),
     ],

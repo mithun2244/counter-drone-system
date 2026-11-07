@@ -12,6 +12,7 @@ CLASSES = ("drone", "bird")
 WIDTH = 1000
 HIGH = 0.5
 FORBIDDEN = {"label", "target", "target_id", "target_type", "path", "class_id"}
+WEIGHTS_LOADERS = {"load_starting_weights", "load_trained"}
 
 
 def drone(x: float, score: float = 0.9, name: str = "drone") -> Box:
@@ -82,6 +83,6 @@ def test_station_code_has_no_parameter_for_a_label_path_or_target(module) -> Non
         for function in functions:
             parameters = set(inspect.signature(function).parameters)
             bad = parameters & FORBIDDEN
-            if name == "load_starting_weights":
+            if name in WEIGHTS_LOADERS:
                 bad -= {"path"}  # the weights file, which is not a clip
             assert not bad, f"{module.__name__}.{function.__qualname__}: {bad}"

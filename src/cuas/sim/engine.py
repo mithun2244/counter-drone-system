@@ -6,7 +6,7 @@ from cuas.config import SiteConfig
 from cuas.schemas.topics import BEARING_DETECTION, PICKET_ALERT, SENSOR_STATUS
 from cuas.sim.picket import PicketSim
 from cuas.sim.scenario import Scenario
-from cuas.sim.station import Observation, StationSim
+from cuas.sim.station import LookSource, Observation, StationSim
 from cuas.sim.trajectories import Trajectory, build_trajectories
 from cuas.sim.truth import TargetState, TruthLog
 
@@ -17,6 +17,7 @@ async def run_scenario(
     bus: Bus,
     clock: SimClock,
     seed: int | None = None,
+    media: LookSource | None = None,
 ) -> TruthLog:
     """Run to the end. Observations go on the bus; ground truth is only ever returned."""
     if clock.now != 0.0:
@@ -24,7 +25,7 @@ async def run_scenario(
     run_seed = scenario.seed if seed is None else seed
     wind_factor = scenario.environment.wind_range_factor(site.simulation)
     stations = [
-        StationSim(station, site, scenario.environment, run_seed)
+        StationSim(station, site, scenario.environment, run_seed, media)
         for station in site.stations
     ]
     pickets = [

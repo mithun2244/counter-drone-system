@@ -36,13 +36,14 @@ def record(config_dir: Path) -> Callable[..., Awaitable[Recorded]]:
         *,
         pace: float | None = None,
         zoom: int = 1,
+        media: object = None,
     ) -> Recorded:
         site = load_site(config_dir, zoom_per_station=zoom)
         if isinstance(scenario, str):
             scenario = load_scenario(config_dir, scenario)
         bus, clock = InProcessBus(), SimClock(site.simulation.tick_s, pace=pace)
         tap = bus.subscribe(WILDCARD)  # every message, in exact publish order
-        truth = await run_scenario(scenario, site, bus, clock, seed=seed)
+        truth = await run_scenario(scenario, site, bus, clock, seed=seed, media=media)
         await bus.close()
         return [message async for message in tap], truth
 

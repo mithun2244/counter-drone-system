@@ -4,7 +4,7 @@ import av
 import numpy as np
 import pytest
 
-from cuas.recordings import decode_frames, frame_count
+from cuas.recordings import decode_every, decode_frames, frame_count, frame_rate
 
 FRAMES = 6
 WIDTH, HEIGHT = 32, 16
@@ -37,6 +37,16 @@ def test_requested_frames_come_back_as_rgb_arrays(clip: Path) -> None:
     assert frames[1].shape == (HEIGHT, WIDTH, 3)
     assert frames[1].dtype == np.uint8
     assert frames[4].mean() > frames[1].mean()
+
+
+def test_frame_rate_comes_from_the_clip(clip: Path) -> None:
+    assert frame_rate(clip) == 30.0
+
+
+def test_decode_every_keeps_every_nth_frame_from_the_first(clip: Path) -> None:
+    frames = decode_every(clip, 2)
+    assert len(frames) == 3
+    assert frames[0].mean() < frames[1].mean() < frames[2].mean()
 
 
 def test_requesting_nothing_gives_nothing(clip: Path) -> None:

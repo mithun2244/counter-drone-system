@@ -94,6 +94,8 @@ class LookSettings(ConfigModel):
     """How far a target may move between looks, as a share of the frame width."""
     max_missed: Annotated[int, Field(ge=0)]
     period_s: Positive
+    range_bins_m: dict[str, tuple[Positive, Positive]]
+    """Where each label's Close and Medium distance bins end, from the dataset's article."""
 
 
 class TrainingSettings(ConfigModel):

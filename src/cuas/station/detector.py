@@ -69,6 +69,13 @@ def load_starting_weights(model: nn.Module, path: Path) -> list[str]:
     return copy_except_class_head(model, state)
 
 
+def load_trained(settings: DetectorSettings, path: Path) -> "Detector":
+    """A detector from weights fine-tuned by ``scripts/train_detector.py``."""
+    model = build_model(settings)
+    model.load_state_dict(torch.load(path, map_location="cpu", weights_only=True))
+    return Detector(model, settings)
+
+
 def copy_except_class_head(model: nn.Module, state: Mapping) -> list[str]:
     """Copy shared weights and return which were skipped."""
     own = model.state_dict()

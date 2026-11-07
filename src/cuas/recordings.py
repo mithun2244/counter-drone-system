@@ -22,6 +22,22 @@ def decode_frames(path: Path, indices: Collection[int]) -> dict[int, np.ndarray]
     return frames
 
 
+def frame_rate(path: Path) -> float:
+    with av.open(str(path)) as container:
+        return float(container.streams.video[0].average_rate)
+
+
+def decode_every(path: Path, step: int) -> list[np.ndarray]:
+    """Every ``step``-th frame, starting with the first."""
+    frames: list[np.ndarray] = []
+    with av.open(str(path)) as container:
+        container.streams.video[0].thread_type = "AUTO"
+        for index, frame in enumerate(container.decode(video=0)):
+            if index % step == 0:
+                frames.append(frame.to_ndarray(format="rgb24"))
+    return frames
+
+
 def frame_count(path: Path) -> int:
     with av.open(str(path)) as container:
         container.streams.video[0].thread_type = "AUTO"
