@@ -10,13 +10,18 @@ from cuas.config import load_site
 from cuas.media_manifest import MANIFEST_NAME, MediaManifest, load_manifest
 from cuas.metrics.mat_labels import read_label_file
 from cuas.recordings import frame_count
+from cuas.schemas import BearingDetection, PicketAlert
+from cuas.sim.media import MediaLink, build_media_link
+from cuas.sim.scenario import load_scenario
 from cuas.station.detector import build_model, load_starting_weights
+from cuas.station.recorder import verify_recordings
 
 pytestmark = pytest.mark.media
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR = ROOT / "config"
 DATA_DIR = ROOT / "data"
+SEED = 7
 COCO_WEIGHTS = (
     ROOT / "models" / "pretrained" / "ssdlite320_mobilenet_v3_large_coco-a79551df.pth"
 )
@@ -168,3 +173,104 @@ def test_no_uploader_name_is_stored_in_the_manifest(manifest: MediaManifest) -> 
     selection = json.loads(selection_path.read_text(encoding="utf-8"))
     text = (CONFIG_DIR / MANIFEST_NAME).read_text(encoding="utf-8")
     assert not [c["uploader"] for c in selection if f"_{c['uploader']}" in text]
+
+
+MODELS_DIR = ROOT / "models"
+TRUTH_WORDS = ("quadcopter", "attack_drone", "svanstrom", "fsd50k", ".mp4", ".wav")
+
+
+@pytest.fixture
+def real_media(manifest: MediaManifest, tmp_path: Path):
+    """Factory for a real media link. Skipped until the RGB and sound models exist."""
+    needed = [MODELS_DIR / f"{name}.pt" for name in ("look_rgb", "sound")]
+    if not all(path.exists() for path in needed):
+        pytest.skip("models not trained")
+    site = load_site(CONFIG_DIR)
+
+    def build(wind_mps: float, seed: int, run_dir: Path | None = None) -> MediaLink:
+        return build_media_link(
+            CONFIG_DIR,
+            DATA_DIR,
+            MODELS_DIR,
+            run_dir or tmp_path,
+            site.station_ai,
+            site.simulation.tick_s,
+            wind_mps,
+            seed,
+        )
+
+    return build
+
+
+def s2_wind() -> float:
+    return load_scenario(CONFIG_DIR, "s2").environment.wind_mps
+
+
+def strip_look(bearing: BearingDetection) -> str:
+    return bearing.model_copy(
+        update={"class_probs": {}, "snapshot_ref": None}
+    ).model_dump_json()
+
+
+async def test_s2_bearings_carry_real_output_and_the_same_geometry(
+    record, real_media, manifest: MediaManifest
+) -> None:
+    if not (MODELS_DIR / "look_thermal.pt").exists():
+        pytest.skip("thermal model not trained")
+    plain, _ = await record("s2", seed=SEED)
+    linked, _ = await record("s2", seed=SEED, media=real_media(s2_wind(), SEED))
+    assert len(plain) == len(linked)
+    bearings = [m for m in linked if isinstance(m, BearingDetection)]
+    assert {b.sensor for b in bearings} == {"rgb", "thermal", "acoustic"}
+    held_out = {c.id for c in manifest.clips if c.split == "test"}
+    for bearing in bearings:
+        assert bearing.class_probs
+        assert bearing.snapshot_ref is not None
+        assert bearing.snapshot_ref.split(":")[0] in held_out
+    for a, b in zip(plain, linked, strict=True):
+        if isinstance(a, BearingDetection):
+            assert strip_look(a) == strip_look(b)
+
+
+async def test_s2_with_real_models_is_repeatable(record, real_media) -> None:
+    first, _ = await record("s2", seed=SEED, media=real_media(s2_wind(), SEED))
+    second, _ = await record("s2", seed=SEED, media=real_media(s2_wind(), SEED))
+    assert [m.model_dump_json() for m in first] == [m.model_dump_json() for m in second]
+
+
+async def test_a_real_media_run_leaks_no_truth(record, real_media) -> None:
+    messages, truth = await record("s2", seed=SEED, media=real_media(s2_wind(), SEED))
+    words = {*TRUTH_WORDS, *(state.target_id for state in truth.states)}
+    for message in messages:
+        text = message.model_dump_json()
+        assert not [word for word in words if word in text]
+
+
+async def test_the_recorder_keeps_verifiable_copies(
+    record, real_media, tmp_path: Path
+) -> None:
+    run_dir = tmp_path / "run"
+    await record("s2", seed=SEED, media=real_media(s2_wind(), SEED, run_dir))
+    stations = sorted(path.name for path in run_dir.iterdir())
+    assert stations == ["station_st1", "station_st2", "station_st3"]
+    assert verify_recordings(run_dir) == []
+    saved = next(run_dir.glob("station_st1/*.mp4"))
+    assert not [word for word in ("DRONE", "BIRD", "V_", "IR_") if word in saved.name]
+    saved.write_bytes(saved.read_bytes() + b"x")
+    assert "hash mismatch" in verify_recordings(run_dir)[0]
+
+
+async def test_s1_pickets_use_the_real_classifier(record, real_media) -> None:
+    wind = load_scenario(CONFIG_DIR, "s1").environment.wind_mps
+    messages, _ = await record("s1", seed=SEED, media=real_media(wind, SEED))
+    alerts = [m for m in messages if isinstance(m, PicketAlert)]
+    assert alerts
+    for alert in alerts:
+        assert set(alert.engine_type_probs) == {"electric", "piston"}
+        assert sum(alert.engine_type_probs.values()) == pytest.approx(1.0)
+    cameras = [
+        m
+        for m in messages
+        if isinstance(m, BearingDetection) and m.sensor != "acoustic"
+    ]
+    assert all(b.class_probs == {} for b in cameras)  # no fixed-wing footage exists
