@@ -117,6 +117,30 @@ async def test_replaying_the_accepted_messages_alone_gives_the_same_tracks(
     assert dumps([m async for m in tap]) == dumps(live)
 
 
+async def test_class_data_never_changes_the_tracks(
+    record_pipeline, site: SiteConfig
+) -> None:
+    """Made-up class scores and snapshots on every bearing must leave the tracks unchanged."""
+    _, ingested, live, _ = await record_pipeline("s1", seed=7)
+    accepted = [m for m in ingested if not isinstance(m, RejectedMessage)]
+    labelled = [
+        m.model_copy(
+            update={
+                "class_probs": {"drone": (i % 10) / 10, "bird": 1.0},
+                "snapshot_ref": f"abcd:{i}",
+            }
+        )
+        if isinstance(m, BearingDetection)
+        else m
+        for i, m in enumerate(accepted)
+    ]
+    sink = InProcessBus()
+    tap = sink.subscribe(WILDCARD)
+    await run_control(control_layer(site), replay(labelled), sink)
+    await sink.close()
+    assert dumps([m async for m in tap]) == dumps(live)
+
+
 async def test_target_order_leaves_no_trace_in_the_tracks(
     record_pipeline, config_dir
 ) -> None:
