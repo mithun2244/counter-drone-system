@@ -21,6 +21,7 @@ from cuas.metrics.mat_labels import read_label_file
 from cuas.metrics.recorded_media import (
     ClipScore,
     add_frame,
+    note_look,
     render_audio_report,
     render_video_report,
     summarise_audio,
@@ -107,18 +108,8 @@ def score_clip(
             started = time.perf_counter()
             result = stream.update(boxes)
             timing["tracker"].append((time.perf_counter() - started) * TO_MS)
-            _note_confirmed(score, result, clip.label, index / rate)
+            note_look(score, result, high_score, index / rate)
     return score
-
-
-def _note_confirmed(
-    score: ClipScore, result: dict[str, float], label: str, seconds: float
-) -> None:
-    for name, confidence in result.items():
-        if confidence > 0.0:
-            score.confirmed_tracks[name] = 1
-            if name == label and score.first_confirmed_s is None:
-                score.first_confirmed_s = seconds
 
 
 def single_thread_timing(clips: list[ClipEntry], detector: Detector) -> list[float]:
@@ -172,6 +163,10 @@ def evaluate_video(modality: str, split: str, ai: StationAiSettings) -> dict:
         "Weights SHA-256": digest,
         "Manifest SHA-256": manifest_hash,
         "Threshold, chosen on validation": high_score,
+        "Drone miss rate by bin on validation, for comparison": {
+            name: round(row["miss_rate"], 3)
+            for name, row in record["validation"]["drone_misses_by_bin"].items()
+        },
         f"Evaluations of these weights on {split}": count_attempts(name, split, digest),
         "CPU": platform.processor() or platform.machine(),
         "Torch": torch.__version__,

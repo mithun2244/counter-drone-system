@@ -6,6 +6,7 @@ from cuas.metrics.recorded_media import (
     add_frame,
     iou,
     match_frame,
+    note_look,
     ratio,
     render_audio_report,
     render_video_report,
@@ -211,3 +212,19 @@ def test_audio_report_is_labelled_and_carries_its_notes() -> None:
     assert report.startswith(f"# {BANNER}")
     assert "Engine is a proxy." in report
     assert "[evaluator]" not in report
+
+
+def test_a_stray_low_score_does_not_count_as_a_confirmed_class() -> None:
+    score = ClipScore("c", "bird", "g", "medium")
+    note_look(score, {"bird": 0.8, "drone": 0.06}, IOU_HIT, 2.0)
+    assert score.confirmed_tracks["bird"] == 1
+    assert score.confirmed_tracks["drone"] == 0
+
+
+def test_the_first_confirmation_of_the_clips_own_class_sets_the_time() -> None:
+    score = ClipScore("c", "drone", "g", "medium")
+    note_look(score, {"bird": 0.8, "drone": 0.0}, IOU_HIT, 1.0)
+    assert score.first_confirmed_s is None
+    note_look(score, {"drone": 0.8}, IOU_HIT, 3.0)
+    note_look(score, {"drone": 0.9}, IOU_HIT, 4.0)
+    assert score.first_confirmed_s == 3.0

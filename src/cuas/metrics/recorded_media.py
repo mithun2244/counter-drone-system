@@ -116,6 +116,21 @@ def add_frame(
     score.strict_misses.update(b.class_name for b in misses)
 
 
+def note_look(
+    score: ClipScore, confidence: dict[str, float], threshold: float, seconds: float
+) -> None:
+    """Records which classes one look confirmed.
+
+    A class counts only at the working threshold. A bird track holding one stray 0.06 drone box
+    is not a confirmed drone.
+    """
+    for name, value in confidence.items():
+        if value >= threshold:
+            score.confirmed_tracks[name] = 1
+            if name == score.label and score.first_confirmed_s is None:
+                score.first_confirmed_s = seconds
+
+
 def _totals(clips: Sequence[ClipScore], attribute: str) -> Counter[str]:
     total: Counter[str] = Counter()
     for clip in clips:
