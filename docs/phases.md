@@ -47,18 +47,18 @@ Done when:
 **Goal:** real detectors turn real clips into look and sound confidences.
 
 Tasks:
-- [ ] `scripts/download_data.py` plus `data/README.md` (dataset, URL, licence)
-- [ ] Video detector wrapper (YOLO11n to start), ByteTrack, M-of-N confirmation (`design.md` A3)
-- [ ] Fine-tune or evaluate the detector on drone vs bird clips; save weights in `models/`
-- [ ] Audio classifier: mel-spectrogram plus small CNN (drone / no-drone, engine type); train and save
-- [ ] SNR mixing by distance and wind (`design.md` A2)
-- [ ] Hybrid link: a simulated detection pulls a real clip and runs the real models
-- [ ] Local recorder with a SHA-256 hash per file
+- [x] `scripts/download_data.py` plus `data/README.md` (dataset, URL, licence)
+- [x] Video detector wrapper (SSDLite320, see `architecture.md` §6), ByteTrack-style tracker, M-of-N confirmation (`design.md` A3)
+- [x] Fine-tune or evaluate the detector on drone vs bird clips; save weights in `models/`
+- [x] Audio classifier: mel-spectrogram plus small CNN (drone / no-drone, engine type); train and save
+- [x] SNR mixing by distance and wind (`design.md` A2)
+- [x] Hybrid link: a simulated detection pulls a real clip and runs the real models
+- [x] Local recorder with a SHA-256 hash per file
 
 Done when:
-- [ ] Detector evaluation report in `runs/eval/` (precision, recall on a held-out set)
-- [ ] Audio classifier accuracy on a held-out set is reported (no target; just measured honestly)
-- [ ] S2 runs and bearings carry real `class_probs`
+- [x] Detector evaluation report in `runs/eval/` (precision, recall on a held-out set)
+- [x] Audio classifier accuracy on a held-out set is reported (no target; just measured honestly)
+- [x] S2 runs and bearings carry real `class_probs`
 
 ---
 

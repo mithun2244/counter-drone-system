@@ -69,6 +69,96 @@ class PicketSettings(ConfigModel):
     loudness_sigma: NonNegative
 
 
+class SplitSettings(ConfigModel):
+    fractions: dict[str, Probability]
+    salt: str
+    min_test_clips: Annotated[int, Field(ge=1)]
+    audio_block_clips: Annotated[int, Field(ge=1)]
+    scene_max_hamming: Annotated[int, Field(ge=0)]
+
+
+class DetectorSettings(ConfigModel):
+    classes: tuple[str, ...]
+    input_size: Annotated[int, Field(gt=0)]
+    anchor_scales: tuple[Positive, ...]
+    min_score: Probability
+    max_candidates: Annotated[int, Field(ge=1)]
+    max_detections: Annotated[int, Field(ge=1)]
+    threads: Annotated[int, Field(ge=1)]
+
+
+class LookSettings(ConfigModel):
+    m: Annotated[int, Field(ge=1)]
+    n: Annotated[int, Field(ge=1)]
+    max_step_fraction: Positive
+    """How far a target may move between looks, as a share of the frame width."""
+    max_missed: Annotated[int, Field(ge=0)]
+    period_s: Positive
+    range_bins_m: dict[str, tuple[Positive, Positive]]
+    """Where each label's Close and Medium distance bins end, from the dataset's article."""
+
+
+class TrainingSettings(ConfigModel):
+    seed: Annotated[int, Field(ge=0)]
+    batch_size: Annotated[int, Field(ge=1)]
+    learning_rate: Positive
+    weight_decay: NonNegative
+    epochs: Annotated[int, Field(ge=1)]
+    max_minutes: Positive
+    freeze_backbone: bool
+    train_frames_per_clip: Annotated[int, Field(ge=1)]
+    val_frames_per_clip: Annotated[int, Field(ge=1)]
+
+
+class SoundTrainingSettings(ConfigModel):
+    seed: Annotated[int, Field(ge=0)]
+    batch_size: Annotated[int, Field(ge=1)]
+    learning_rate: Positive
+    weight_decay: NonNegative
+    epochs: Annotated[int, Field(ge=1)]
+    windows_per_class: Annotated[int, Field(ge=1)]
+    clean_fraction: Probability
+    snr_range_db: tuple[float, float]
+
+
+class MixingSettings(ConfigModel):
+    reference_range_m: Positive
+    reference_snr_db: float
+    wind_loss_db_per_mps: NonNegative
+    min_snr_db: float
+    max_snr_db: float
+
+
+class SoundSettings(ConfigModel):
+    classes: tuple[str, ...]
+    sample_rate: Annotated[int, Field(gt=0)]
+    window_s: Positive
+    n_fft: Annotated[int, Field(gt=0)]
+    hop: Annotated[int, Field(gt=0)]
+    n_mels: Annotated[int, Field(gt=0)]
+    evaluation_snr_db: tuple[float, ...]
+    mixing: MixingSettings
+    training: SoundTrainingSettings
+
+    @property
+    def window_samples(self) -> int:
+        return round(self.window_s * self.sample_rate)
+
+
+class EvaluationSettings(ConfigModel):
+    iou_hit: Probability
+    iou_strict: Probability
+
+
+class StationAiSettings(ConfigModel):
+    split: SplitSettings
+    detector: DetectorSettings
+    look: LookSettings
+    training: TrainingSettings
+    evaluation: EvaluationSettings
+    sound: SoundSettings
+
+
 class SiteConfig(ConfigModel):
     """The baseline every scenario shares."""
 
@@ -79,6 +169,7 @@ class SiteConfig(ConfigModel):
     zones: tuple[Zone, ...]
     sensors: dict[SensorKind, SensorSettings]
     picket_settings: PicketSettings
+    station_ai: StationAiSettings
 
 
 class ZoneLabels(ConfigModel):

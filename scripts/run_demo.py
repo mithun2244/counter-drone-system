@@ -9,6 +9,7 @@ output that names targets.
 import argparse
 import asyncio
 import hashlib
+import sys
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -19,8 +20,13 @@ from cuas.metrics.evaluator import TargetSummary, summarize
 from cuas.schemas import BearingDetection, Message, PicketAlert
 from cuas.sim.engine import run_scenario
 from cuas.sim.scenario import Scenario, available_scenarios, load_scenario
+from cuas.sim.station import LookSource
 
-CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"
+ROOT = Path(__file__).resolve().parents[1]
+CONFIG_DIR = ROOT / "config"
+DATA_DIR = ROOT / "data"
+MODELS_DIR = ROOT / "models"
+USAGE_ERROR = 2
 REAL_TIME_PACE = 1.0
 
 
@@ -48,7 +54,19 @@ def parse_args() -> argparse.Namespace:
         choices=[0, 1, 2],
         help="zoom cameras per station (default: the value in site.yaml)",
     )
+    parser.add_argument(
+        "--recorded-media",
+        action="store_true",
+        help="run real models on held-out recordings for look evidence",
+    )
     return parser.parse_args()
+
+
+def describe_look(bearing: BearingDetection) -> str:
+    if not bearing.class_probs:
+        return ""
+    scores = ",".join(f"{k}:{v:.2f}" for k, v in bearing.class_probs.items())
+    return f" look={scores} clip={bearing.snapshot_ref}"
 
 
 def describe(message: Message) -> str | None:
@@ -57,7 +75,7 @@ def describe(message: Message) -> str | None:
         return (
             f"t={message.t:.3f} bearing {message.station_id} {message.sensor} "
             f"az={message.azimuth_deg:.3f} el={message.elevation_deg:.3f} "
-            f"sigma={message.sigma_deg}"
+            f"sigma={message.sigma_deg}{describe_look(message)}"
         )
     if isinstance(message, PicketAlert):
         engines = ",".join(
@@ -118,6 +136,26 @@ def print_evaluation(summaries: list[TargetSummary]) -> None:
         )
 
 
+def build_media(
+    args: argparse.Namespace, site: SiteConfig, wind_mps: float, seed: int
+) -> LookSource | None:
+    """Imported only when asked for, so simulator-only runs never load torch."""
+    if not args.recorded_media:
+        return None
+    from cuas.sim.media import build_media_link
+
+    return build_media_link(
+        CONFIG_DIR,
+        DATA_DIR,
+        MODELS_DIR,
+        ROOT / "runs" / f"{args.scenario}_seed{seed}",
+        site.station_ai,
+        site.simulation.tick_s,
+        wind_mps,
+        seed,
+    )
+
+
 async def run(args: argparse.Namespace, site: SiteConfig) -> None:
     scenario = load_scenario(CONFIG_DIR, args.scenario)
     seed = scenario.seed if args.seed is None else args.seed
@@ -125,7 +163,8 @@ async def run(args: argparse.Namespace, site: SiteConfig) -> None:
     bus = InProcessBus()
     clock = SimClock(site.simulation.tick_s, pace=None if args.fast else REAL_TIME_PACE)
     printer = asyncio.create_task(print_observations(bus.subscribe(WILDCARD)))
-    truth = await run_scenario(scenario, site, bus, clock, seed=seed)
+    media = build_media(args, site, scenario.environment.wind_mps, seed)
+    truth = await run_scenario(scenario, site, bus, clock, seed=seed, media=media)
     await bus.close()
     await printer
     print_evaluation(summarize(truth))
@@ -140,7 +179,11 @@ def main() -> None:
         f"{len(site.pickets)} pickets, {len(site.zones)} zones"
     )
     if args.scenario:
-        asyncio.run(run(args, site))
+        try:
+            asyncio.run(run(args, site))
+        except FileNotFoundError as error:
+            print(f"recorded media is not ready: {error}", file=sys.stderr)
+            sys.exit(USAGE_ERROR)
 
 
 if __name__ == "__main__":

@@ -74,6 +74,7 @@ cuas-demo/
 ├── docs/                     # prd, architecture, design, rules, phases, memory
 ├── config/
 │   ├── site.yaml             # stations, pickets, zones, camera specs
+│   ├── media_manifest.yaml   # recorded clips: hashes, labels, train/val/test split (no media)
 │   └── scenarios/            # s1_owa_wave.yaml, s2_stadium_quad.yaml, ...
 ├── src/cuas/
 │   ├── schemas/              # Pydantic message models (one file per message type)
@@ -81,8 +82,8 @@ cuas-demo/
 │   ├── clock.py              # single simulated clock
 │   ├── config.py             # typed site config, truth-free scenario metadata
 │   ├── geometry.py           # bearing calculation, shared by simulator and tracker
-│   ├── sim/                  # scenario loader, trajectories, station + picket simulation, ground truth log
-│   ├── station/              # video detector, audio classifier, bearing builder, recorder
+│   ├── sim/                  # scenario loader, trajectories, station + picket simulation, ground truth log, hybrid media and sound links, SNR mixing
+│   ├── station/              # video detector, local tracker, M-of-N, mel and audio classifier, recorder
 │   ├── gateway/              # validation, time alignment, rejection log
 │   ├── control/
 │   │   ├── visibility.py
@@ -92,10 +93,14 @@ cuas-demo/
 │   │   └── scheduler.py      # zoom camera assignment
 │   ├── evidence/             # store, hashing, tamper-evident log, hand-off export
 │   ├── dashboard/            # FastAPI app, WebSocket, static HTML/JS
-│   └── metrics/              # run report, evaluator (the only reader of ground truth)
+│   └── metrics/              # run report, evaluator (the only reader of ground truth); splits, label reader, recorded-media report
 ├── scripts/
 │   ├── run_demo.py           # python scripts/run_demo.py --scenario s1
-│   └── download_data.py      # fetch public datasets into data/
+│   ├── download_data.py      # fetch public datasets into data/
+│   ├── prepare_media.py      # read labels, write config/media_manifest.yaml
+│   ├── train_detector.py     # fine-tune a detector; resumes after a kill; CPU by default, opt-in CUDA (docs/colab_gpu.md)
+│   ├── train_audio.py        # train the audio classifier
+│   └── evaluate_media.py     # held-out reports in runs/eval/
 ├── tests/                    # pytest, mirrors src/ layout
 ├── data/                     # datasets (gitignored)
 ├── models/                   # trained weights (gitignored)
@@ -139,9 +144,10 @@ Rules:
 | Language | Python 3.11+ | ML ecosystem; team skill |
 | Env and deps | `uv` (or pip + venv) | Fast, reproducible lock file |
 | Messages | Pydantic v2 | Typed, validated messages |
-| Video detection | Ultralytics YOLO11n (demo) | Fast to start. **AGPL-3.0**: needs a licence or a swap before client delivery |
-| Video tracking | ByteTrack (via `supervision`) | Simple, MIT licence |
-| Audio | `librosa` mel-spectrogram + small PyTorch CNN | Light and trainable on a laptop |
+| Video detection | `torchvision` SSDLite320 MobileNetV3, fine-tuned | BSD-3-Clause code and light on CPU. Small targets are its weak point; YOLOX-Nano (Apache-2.0) is the fallback |
+| Video decoding | `av` (PyAV) | Reads the recorded clips |
+| Video tracking | Own two-stage association, ByteTrack's method | `supervision` 0.31.5 no longer includes ByteTrack, and its replacement pulls in many packages |
+| Audio | `numpy` mel-spectrogram + small PyTorch CNN | Light and trainable on a laptop; current `librosa` needs Python 3.12 |
 | Tracking maths | `numpy`, `filterpy` (EKF) | Standard, small |
 | Config | YAML + Pydantic settings | One place for site and scenario values |
 | Dashboard | FastAPI + WebSocket + plain HTML/JS canvas | Real-time, no heavy frontend build |
@@ -151,9 +157,9 @@ Rules:
 
 ## 7. Data
 
-- Public video: an RGB + thermal anti-drone dataset (for example Anti-UAV). Check the licence first.
-- Public audio: a drone audio dataset plus background and bird sounds. Check the licence first.
-- Bird videos for the false-alarm scenario (S3).
+- Sources, licences and recording rights are in `data/README.md`.
+- Video and most audio: the Svanström Drone Detection Dataset (RGB, thermal, audio; drones, birds, airplanes, helicopters).
+- Engine audio: CC0 clips from FSD50K, as a proxy. No public recordings of one-way attack drones were found.
 - All data lives in `data/` (gitignored), fetched by `scripts/download_data.py`.
 - No client or Saudi site footage is used in the demo.
 

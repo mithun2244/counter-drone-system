@@ -1,6 +1,8 @@
 """Simulated station sensors: field of view, range, detection chance, noise (docs/design.md A2)."""
 
 from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Protocol
 
 import numpy as np
 
@@ -17,6 +19,37 @@ from cuas.sim.scenario import Environment
 from cuas.sim.truth import BearingTruth
 
 Observation = tuple[BearingDetection, BearingTruth]
+
+
+@dataclass(frozen=True)
+class Look:
+    """Real model output for one detection. ``snapshot_ref`` is opaque and reveals no label."""
+
+    class_probs: dict[str, float]
+    snapshot_ref: str
+
+
+class LookSource(Protocol):
+    """Supplies recorded-media evidence. Without one, bearings carry no model output."""
+
+    def look(
+        self,
+        station_id: str,
+        sensor: SensorKind,
+        target_id: str,
+        target_type: TargetType,
+        range_m: float,
+        t: float,
+    ) -> Look | None: ...
+
+    def hear_engine(
+        self,
+        picket_id: str,
+        target_id: str,
+        target_type: TargetType,
+        range_m: float,
+        t: float,
+    ) -> dict[str, float] | None: ...
 
 
 def detection_probability(range_m: float, max_range_m: float, p0: float) -> float:
@@ -40,11 +73,17 @@ class StationSim:
     """One station's sensors. Cameras lose range to visibility, acoustic sensors to wind."""
 
     def __init__(
-        self, station: Placement, site: SiteConfig, environment: Environment, seed: int
+        self,
+        station: Placement,
+        site: SiteConfig,
+        environment: Environment,
+        seed: int,
+        media: LookSource | None = None,
     ) -> None:
         self._station = station
         self._sensors = site.sensors
         self._seed = seed
+        self._media = media
         wind_factor = environment.wind_range_factor(site.simulation)
         self._range_factors: dict[SensorKind, float] = {
             "rgb": environment.visibility_factor,
@@ -96,8 +135,9 @@ class StationSim:
             return None
         if chance >= detection_probability(range_m, max_range_m, settings.p0):
             return None
-        # MOCK: geometry and noise are simulated; class_probs and snapshot_ref stay empty
-        # until the real models arrive in Phase 2.
+        # MOCK: geometry and noise are simulated. Without recorded media, class_probs and
+        # snapshot_ref stay empty.
+        look = self._look(sensor, target_id, target_type, range_m, t)
         bearing = BearingDetection(
             station_id=self._station.id,
             sensor=sensor,
@@ -107,6 +147,8 @@ class StationSim:
                 elevation + settings.sigma_deg * elevation_noise
             ),
             sigma_deg=settings.sigma_deg,
+            class_probs=look.class_probs if look else {},
+            snapshot_ref=look.snapshot_ref if look else None,
         )
         truth = BearingTruth(
             t=t,
@@ -120,6 +162,20 @@ class StationSim:
             max_range_m=max_range_m,
         )
         return bearing, truth
+
+    def _look(
+        self,
+        sensor: SensorKind,
+        target_id: str,
+        target_type: TargetType,
+        range_m: float,
+        t: float,
+    ) -> Look | None:
+        if self._media is None:
+            return None
+        return self._media.look(
+            self._station.id, sensor, target_id, target_type, range_m, t
+        )
 
     def statuses(self, t: float) -> list[SensorStatus]:
         # MOCK: simulated sensors never fail.
