@@ -15,12 +15,14 @@ import numpy as np
 
 from cuas.config import DetectorSettings, LookSettings, StationAiSettings, TargetType
 from cuas.media_manifest import ClipEntry, load_manifest
-from cuas.recordings import decode_every, frame_rate
+from cuas.recordings import decode_every, frame_rate, read_wav
 from cuas.schemas import SensorKind
 from cuas.sim.rng import stream
+from cuas.sim.sound_link import SoundLink, engine_probabilities
 from cuas.sim.station import Look
 from cuas.station.detector import load_trained
 from cuas.station.look import CachedDetector, LookStream
+from cuas.station.sound import load_sound_model
 
 # No fixed-wing drone is in the footage, so an attack drone has no clips and no real look.
 CAMERA_LABELS: Mapping[TargetType, str] = {
@@ -68,7 +70,9 @@ class MediaLink:
         settings: LookSettings,
         tick_s: float,
         seed: int,
+        sound: SoundLink | None = None,
     ) -> None:
+        self._sound = sound
         self._load_frames = load_frames
         self._models = models
         self._settings = settings
@@ -99,11 +103,17 @@ class MediaLink:
         t: float,
     ) -> Look | None:
         """What the model reports for this detection, or ``None`` if no clip can stand in."""
+        tick = round(t / self._tick_s)
+        if sensor == "acoustic":
+            if self._sound is None:
+                return None
+            return self._sound.hear(
+                (station_id, sensor, target_id), target_type, range_m, tick
+            )
         label = CAMERA_LABELS.get(target_type)
         model = self._models.get(sensor)
         if label is None or model is None:
             return None
-        tick = round(t / self._tick_s)
         key = (station_id, sensor, target_id)
         wanted = distance_bin(range_m, self._settings.range_bins_m[label])
         state = self._streams.get(key)
@@ -113,6 +123,21 @@ class MediaLink:
         if tick >= state.next_tick:
             self._advance(state, model, tick)
         return state.result
+
+    def hear_engine(
+        self,
+        picket_id: str,
+        target_id: str,
+        target_type: TargetType,
+        range_m: float,
+        t: float,
+    ) -> dict[str, float] | None:
+        """Engine type from the real classifier, or ``None`` if nothing stands in for it."""
+        if self._sound is None:
+            return None
+        tick = round(t / self._tick_s)
+        look = self._sound.hear((picket_id, target_id), target_type, range_m, tick)
+        return None if look is None else engine_probabilities(look.class_probs)
 
     def _open(
         self,
@@ -185,22 +210,52 @@ def clip_frames(
     return load
 
 
+def build_sound_link(
+    clips: Sequence[ClipEntry],
+    data_dir: Path,
+    models_dir: Path,
+    ai: StationAiSettings,
+    look_every_ticks: int,
+    wind_mps: float,
+    seed: int,
+) -> SoundLink | None:
+    weights = models_dir / "sound.pt"
+    if not weights.exists():
+        return None
+    settings = ai.sound
+    model = load_sound_model(settings, weights)
+
+    def load_audio(clip: ClipEntry) -> np.ndarray:
+        return read_wav(data_dir / clip.path, settings.sample_rate)
+
+    return SoundLink(
+        clips, load_audio, model.classify, settings, look_every_ticks, wind_mps, seed
+    )
+
+
 def build_media_link(
     config_dir: Path,
     data_dir: Path,
     models_dir: Path,
     ai: StationAiSettings,
     tick_s: float,
+    wind_mps: float,
     seed: int,
 ) -> MediaLink:
     models = load_look_models(models_dir, ai.detector)
     if not models:
         raise FileNotFoundError(f"no trained models in {models_dir}")
+    clips = load_manifest(config_dir).clips
+    look_every_ticks = round(ai.look.period_s / tick_s)
+    sound = build_sound_link(
+        clips, data_dir, models_dir, ai, look_every_ticks, wind_mps, seed
+    )
     return MediaLink(
-        load_manifest(config_dir).clips,
+        clips,
         clip_frames(data_dir, ai.look.period_s),
         models,
         ai.look,
         tick_s,
         seed,
+        sound,
     )

@@ -116,7 +116,7 @@ class SoundTrainingSettings(ConfigModel):
     learning_rate: Positive
     weight_decay: NonNegative
     epochs: Annotated[int, Field(ge=1)]
-    windows_per_clip: Annotated[int, Field(ge=1)]
+    windows_per_class: Annotated[int, Field(ge=1)]
     clean_fraction: Probability
     snr_range_db: tuple[float, float]
 

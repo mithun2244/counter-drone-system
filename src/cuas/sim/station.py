@@ -42,6 +42,15 @@ class LookSource(Protocol):
         t: float,
     ) -> Look | None: ...
 
+    def hear_engine(
+        self,
+        picket_id: str,
+        target_id: str,
+        target_type: TargetType,
+        range_m: float,
+        t: float,
+    ) -> dict[str, float] | None: ...
+
 
 def detection_probability(range_m: float, max_range_m: float, p0: float) -> float:
     """``p0 * (1 - (r / R)^2)`` inside the range, and 0 at the range and beyond."""

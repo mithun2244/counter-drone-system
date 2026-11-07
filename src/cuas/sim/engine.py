@@ -29,7 +29,9 @@ async def run_scenario(
         for station in site.stations
     ]
     pickets = [
-        PicketSim(picket, site.picket_settings, clock.tick_s, wind_factor, run_seed)
+        PicketSim(
+            picket, site.picket_settings, clock.tick_s, wind_factor, run_seed, media
+        )
         for picket in site.pickets
     ]
     trajectories = [

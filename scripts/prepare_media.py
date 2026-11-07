@@ -4,6 +4,8 @@ Applies the exclusions in data/README.md and splits by source. Writes hashes and
 the media itself stays in data/.
 """
 
+import hashlib
+import json
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -46,6 +48,9 @@ SIGNATURE_POSITIONS = (0.0, 1 / 3, 2 / 3, 1.0)
 VIDEO_FOLDERS = {"IR": "Video_IR", "V": "Video_V"}
 MODALITIES = {"IR": "thermal", "V": "rgb"}
 AUDIO_CLASSES = {"DRONE": "electric_drone", "BACKGROUND": "background"}
+ENGINE_LABEL = "engine"
+FSD50K = "fsd50k"
+UPLOADER_HASH_CHARS = 10
 EXCLUDED_AUDIO_REASON = "helicopter audio may come from third-party YouTube videos"
 EXCLUDED_VIDEO_REASON = "third-party internet source, rights unverified"
 EXCLUDED_LABELS_REASON = "label file layout could not be read"
@@ -53,7 +58,7 @@ REQUIRED_CLIPS = tuple(
     (modality, label)
     for modality in MODALITIES.values()
     for label in ("drone", "bird", "airplane", "helicopter")
-) + tuple(("audio", label) for label in AUDIO_CLASSES.values())
+) + tuple(("audio", label) for label in (*AUDIO_CLASSES.values(), ENGINE_LABEL))
 
 
 def read_description(path: Path) -> list[dict[str, str]]:
@@ -201,6 +206,31 @@ def build_audio(settings: SplitSettings) -> tuple[list[dict], list[dict]]:
     return entries, excluded
 
 
+def build_engine(settings: SplitSettings) -> list[dict]:
+    """The FSD50K proxy clips. No uploader spans two splits; only a hash of their name is kept."""
+    selection = json.loads(
+        (DATA_DIR / FSD50K / "selected.json").read_text(encoding="utf-8")
+    )
+    by_uploader: defaultdict[str, list[dict]] = defaultdict(list)
+    for clip in selection:
+        by_uploader[clip["uploader"]].append(clip)
+    stratum = f"audio|{ENGINE_LABEL}"
+    groups = []
+    for uploader, clips in sorted(by_uploader.items()):
+        digest = hashlib.sha256(uploader.encode()).hexdigest()[:UPLOADER_HASH_CHARS]
+        members = tuple(Clip(c["fname"], int(c["fname"]), stratum) for c in clips)
+        groups.append(Group(f"audio_{ENGINE_LABEL}_{digest}", stratum, members))
+    assigned = assign_splits(groups, settings.fractions, settings.salt)
+    entries = []
+    for group in groups:
+        for clip in group.clips:
+            path = DATA_DIR / FSD50K / f"{clip.id}.wav"
+            entry = _audio_entry(path, ENGINE_LABEL, group.id, assigned[group.id])
+            entry["path"] = f"{FSD50K}/{path.name}"
+            entries.append(entry)
+    return entries
+
+
 def _audio_entry(path: Path, label: str, group: str, split: str) -> dict:
     digest = sha256_of(path)
     return {
@@ -260,7 +290,7 @@ def main() -> int:
     )
     video, excluded_video = build_video(rows, settings, signatures, unreadable)
     audio, excluded_audio = build_audio(settings)
-    entries, copies = drop_exact_copies(video + audio)
+    entries, copies = drop_exact_copies(video + audio + build_engine(settings))
     excluded = excluded_video + excluded_audio + copies
     counts = summarise(entries)
     for key, tally in sorted(counts.items()):

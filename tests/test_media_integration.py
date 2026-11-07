@@ -1,5 +1,6 @@
 """Checks on the real recordings and models. Skipped when they have not been downloaded."""
 
+import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -139,3 +140,31 @@ def test_every_kept_label_file_is_readable(manifest: MediaManifest) -> None:
     assert len(videos) == 600
     excluded = {e.path: e.reason for e in manifest.excluded}
     assert "label" in excluded["svanstrom/Data/Video_V/V_AIRPLANE_002.mp4"]
+
+
+def test_engine_clips_are_cc0_with_no_uploader_in_two_splits(
+    manifest: MediaManifest,
+) -> None:
+    selection_path = DATA_DIR / "fsd50k" / "selected.json"
+    if not selection_path.exists():
+        pytest.skip("engine clips not downloaded")
+    selection = json.loads(selection_path.read_text(encoding="utf-8"))
+    assert all("publicdomain/zero" in clip["license"] for clip in selection)
+    uploader_of = {clip["fname"]: clip["uploader"] for clip in selection}
+    engines = [c for c in manifest.clips if c.label == "engine"]
+    assert engines
+    splits: defaultdict[str, set[str]] = defaultdict(set)
+    for clip in engines:
+        fname = Path(clip.path).stem
+        splits[uploader_of[fname]].add(clip.split)
+    assert all(len(found) == 1 for found in splits.values())
+    assert {clip.split for clip in engines} == {"train", "val", "test"}
+
+
+def test_no_uploader_name_is_stored_in_the_manifest(manifest: MediaManifest) -> None:
+    selection_path = DATA_DIR / "fsd50k" / "selected.json"
+    if not selection_path.exists():
+        pytest.skip("engine clips not downloaded")
+    selection = json.loads(selection_path.read_text(encoding="utf-8"))
+    text = (CONFIG_DIR / MANIFEST_NAME).read_text(encoding="utf-8")
+    assert not [c["uploader"] for c in selection if f"_{c['uploader']}" in text]

@@ -108,7 +108,7 @@ station_ai:  # real models on recorded media; all start values
     iou_hit: 0.3
     iou_strict: 0.5
   sound:
-    classes: [electric_drone, background]
+    classes: [electric_drone, engine, background]  # engine is a proxy: see data/README.md
     sample_rate: 16000
     window_s: 1.0
     n_fft: 512
@@ -127,6 +127,6 @@ station_ai:  # real models on recorded media; all start values
       learning_rate: 0.001
       weight_decay: 0.0001
       epochs: 30
-      windows_per_clip: 6
+      windows_per_class: 150  # balanced, because engine clips far outnumber the others
       clean_fraction: 0.3
       snr_range_db: [-10.0, 20.0]

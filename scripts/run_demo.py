@@ -137,7 +137,7 @@ def print_evaluation(summaries: list[TargetSummary]) -> None:
 
 
 def build_media(
-    args: argparse.Namespace, site: SiteConfig, seed: int
+    args: argparse.Namespace, site: SiteConfig, wind_mps: float, seed: int
 ) -> LookSource | None:
     """Imported only when asked for, so simulator-only runs never load torch."""
     if not args.recorded_media:
@@ -150,6 +150,7 @@ def build_media(
         MODELS_DIR,
         site.station_ai,
         site.simulation.tick_s,
+        wind_mps,
         seed,
     )
 
@@ -161,7 +162,7 @@ async def run(args: argparse.Namespace, site: SiteConfig) -> None:
     bus = InProcessBus()
     clock = SimClock(site.simulation.tick_s, pace=None if args.fast else REAL_TIME_PACE)
     printer = asyncio.create_task(print_observations(bus.subscribe(WILDCARD)))
-    media = build_media(args, site, seed)
+    media = build_media(args, site, scenario.environment.wind_mps, seed)
     truth = await run_scenario(scenario, site, bus, clock, seed=seed, media=media)
     await bus.close()
     await printer

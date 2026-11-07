@@ -11,6 +11,7 @@ from cuas.config import EngineSettings, PicketSettings, Placement, TargetType
 from cuas.geometry import bearing_to, wrap_azimuth
 from cuas.schemas import PicketAlert, SensorStatus
 from cuas.sim.rng import stream
+from cuas.sim.station import LookSource
 from cuas.sim.truth import PicketTruth
 
 Report = tuple[PicketAlert, PicketTruth]
@@ -24,8 +25,9 @@ def guess_engine(
 ) -> tuple[str, dict[str, float]]:
     """A noisy engine guess and its probabilities.
 
-    MOCK: stands in for the audio classifier until Phase 2. It is deliberately imperfect,
-    because a perfect guess would hand the true target type to everything downstream.
+    MOCK: stands in for the audio classifier when no recorded media is in use. It is
+    deliberately imperfect, because a perfect guess would hand the true target type to
+    everything downstream.
     """
     others = [engine for engine in engine_types if engine != true_type]
     correct, pick = rng.random(2).tolist()
@@ -63,7 +65,9 @@ class PicketSim:
         tick_s: float,
         wind_factor: float,
         seed: int,
+        media: LookSource | None = None,
     ) -> None:
+        self._media = media
         self._picket = picket
         self._settings = settings
         self._tick_s = tick_s
@@ -126,6 +130,12 @@ class PicketSim:
         radius_m = engine.hearing_radius_m * self._wind_factor
         if distance_m > radius_m:
             return None
+        if self._media is not None:
+            real = self._media.hear_engine(
+                self._picket.id, target_id, target_type, distance_m, t
+            )
+            if real is not None:
+                guess, probs = max(real, key=real.get), real
         return _Heard(
             heard_t=t,
             target_id=target_id,
@@ -134,7 +144,7 @@ class PicketSim:
             reported_bearing_deg=wrap_azimuth(azimuth + float(bearing_error)),
             distance_m=distance_m,
             hearing_radius_m=radius_m,
-            # MOCK: a simple falloff with distance, until real audio arrives in Phase 2.
+            # MOCK: a simple falloff with distance, also when recorded media is in use.
             loudness=max(
                 0.0, min(1.0, 1.0 - distance_m / radius_m + float(loudness_noise))
             ),

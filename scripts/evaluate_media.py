@@ -11,6 +11,7 @@ import sys
 import time
 from pathlib import Path
 
+import numpy as np
 import torch
 
 from cuas.config import StationAiSettings, load_site
@@ -20,13 +21,18 @@ from cuas.metrics.mat_labels import read_label_file
 from cuas.metrics.recorded_media import (
     ClipScore,
     add_frame,
+    render_audio_report,
     render_video_report,
+    summarise_audio,
     summarise_video,
     timing_summary,
 )
-from cuas.recordings import decode_frames, frame_count, frame_rate
+from cuas.recordings import decode_frames, frame_count, frame_rate, read_wav
+from cuas.sim.mixing import fit_length, mix_at_snr
+from cuas.sim.rng import stream
 from cuas.station.detector import Detector, load_trained
 from cuas.station.look import LookStream
+from cuas.station.sound import SoundModel, load_sound_model
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR = ROOT / "config"
@@ -36,6 +42,20 @@ EVAL_DIR = ROOT / "runs" / "eval"
 ATTEMPTS_LOG = EVAL_DIR / "attempts.jsonl"
 FRAME_STEP = 5  # neighbouring frames are near-copies, so every 5th frame is enough
 MIN_TIMING_FRAMES = 1000
+NOISE_LABEL = "background"
+CLEAN = "clean"
+SOUND_NOTES = (
+    (
+        "The `engine` class is a **proxy**: CC0 recordings of mostly road vehicles from FSD50K, "
+        "not one-way attack drones. It says nothing about detecting those."
+    ),
+    "",
+    (
+        "`Misses` counts drone or engine clips called background. `False detections` counts "
+        "background clips called drone or engine. Each clip is judged on the average of its "
+        "1 s windows, and intervals treat clips as independent."
+    ),
+)
 TO_MS = 1000.0
 
 
@@ -164,6 +184,79 @@ def evaluate_video(modality: str, split: str, ai: StationAiSettings) -> dict:
     }
 
 
+def classify_clip(
+    model: SoundModel,
+    audio: np.ndarray,
+    noise: np.ndarray | None,
+    snr_db: float | None,
+    window_samples: int,
+    times: list[float],
+) -> dict[str, float]:
+    """The average of a clip's windows, mixed with held-out noise if an SNR is given."""
+    starts = range(0, max(audio.size - window_samples, 1), window_samples)
+    scores = []
+    for start in starts:
+        window = fit_length(audio, window_samples, start)
+        if noise is not None and snr_db is not None:
+            noise_window = fit_length(noise, window_samples, start)
+            window = mix_at_snr(window, noise_window, snr_db)
+        began = time.perf_counter()
+        scores.append(model.classify(window))
+        times.append((time.perf_counter() - began) * TO_MS)
+    return {name: float(np.mean([s[name] for s in scores])) for name in scores[0]}
+
+
+def evaluate_sound(split: str, ai: StationAiSettings) -> dict:
+    """Every clip at every noise level. Noise comes from the same held-out split."""
+    settings = ai.sound
+    weights = MODELS_DIR / "sound.pt"
+    record = json.loads((MODELS_DIR / "sound.json").read_text(encoding="utf-8"))
+    manifest_hash = sha256_of(CONFIG_DIR / MANIFEST_NAME)
+    if record["manifest_sha256"] != manifest_hash:
+        raise SystemExit("these weights were trained against a different manifest")
+    clips = [
+        c
+        for c in load_manifest(CONFIG_DIR).clips
+        if c.modality == "audio" and c.split == split and c.label in settings.classes
+    ]
+    audio = {c.id: read_wav(DATA_DIR / c.path, settings.sample_rate) for c in clips}
+    noises = [audio[c.id] for c in clips if c.label == NOISE_LABEL]
+    model = load_sound_model(settings, weights)
+    rng = stream(settings.training.seed, "evaluate", split)
+    times: list[float] = []
+    summaries = {}
+    for level in (None, *settings.evaluation_snr_db):
+        results = []
+        for clip in clips:
+            mixed = level is not None and clip.label != NOISE_LABEL
+            noise = noises[int(rng.integers(len(noises)))] if mixed else None
+            scores = classify_clip(
+                model, audio[clip.id], noise, level, settings.window_samples, times
+            )
+            results.append((clip.label, max(scores, key=scores.get)))
+        name = CLEAN if level is None else f"{level:+.0f} dB"
+        summaries[name] = summarise_audio(results, settings.classes, NOISE_LABEL)
+    digest = sha256_of(weights)
+    provenance = {
+        "Split": split,
+        "Modality": "audio",
+        "Weights SHA-256": digest,
+        "Manifest SHA-256": manifest_hash,
+        "Clips": len(clips),
+        f"Evaluations of these weights on {split}": count_attempts(
+            "sound", split, digest
+        ),
+        "CPU": platform.processor() or platform.machine(),
+        "Torch": torch.__version__,
+    }
+    return {
+        "name": "sound",
+        "summary": summaries,
+        "provenance": provenance,
+        "timing": {"classifier, per 1 s window": timing_summary(times)},
+    }
+
+
 def write_report(result: dict, split: str, title: str, report: str) -> Path:
     folder = EVAL_DIR / (
         result["name"] if split == "test" else f"{result['name']}_{split}"
@@ -179,14 +272,26 @@ def write_report(result: dict, split: str, title: str, report: str) -> Path:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--model", choices=["look_rgb", "look_thermal"], required=True)
+    parser.add_argument(
+        "--model", choices=["look_rgb", "look_thermal", "sound"], required=True
+    )
     parser.add_argument("--split", choices=["val", "test"], default="test")
     args = parser.parse_args()
     ai = load_site(CONFIG_DIR).station_ai
-    result = evaluate_video(args.model.removeprefix("look_"), args.split, ai)
-    report = render_video_report(
-        args.model, result["summary"], result["provenance"], result["timing"]
-    )
+    if args.model == "sound":
+        result = evaluate_sound(args.split, ai)
+        report = render_audio_report(
+            args.model,
+            result["summary"],
+            result["provenance"],
+            result["timing"],
+            notes=SOUND_NOTES,
+        )
+    else:
+        result = evaluate_video(args.model.removeprefix("look_"), args.split, ai)
+        report = render_video_report(
+            args.model, result["summary"], result["provenance"], result["timing"]
+        )
     folder = write_report(result, args.split, args.model, report)
     print(f"wrote {folder / 'report.md'}")
     return 0

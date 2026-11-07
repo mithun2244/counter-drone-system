@@ -9,8 +9,9 @@ import pytest
 
 from cuas.config import SiteConfig
 from cuas.media_manifest import ClipEntry
-from cuas.schemas import BearingDetection
+from cuas.schemas import BearingDetection, PicketAlert
 from cuas.sim.media import LookModel, MediaLink, distance_bin
+from cuas.sim.station import Look
 from cuas.station.detector import Box
 from cuas.station.look import CachedDetector
 
@@ -250,3 +251,61 @@ async def test_attack_drones_keep_empty_camera_output(record, site) -> None:
     bearings = [m for m in messages if isinstance(m, BearingDetection)]
     assert bearings
     assert all(b.class_probs == {} and b.snapshot_ref is None for b in bearings)
+
+
+class FakeSound:
+    """Stands in for the sound link, to check the routing."""
+
+    def __init__(self) -> None:
+        self.keys: list[tuple[str, ...]] = []
+
+    def hear(self, key, target_type, range_m, tick):
+        self.keys.append(key)
+        return Look({"electric_drone": 0.2, "engine": 0.6, "background": 0.2}, "abcd:0")
+
+
+def media_with_sound(site: SiteConfig) -> MediaLink:
+    return MediaLink(
+        [entry(OPAQUE)],
+        frames_for,
+        {"rgb": model_saying("drone")},
+        site.station_ai.look,
+        TICK,
+        1,
+        FakeSound(),
+    )
+
+
+def test_acoustic_sensors_go_to_the_sound_link(site: SiteConfig) -> None:
+    look = media_with_sound(site).look(
+        "st1", "acoustic", "t1", "quadcopter", 100.0, 0.0
+    )
+    assert look.class_probs["engine"] == 0.6
+
+
+def test_pickets_get_engine_type_from_the_classifier(site: SiteConfig) -> None:
+    result = media_with_sound(site).hear_engine("pk1", "t1", "attack_drone", 500.0, 0.0)
+    assert result == pytest.approx({"electric": 0.25, "piston": 0.75})
+
+
+def test_without_a_sound_model_pickets_keep_their_mock(site: SiteConfig) -> None:
+    media = link(site, [entry(OPAQUE)], model_saying("drone"))
+    assert media.hear_engine("pk1", "t1", "attack_drone", 500.0, 0.0) is None
+
+
+async def test_pickets_report_the_classifier_and_their_geometry_is_unchanged(
+    record, site
+) -> None:
+    plain, _ = await record("s1", seed=7)
+    linked, truth = await record("s1", seed=7, media=media_with_sound(site))
+    alerts = [m for m in linked if isinstance(m, PicketAlert)]
+    assert alerts
+    assert all(
+        a.engine_type_probs == pytest.approx({"electric": 0.25, "piston": 0.75})
+        for a in alerts
+    )
+    assert all(t.guessed_engine_type == "piston" for t in truth.picket_alerts)
+    plain_alerts = [m for m in plain if isinstance(m, PicketAlert)]
+    assert [(a.t, a.picket_id, a.bearing_deg) for a in alerts] == [
+        (a.t, a.picket_id, a.bearing_deg) for a in plain_alerts
+    ]
