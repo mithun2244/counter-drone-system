@@ -98,7 +98,7 @@ cuas-demo/
 │   ├── run_demo.py           # python scripts/run_demo.py --scenario s1
 │   ├── download_data.py      # fetch public datasets into data/
 │   ├── prepare_media.py      # read labels, write config/media_manifest.yaml
-│   ├── train_detector.py     # fine-tune a detector; resumes after a kill
+│   ├── train_detector.py     # fine-tune a detector; resumes after a kill; CPU by default, opt-in CUDA (docs/colab_gpu.md)
 │   ├── train_audio.py        # train the audio classifier
 │   └── evaluate_media.py     # held-out reports in runs/eval/
 ├── tests/                    # pytest, mirrors src/ layout

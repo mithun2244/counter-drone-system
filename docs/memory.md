@@ -8,7 +8,7 @@
 - **Current phase:** Phase 2 — Station AI, in progress on `phase-2-station-ai`, not merged
 - **Last session:** 2026-11-07
 - **Blocked on:** the thermal detector is not trained. Claude Code's low-memory reaper killed the run at epoch 16 (82 min); it restarts only when the user asks
-- **Next step:** train thermal (`uv run python scripts/train_detector.py --modality thermal`, about 105 min; keep the laptop awake and close other programs), then run `uv run python scripts/evaluate_media.py --model look_thermal --split test` alone, then acceptance checks 6, 14, 16, 17, 18, 23, tick `phases.md`, merge. Sabotage checks and the other acceptance checks already pass
+- **Next step:** the user benchmarks a Colab T4 with `docs/colab_gpu.md`, then decides where to train thermal (locally: `uv run python scripts/train_detector.py --modality thermal`, about 105 min, laptop awake and other programs closed). Then run `uv run python scripts/evaluate_media.py --model look_thermal --split test` alone, then acceptance checks 6, 14, 16, 17, 18, 23, tick `phases.md`, merge. Sabotage checks and the other acceptance checks already pass
 - **Start sessions from `cuas-demo/`**, or `CLAUDE.md` will not auto-load
 
 ## Decisions log
@@ -39,6 +39,7 @@
 | 2026-11-06 | Clips are matched to simulated range; M-of-N does not drop bearings | Mixing all bins would overstate results; keeping geometry leaves Phase 1 bearings identical |
 | 2026-11-06 | FSD50K clips read by HTTP range requests with our own zip directory reader | Stores only the selected clips instead of downloading 6.2 GB; `zipfile` refuses a multi-part zip64 archive |
 | 2026-11-07 | Look period 0.6 s; the media link refuses a period that is not whole ticks | `round(0.5 / 0.2)` silently gave 0.4 s |
+| 2026-11-07 | Opt-in `--device cuda` for detector training, with the CUDA build of torch installed on Colab only (`docs/colab_gpu.md`); CPU stays the default and `uv.lock` is unchanged | The user measured Colab's CPU at 3.5 s per batch, and 20 epochs inside the 120-minute budget need 1.4 s or less. The model returns to the CPU for saving and validation, so the weights and threshold suit the CPU evaluator |
 | 2026-11-07 | Detector training saves a checkpoint each epoch and resumes from it | A low-memory kill cost 82 minutes because weights were saved only at the end |
 | 2026-11-06 | Use Superpowers (official marketplace version) for focused debugging, testing and code review when useful; skip its brainstorming and writing-plans; ask before separate worktrees or subagents (rules in `CLAUDE.md`) | `docs/phases.md`, `docs/rules.md` and approval in Plan Mode stay the one project workflow |
 
@@ -65,6 +66,8 @@
 - RGB test results rest on few scenes: the 17 drone clips come from 3 scene groups, so the intervals are too narrow. The Distant drone miss rate is 0.085 on test but 0.817 on validation, so the test split is much easier there
 - The audio classifier does not beat its baseline: 0.750 clean against 0.773 for always answering `engine`, which is 34 of 44 test clips. Nine engine clips are called background
 - Sustained live inference is unproven: S2 keeps real time only through a per-frame memo. By calculation, 6 unmemoised streams at one look per 0.6 s need about 825 ms of CPU per simulated second
+- The CUDA path has not run on a real GPU yet: no GPU is available here, so tests use stand-ins. The user's T4 benchmark will be its first real run. Resuming on a GPU is not proven bit-identical
+- The manifest hash depends on line endings: `bc49b46d` on Windows with `autocrlf`, `ba662739` for the committed bytes. A fresh Linux clone would have its weights refused by `evaluate_media.py`, so Colab must use a ZIP built with `git archive` on the Windows machine. Worth fixing before Phase 6's second-machine check
 - This laptop has 7.7 GB of RAM, and long training competes with everything else open. The training time budget is wall clock, so it also counts sleep
 - S4's dust reduces simulated range but is not applied to the frames
 - The simulator's 800 m RGB range for a quadcopter is a start value this footage cannot support: the dataset's Distant bin starts at 60 m
