@@ -49,6 +49,29 @@ class Sample:
     boxes: tuple[Box, ...]
 
 
+@dataclass(frozen=True)
+class Checkpoint:
+    """Keeps a long run's progress after each epoch, so a killed process loses one epoch at most."""
+
+    path: Path
+    run: str
+
+    def load(self) -> dict | None:
+        if not self.path.exists():
+            return None
+        saved = torch.load(self.path)
+        if saved["run"] != self.run:
+            raise SystemExit(
+                f"{self.path} came from other settings. Delete it to start again."
+            )
+        return saved
+
+    def save(self, state: dict) -> None:
+        scratch = self.path.with_suffix(".tmp")
+        torch.save({**state, "run": self.run}, scratch)
+        scratch.replace(self.path)  # a kill during the write leaves the last good one
+
+
 def sample_clip(clip: ClipEntry, per_clip: int) -> list[Sample]:
     """Evenly spaced frames, cached on disk so training does not hold them all in memory."""
     count = frame_count(DATA_DIR / clip.path)
@@ -120,6 +143,7 @@ def train(
     classes: tuple[str, ...],
     settings: TrainingSettings,
     max_batches: int | None = None,
+    checkpoint: Checkpoint | None = None,
 ) -> dict:
     """Runs until the epochs or the time budget run out, whichever comes first."""
     rng = np.random.default_rng(settings.seed)
@@ -127,10 +151,18 @@ def train(
     optimizer = torch.optim.AdamW(
         parameters, lr=settings.learning_rate, weight_decay=settings.weight_decay
     )
-    started = time.perf_counter()
+    batches, epochs_done, losses, elapsed = 0, 0, [], 0.0
+    if saved := checkpoint.load() if checkpoint else None:
+        model.load_state_dict(saved["model"])
+        optimizer.load_state_dict(saved["optimizer"])
+        rng.bit_generator.state = saved["numpy_rng"]
+        torch.set_rng_state(saved["torch_rng"])
+        batches, epochs_done = saved["batches"], saved["epochs"]
+        losses, elapsed = saved["losses"], saved["seconds"]
+        print(f"resuming after epoch {epochs_done}")
+    started = time.perf_counter() - elapsed
     deadline = started + settings.max_minutes * 60
-    batches, epochs_done, losses = 0, 0, []
-    for epoch in range(settings.epochs):
+    for epoch in range(epochs_done, settings.epochs):
         set_training_mode(model, settings.freeze_backbone)
         order = rng.permutation(len(samples))
         for start in range(0, len(order), settings.batch_size):
@@ -153,6 +185,19 @@ def train(
                     batches, epochs_done, losses, started, stopped_early=True
                 )
         epochs_done = epoch + 1
+        if checkpoint:
+            checkpoint.save(
+                {
+                    "model": model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "numpy_rng": rng.bit_generator.state,
+                    "torch_rng": torch.get_rng_state(),
+                    "batches": batches,
+                    "epochs": epochs_done,
+                    "losses": losses,
+                    "seconds": time.perf_counter() - started,
+                }
+            )
     return _summary(batches, epochs_done, losses, started, stopped_early=False)
 
 
@@ -250,9 +295,20 @@ def main() -> int:
         )
         return 0
 
-    result = train(model, train_samples, settings.classes, training)
-    print(f"training: {result}")
     MODELS_DIR.mkdir(exist_ok=True)
+    checkpoint = Checkpoint(
+        MODELS_DIR / f"look_{args.modality}.checkpoint.pt",
+        json.dumps(
+            {
+                "manifest": sha256_of(CONFIG_DIR / MANIFEST_NAME),
+                "detector": settings.model_dump(),
+                "training": training.model_dump(),
+            },
+            sort_keys=True,
+        ),
+    )
+    result = train(model, train_samples, settings.classes, training, None, checkpoint)
+    print(f"training: {result}")
     weights = MODELS_DIR / f"look_{args.modality}.pt"
     torch.save(model.state_dict(), weights)
 
@@ -277,6 +333,7 @@ def main() -> int:
     (MODELS_DIR / f"look_{args.modality}.json").write_text(
         json.dumps(record, indent=2), encoding="utf-8"
     )
+    checkpoint.path.unlink(missing_ok=True)
     print(f"validation threshold: {threshold}")
     print(f"validation drone: {summary['classes']['drone']}")
     print(f"validation by bin: {summary['drone_misses_by_bin']}")
