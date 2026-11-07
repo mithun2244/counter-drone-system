@@ -27,6 +27,15 @@ NOISE_LABEL = "background"
 PROBABILITY_FLOOR = 1e-6
 
 
+def clips_for_training(
+    clips: list[ClipEntry],
+) -> tuple[list[ClipEntry], list[ClipEntry], list[ClipEntry]]:
+    """Training, validation and noise clips. Noise is training clips only; test clips go nowhere."""
+    train = [c for c in clips if c.split == "train"]
+    val = [c for c in clips if c.split == "val"]
+    return train, val, [c for c in train if c.label == NOISE_LABEL]
+
+
 def load_clips(
     clips: list[ClipEntry], settings: SoundSettings
 ) -> list[tuple[str, np.ndarray]]:
@@ -101,9 +110,10 @@ def main() -> int:
         for c in load_manifest(CONFIG_DIR).clips
         if c.modality == "audio" and c.label in settings.classes
     ]
-    train_clips = load_clips([c for c in clips if c.split == "train"], settings)
-    val_clips = load_clips([c for c in clips if c.split == "val"], settings)
-    noises = [audio for label, audio in train_clips if label == NOISE_LABEL]
+    train, val, noise = clips_for_training(clips)
+    train_clips = load_clips(train, settings)
+    val_clips = load_clips(val, settings)
+    noises = [audio for _, audio in load_clips(noise, settings)]
     by_label: defaultdict[str, list[np.ndarray]] = defaultdict(list)
     for label, audio in train_clips:
         by_label[label].append(audio)
