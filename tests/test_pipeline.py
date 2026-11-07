@@ -7,6 +7,7 @@ import pytest
 from cuas.bus import WILDCARD, InProcessBus
 from cuas.config import SiteConfig
 from cuas.geometry import bearing_to
+from cuas.metrics.track_evaluator import TrackReport, evaluate_tracks
 from cuas.pipeline import control_layer, run_control, start_pipeline
 from cuas.schemas import (
     BearingDetection,
@@ -132,3 +133,40 @@ async def test_same_seed_same_tracks_and_pace_does_not_matter(record_pipeline) -
     _, _, paced, _ = await record_pipeline("s2", seed=7, pace=100.0)
     assert first
     assert dumps(first) == dumps(second) == dumps(paced)
+
+
+MAX_MEDIAN_ERROR_M = 20.0  # phases.md, Phase 3
+# The scenario's own seed, seed 7, and 20 seeds the design prototype never ran.
+ACCEPTANCE_SEEDS = [None, 7, *range(101, 121)]
+
+
+async def track_report(
+    record_pipeline, scenario_id: str, seed: int | None
+) -> TrackReport:
+    _, _, controlled, truth = await record_pipeline(scenario_id, seed=seed)
+    return evaluate_tracks(truth, [m for m in controlled if isinstance(m, Track)])
+
+
+def assert_accurate(report: TrackReport) -> None:
+    assert report.median_error_m is not None
+    assert report.median_error_m <= MAX_MEDIAN_ERROR_M
+    assert report.worst_target[1] <= MAX_MEDIAN_ERROR_M
+
+
+@pytest.mark.parametrize("seed", ACCEPTANCE_SEEDS, ids=str)
+async def test_s1_exactly_three_confirmed_tracks_within_20_m(
+    record_pipeline, seed: int | None
+) -> None:
+    report = await track_report(record_pipeline, "s1", seed)
+    assert report.confirmed == 3
+    assert report.false_tracks == 0
+    assert report.overlapping_duplicates == report.sequential_duplicates == 0
+    assert report.tracks_per_target == {"atk-1": 1, "atk-2": 1, "atk-3": 1}
+    assert_accurate(report)
+
+
+@pytest.mark.parametrize("seed", ACCEPTANCE_SEEDS, ids=str)
+async def test_s2_median_error_within_20_m(record_pipeline, seed: int | None) -> None:
+    report = await track_report(record_pipeline, "s2", seed)
+    assert report.drones_tracked == (1, 1)
+    assert_accurate(report)

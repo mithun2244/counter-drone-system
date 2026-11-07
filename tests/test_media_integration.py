@@ -232,6 +232,17 @@ async def test_s2_bearings_carry_real_output_and_the_same_geometry(
             assert strip_look(a) == strip_look(b)
 
 
+async def test_tracks_use_geometry_only_so_real_models_change_nothing(
+    record_pipeline, real_media
+) -> None:
+    _, _, plain, _ = await record_pipeline("s2", seed=SEED)
+    _, _, linked, _ = await record_pipeline(
+        "s2", seed=SEED, media=real_media(s2_wind(), SEED)
+    )
+    assert plain
+    assert [m.model_dump_json() for m in plain] == [m.model_dump_json() for m in linked]
+
+
 async def test_s2_with_real_models_is_repeatable(record, real_media) -> None:
     first, _ = await record("s2", seed=SEED, media=real_media(s2_wind(), SEED))
     second, _ = await record("s2", seed=SEED, media=real_media(s2_wind(), SEED))
