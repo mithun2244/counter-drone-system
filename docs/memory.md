@@ -5,10 +5,10 @@
 
 ## Current status
 
-- **Current phase:** Phase 2 — Station AI, on `phase-2-station-ai`, not merged. All three models are trained and have test reports
+- **Current phase:** Phase 2 — Station AI is done. Phase 3 has not started
 - **Last session:** 2026-11-07
-- **Blocked on:** the user's review: whether to accept the limits under Known issues, and whether the timing shortfall needs a validation-only run
-- **Next step:** once cleared, tick `phases.md`, merge into `main` with `--no-ff` (do not push), then run check 23: clean tree, and checks 3, 5, 7, 8 again on `main`. Every other acceptance check passes on `ff71287`, and the full suite and fresh clone pass again on `36bad0a`, which only adds tests. Do not rerun the held-out evaluation. Phase 3 needs its own plan and approval
+- **Blocked on:** nothing
+- **Next step:** when the user asks, plan Phase 3 in Plan Mode on a new branch, without starting code until approved. Do not rerun the held-out evaluations
 - **Start sessions from `cuas-demo/`**, or `CLAUDE.md` will not auto-load
 
 ## Decisions log
@@ -39,6 +39,8 @@
 | 2026-11-06 | Clips are matched to simulated range; M-of-N does not drop bearings | Mixing all bins would overstate results; keeping geometry leaves Phase 1 bearings identical |
 | 2026-11-06 | FSD50K clips read by HTTP range requests with our own zip directory reader | Stores only the selected clips instead of downloading 6.2 GB; `zipfile` refuses a multi-part zip64 archive |
 | 2026-11-07 | Look period 0.6 s; the media link refuses a period that is not whole ticks | `round(0.5 / 0.2)` silently gave 0.4 s |
+| 2026-11-07 | The user accepted the documented limits for the Phase 2 demo: false drone tracks, the Distant validation and test gap, unmeasured empty-sky false alarms, narrow S2 look evidence and the rest of Known issues | Phase 2 has no accuracy target, and results are reported as measured. This covers the Phase 2 demo only, and the limits stay listed because they are still true |
+| 2026-11-07 | The user approved an exception for the decode, tracker and audio timing shortfalls; exactly what was missed is under Exceptions to the Phase 2 plan | These stages are small next to camera inference: tracker 0.1 ms and decode 4 ms against 90 ms, and audio 4.1 ms per 1 s window |
 | 2026-11-07 | Thermal detector trained on a Colab T4 (20 epochs, 7.3 min in the training loop, 0.086 s per batch) and evaluated once on this laptop's CPU; RGB and audio stay CPU-trained | The local CPU run was killed at epoch 16 and Colab's CPU was too slow. Evaluating here keeps CPU timings on the machine the plan measures |
 | 2026-11-07 | Opt-in `--device cuda` for detector training, with the CUDA build of torch installed on Colab only (`docs/colab_gpu.md`); CPU stays the default and `uv.lock` is unchanged | The user measured Colab's CPU at 3.5 s per batch, and 20 epochs inside the 120-minute budget need 1.4 s or less. The model returns to the CPU for saving and validation, so the weights and threshold suit the CPU evaluator |
 | 2026-11-07 | Detector training saves a checkpoint each epoch and resumes from it | A low-memory kill cost 82 minutes because weights were saved only at the end |
@@ -70,9 +72,8 @@
 - Thermal separates other aircraft poorly at frame level: airplane precision 0.307, recall 0.205; helicopter 0.284, 0.198; 391.7 false detections per 1,000 frames across all classes
 - S2's look evidence is narrow. Each sensor draws on one scene: RGB 2 clips of `V_DRONE_026`, thermal 3 of `IR_DRONE_096`, acoustic 2 of `audio_DRONE_006`, and both cameras use only F450 Distant clips while simulated range is 209 to 766 m. The Distant bin starts at 60 m and the dataset gives no exact distances, so S2's share of non-zero drone confidence is not a detection rate at those ranges
 - No test checks the real trained weights' S2 confidences. `test_s2_bearings_carry_real_output_and_the_same_geometry` only needs them non-empty. Two tests in `tests/sim/test_media.py` now catch forced-zero confidences and an RGB model on the thermal path (9 of 9 sabotages), with real loading and inference, but on checkpoints built to give a known answer. So damaged weights that only output zeros would pass; the real share is reported, with no target, as the plan says
-- CPU timing against the plan: inference at 4 and 1 threads meets 1,000 frames on both cameras. Short: tracker, 976 looks on thermal and 642 on RGB; decode, one value per clip (55 and 36, covering 4,215 and 2,762 kept frames), so its p50 and p95 are per clip; audio, 3,130 windows but a single thread setting the report does not name, and WAV reading untimed. Validation alone closes these only with new code: one pass gives 964 and 584 looks, decode needs per-frame timing, and audio needs a thread setting. `evaluate_media.py --split val` is the wrong tool, because it appends to `attempts.jsonl` and labels its report HELD-OUT
 - The audio classifier does not beat its baseline: 0.750 clean against 0.773 for always answering `engine`, which is 34 of 44 test clips. Nine engine clips are called background
-- Sustained live inference is unproven: S2 with all three models keeps real time (125 s wall clock, check 18) only through a per-frame memo. By calculation, 6 unmemoised streams at one look per 0.6 s need about 864 ms of CPU per simulated second (RGB 82.5 ms and thermal 90.3 ms at 4 threads)
+- **Follow-up check, kept open by the user on 2026-11-07:** concurrent live-stream performance is unproven. S2 with all three models keeps real time (125 s wall clock, check 18) only through a per-frame memo, with each sensor using 2 or 3 clips. By calculation, 6 unmemoised streams at one look per 0.6 s need about 864 ms of CPU per simulated second (RGB 82.5 ms and thermal 90.3 ms at 4 threads). Measure six separate streams before relying on live video
 - The CUDA path has run for real: the user's T4 completed 20 epochs, and its weights load and evaluate on this CPU. Whether that run resumed is not recorded, so resuming on a GPU stays unproven. No CPU run of thermal exists to compare with
 - The manifest hash depends on line endings: `bc49b46d` on Windows with `autocrlf`, `ba662739` for the committed bytes. A fresh Linux clone would have its weights refused by `evaluate_media.py`, so Colab must use a ZIP built with `git archive` on the Windows machine. Worth fixing before Phase 6's second-machine check
 - This laptop has 7.7 GB of RAM, and long training competes with everything else open. The training time budget is wall clock, so it also counts sleep
@@ -80,8 +81,23 @@
 - The simulator's 800 m RGB range for a quadcopter is a start value this footage cannot support: the dataset's Distant bin starts at 60 m
 - The engine class is mostly road vehicles: a proxy, not evidence of detecting a one-way attack drone
 - The dataset has no fixed-wing drone, so S1 camera bearings have no real look evidence
-- Phase 3: `Track.status` has no `sector` value though `design.md` A6 needs one; A6 also uses `scipy`, which is not in the `architecture.md` stack, so expect a dependency request
+- Phase 3: `Track.status` has no `sector` value though `design.md` A6 needs one; A6 also uses `scipy`, which has been locked since Phase 2 but is not yet in the `architecture.md` stack
 - Phase 4: `design.md` A10 does not say which range or grid coverage uses, and S4's result depends on it. Paper calculation at S4's visibility 0.5: `important` zone with quadcopter RGB range gives 100% clear and 55% in dust (works); perimeter with attack drone RGB stays at 100% (warning never fires); perimeter with quadcopter RGB is 45% even in clear air (warning always on)
+
+## Exceptions to the Phase 2 plan
+
+Approved by the user on 2026-11-07, for the Phase 2 demo. The plan's CPU time requirement: mean, p50 and p95 over at least 1,000 frames, split into decode, inference and tracker, at 1 and 4 threads, with CPU, thread count and torch version; audio the same, per window. The test reports stay as they are, and no validation-only timing run was done.
+
+| Requirement missed | Thermal | RGB | Audio |
+| --- | --- | --- | --- |
+| Tracker and M-of-N over at least 1,000 frames | 976 looks | 642 looks | Not applicable |
+| Decode p50 and p95 over at least 1,000 frames | One value per clip: 55, covering 4,215 kept frames | One value per clip: 36, covering 2,762 kept frames | Not timed: WAV reading is outside the row |
+| Timing at both 1 and 4 threads | Met | Met | One setting only |
+| Thread count stated | Met | Met | Not stated: `evaluate_sound` sets none, so it ran on torch's default |
+
+- **Decode values:** each is a clip's whole decode time divided by its kept frames, so it includes frames decoded and skipped, and the report's mean is a mean of clip averages
+- **Met:** inference at 4 threads (4,215 and 2,762 frames) and at 1 thread (1,000 each), the audio classifier count (3,130 windows), CPU and torch version in every report
+- **To close these later:** validation alone needs new timing code, because one pass gives 964 and 584 looks, decode needs per-frame timing and audio needs a thread setting. `evaluate_media.py --split val` is the wrong tool, because it appends to `attempts.jsonl` and labels its report HELD-OUT
 
 ## Measured results
 
@@ -109,9 +125,9 @@
 
 ## Session log (newest first)
 
-### 2026-11-06 to 11-07 — Phase 2, in progress
-- Done: RGB and thermal detectors, tracker, M-of-N, audio classifier, SNR mixing, hybrid link, recorder, opt-in CUDA training and all three test reports. Every check that can run before merging passes on `ff71287`: 546 tests pass with none skipped, and a fresh clone with no data or models gives 526 passed, 20 skipped. All planned sabotage checks were caught; 2 extra probes of the all-model S2 test were not, which led to two new tests that catch 9 of 9.
-- Decisions: see the log above. Stricter scene-based splits replaced neighbouring clip numbers after a leak check.
+### 2026-11-06 to 11-07 — Phase 2
+- Done: RGB and thermal detectors, tracker, M-of-N, audio classifier, SNR mixing, hybrid link, recorder, opt-in CUDA training and all three test reports. Every check that can run before merging passes. On the last code commit, `36bad0a`, 546 tests pass with none skipped, and a fresh clone with no data or models gives 526 passed, 20 skipped. Check 23 runs on `main` right after this commit merges, so its result is in the report to the user, not here. All planned sabotage checks were caught; 2 extra probes of the all-model S2 test were not, which led to two new tests that catch 9 of 9.
+- Decisions: see the log above. Stricter scene-based splits replaced neighbouring clip numbers after a leak check. The user accepted the documented limits and approved a timing exception.
 - Issues / mocks: see the lists above. Thermal training was killed by the low-memory reaper at epoch 16 and kept nothing, which led to per-epoch checkpoints and then training on a T4.
 - Next step: see Current status.
 
