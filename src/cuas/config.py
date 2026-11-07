@@ -159,6 +159,36 @@ class StationAiSettings(ConfigModel):
     sound: SoundSettings
 
 
+class GatewaySettings(ConfigModel):
+    """How far a timestamp may be from the gateway's clock (design.md A4)."""
+
+    max_future_s: NonNegative
+    max_age_s: Positive
+
+
+class TrackerSettings(ConfigModel):
+    """Triangulation, association and track status (design.md A5, A6)."""
+
+    position_sensors: tuple[SensorKind, ...]
+    """Only these sensors' bearings may place a target in 3D."""
+    batch_window_s: Positive
+    min_ray_angle_deg: Annotated[float, Field(gt=0.0, le=90.0)]
+    max_ray_miss_m: Positive
+    ray_miss_sigmas: Positive
+    """Rays must also pass this many bearing sigmas apart, at the target's range."""
+    ray_join_m: NonNegative
+    """Slack when a ray joins an existing point, on top of its sigma allowance."""
+    gate_sigmas: Positive
+    accel_sigma_mps2: Positive
+    birth_speed_sigma_mps: Positive
+    merge_radius_m: Positive
+    confirm_fixes: Annotated[int, Field(ge=1)]
+    confirm_window_s: Positive
+    lost_after_s: Positive
+    acoustic_sector_sigmas: Positive
+    sector_lost_after_s: Positive
+
+
 class SiteConfig(ConfigModel):
     """The baseline every scenario shares."""
 
@@ -170,6 +200,17 @@ class SiteConfig(ConfigModel):
     sensors: dict[SensorKind, SensorSettings]
     picket_settings: PicketSettings
     station_ai: StationAiSettings
+    gateway: GatewaySettings
+    tracker: TrackerSettings
+
+    @model_validator(mode="after")
+    def _position_sensors_exist(self) -> Self:
+        unknown = set(self.tracker.position_sensors) - set(self.sensors)
+        if not self.tracker.position_sensors or unknown:
+            raise ValueError(
+                f"tracker.position_sensors must name configured sensors, got {unknown}"
+            )
+        return self
 
 
 class ZoneLabels(ConfigModel):
