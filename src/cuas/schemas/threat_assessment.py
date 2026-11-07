@@ -14,3 +14,6 @@ class ThreatAssessment(Message):
     zone: str | None
     time_to_impact_s: Annotated[float, Field(ge=0.0)] | None
     reasons: tuple[str, ...]
+    alert_id: str | None = None
+    """Kept apart from ``track_id``: a track picked up again under a new ID continues the same
+    alert. ``None`` until the track first reaches amber."""

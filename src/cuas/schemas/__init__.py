@@ -2,6 +2,7 @@
 
 from cuas.schemas.base import Message
 from cuas.schemas.bearing_detection import BearingDetection, SensorKind
+from cuas.schemas.coverage_status import CoverageStatus
 from cuas.schemas.evidence_record import EvidenceRecord
 from cuas.schemas.picket_alert import PicketAlert
 from cuas.schemas.rejected_message import RejectedMessage
@@ -15,6 +16,7 @@ from cuas.schemas.zoom_task import ZoomTask
 __all__ = [
     "BearingDetection",
     "ClueEvidence",
+    "CoverageStatus",
     "EvidenceRecord",
     "Message",
     "PicketAlert",

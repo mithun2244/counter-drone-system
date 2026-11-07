@@ -4,7 +4,7 @@ from pydantic import Field
 
 from cuas.schemas.base import AzimuthDeg, ElevationDeg, Message, Probability, SimTime
 
-SensorKind = Literal["rgb", "thermal", "acoustic"]
+SensorKind = Literal["rgb", "thermal", "acoustic", "zoom"]
 
 
 class BearingDetection(Message):
