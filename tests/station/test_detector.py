@@ -12,6 +12,7 @@ from cuas.station.detector import (
     copy_except_class_head,
     frame_to_tensor,
     load_starting_weights,
+    load_trained,
 )
 
 SMALL_SIZE = 128  # keeps these tests quick; the real size comes from site.yaml
@@ -102,6 +103,20 @@ def test_starting_weights_load_from_a_file(
     assert load_starting_weights(model, path)
     name = next(k for k in state if k.startswith("backbone.") and "weight" in k)
     assert torch.equal(model.state_dict()[name], state[name])
+
+
+def test_weights_saved_on_a_gpu_load_on_a_cpu(
+    settings: DetectorSettings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "look.pt"
+    with monkeypatch.context() as patch:
+        patch.setattr(torch.serialization, "location_tag", lambda _: "cuda:0")
+        torch.save(build_model(settings).state_dict(), path)
+    if not torch.cuda.is_available():  # the file really does need a GPU to load plainly
+        with pytest.raises(RuntimeError, match="CUDA"):
+            torch.load(path, weights_only=True)
+    detector = load_trained(settings, path)
+    assert isinstance(detector.detect(np.zeros((8, 8, 3), dtype=np.uint8)), list)
 
 
 def test_the_detector_cannot_be_given_a_label_path_or_target() -> None:

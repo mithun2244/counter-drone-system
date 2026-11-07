@@ -1,7 +1,8 @@
 """Fine-tune the detector on one modality's training clips, then choose its threshold on validation.
 
 The test split is never read here. ``--measure`` only reports speed, so the time budget can be set
-before committing to a long run.
+before committing to a long run. Training runs on the CPU unless ``--device cuda`` is asked for, and
+the model returns to the CPU for saving and validation, so the weights suit the CPU evaluator.
 """
 
 import argparse
@@ -36,8 +37,10 @@ MODELS_DIR = ROOT / "models"
 STARTING_WEIGHTS = (
     MODELS_DIR / "pretrained" / "ssdlite320_mobilenet_v3_large_coco-a79551df.pth"
 )
-MEASURE_BATCHES = 8
+WARM_UP_BATCHES = 2  # a GPU's first batches include one-off setup
+MEASURE_BATCHES = 32
 LOG_EVERY_BATCHES = 25
+CPU = torch.device("cpu")
 THRESHOLDS = tuple(round(t, 2) for t in np.arange(0.1, 0.95, 0.05))
 MIN_BOX_PX = 1.0
 
@@ -59,7 +62,7 @@ class Checkpoint:
     def load(self) -> dict | None:
         if not self.path.exists():
             return None
-        saved = torch.load(self.path)
+        saved = torch.load(self.path, map_location=CPU)  # may come from a GPU run
         if saved["run"] != self.run:
             raise SystemExit(
                 f"{self.path} came from other settings. Delete it to start again."
@@ -126,6 +129,35 @@ def to_batch(
     return images, targets
 
 
+def to_device(
+    images: list[torch.Tensor],
+    targets: list[dict[str, torch.Tensor]],
+    device: torch.device,
+) -> tuple[list[torch.Tensor], list[dict[str, torch.Tensor]]]:
+    return (
+        [image.to(device) for image in images],
+        [{k: v.to(device) for k, v in target.items()} for target in targets],
+    )
+
+
+def resolve_device(requested: str) -> torch.device:
+    """The device asked for. A CUDA request never falls back to the CPU."""
+    if requested == "cuda" and not torch.cuda.is_available():
+        raise SystemExit(
+            f"--device cuda was requested, but torch {torch.__version__} cannot see a "
+            "CUDA GPU. Not falling back to the CPU. On Colab, select a GPU runtime, "
+            "follow docs/colab_gpu.md and run .venv/bin/python, because uv run restores "
+            "the CPU build."
+        )
+    device = torch.device(requested)
+    print(f"training device: {device_name(device)}")
+    return device
+
+
+def device_name(device: torch.device) -> str:
+    return torch.cuda.get_device_name() if device.type == "cuda" else device.type
+
+
 def freeze_backbone(model: torch.nn.Module) -> None:
     for parameter in model.backbone.parameters():
         parameter.requires_grad_(False)
@@ -144,8 +176,12 @@ def train(
     settings: TrainingSettings,
     max_batches: int | None = None,
     checkpoint: Checkpoint | None = None,
+    device: torch.device = CPU,
 ) -> dict:
-    """Runs until the epochs or the time budget run out, whichever comes first."""
+    """Runs until the epochs or the time budget run out, whichever comes first.
+
+    The model must already be on ``device``, so that its optimizer state follows it there.
+    """
     rng = np.random.default_rng(settings.seed)
     parameters = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.AdamW(
@@ -167,7 +203,7 @@ def train(
         order = rng.permutation(len(samples))
         for start in range(0, len(order), settings.batch_size):
             chosen = [samples[i] for i in order[start : start + settings.batch_size]]
-            images, targets = to_batch(chosen, classes, rng)
+            images, targets = to_device(*to_batch(chosen, classes, rng), device)
             loss = sum(model(images, targets).values())
             optimizer.zero_grad()
             loss.backward()
@@ -264,7 +300,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--modality", choices=["rgb", "thermal"], required=True)
     parser.add_argument("--measure", action="store_true", help="only report speed")
+    parser.add_argument(
+        "--device",
+        choices=["cpu", "cuda"],
+        default="cpu",
+        help="where to train; cuda fails rather than falling back to the cpu",
+    )
     args = parser.parse_args()
+    device = resolve_device(args.device)
 
     ai = load_site(CONFIG_DIR).station_ai
     settings, training = ai.detector, ai.training
@@ -282,16 +325,20 @@ def main() -> int:
         s for c in train_clips for s in sample_clip(c, training.train_frames_per_clip)
     ]
     print(f"{len(train_samples)} training frames")
-    model = build_for_training(settings, training.freeze_backbone)
+    model = build_for_training(settings, training.freeze_backbone).to(device)
 
     if args.measure:
-        result = train(
-            model, train_samples, settings.classes, training, MEASURE_BATCHES
-        )
+        for batches in (WARM_UP_BATCHES, MEASURE_BATCHES):
+            result = train(
+                model, train_samples, settings.classes, training, batches, device=device
+            )
         epoch_batches = len(train_samples) / training.batch_size
-        print(f"seconds per batch: {result['seconds_per_batch']:.1f}")
+        per_epoch = result["seconds_per_batch"] * epoch_batches / 60
+        print(f"seconds per batch: {result['seconds_per_batch']:.2f}")
+        print(f"minutes per epoch: {per_epoch:.1f}")
         print(
-            f"minutes per epoch: {result['seconds_per_batch'] * epoch_batches / 60:.1f}"
+            f"minutes for {training.epochs} epochs: {per_epoch * training.epochs:.0f} "
+            f"(budget {training.max_minutes:g})"
         )
         return 0
 
@@ -307,8 +354,11 @@ def main() -> int:
             sort_keys=True,
         ),
     )
-    result = train(model, train_samples, settings.classes, training, None, checkpoint)
+    result = train(
+        model, train_samples, settings.classes, training, None, checkpoint, device
+    )
     print(f"training: {result}")
+    model.cpu()  # the threshold is chosen on the same device the evaluator uses
     weights = MODELS_DIR / f"look_{args.modality}.pt"
     torch.save(model.state_dict(), weights)
 
@@ -326,6 +376,7 @@ def main() -> int:
         "weights_sha256": sha256_of(weights),
         "manifest_sha256": sha256_of(CONFIG_DIR / MANIFEST_NAME),
         "high_score": threshold,
+        "trained_on": device_name(device),
         "training": result,
         "validation": summary,
         "validation_frames": len(val_samples),
