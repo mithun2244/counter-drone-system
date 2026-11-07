@@ -7,8 +7,8 @@
 
 - **Current phase:** Phase 2 — Station AI, on `phase-2-station-ai`, not merged. All three models are trained and have test reports
 - **Last session:** 2026-11-07
-- **Blocked on:** the user's review: whether to accept the limits under Known issues, and whether to add the two small tests listed there before merging
-- **Next step:** once cleared, tick `phases.md`, merge into `main` with `--no-ff` (do not push), then run check 23: clean tree, and checks 3, 5, 7, 8 again on `main`. Every other acceptance check passes on `ff71287`. Do not rerun the held-out evaluation. Phase 3 needs its own plan and approval
+- **Blocked on:** the user's review: whether to accept the limits under Known issues, and whether the timing shortfall needs a validation-only run
+- **Next step:** once cleared, tick `phases.md`, merge into `main` with `--no-ff` (do not push), then run check 23: clean tree, and checks 3, 5, 7, 8 again on `main`. Every other acceptance check passes on `ff71287`, and the full suite and fresh clone pass again on `36bad0a`, which only adds tests. Do not rerun the held-out evaluation. Phase 3 needs its own plan and approval
 - **Start sessions from `cuas-demo/`**, or `CLAUDE.md` will not auto-load
 
 ## Decisions log
@@ -69,8 +69,8 @@
 - False alarms on empty sky are unmeasured: 0 of thermal's 3,459 scored test frames lack a target, and 1 of RGB's 2,264 (counted from labels), so the report's `Any box on a frame with no target: 0` tests nothing
 - Thermal separates other aircraft poorly at frame level: airplane precision 0.307, recall 0.205; helicopter 0.284, 0.198; 391.7 false detections per 1,000 frames across all classes
 - S2's look evidence is narrow. Each sensor draws on one scene: RGB 2 clips of `V_DRONE_026`, thermal 3 of `IR_DRONE_096`, acoustic 2 of `audio_DRONE_006`, and both cameras use only F450 Distant clips while simulated range is 209 to 766 m. The Distant bin starts at 60 m and the dataset gives no exact distances, so S2's share of non-zero drone confidence is not a detection rate at those ranges
-- `test_s2_bearings_carry_real_output_and_the_same_geometry` caught 5 of 5 sabotages (missing thermal output, wrong-split clips, dropped clip references, changed geometry, dropped bearings), but still passes with every confidence set to zero and with the thermal camera running RGB weights; `load_look_models` has no test. The code loads the right file today. Two small tests would close this
-- CPU timing falls short of the plan's 1,000 frames for two stages: tracker 976 looks on thermal and 642 on RGB; decode has one value per clip (55 and 36). The inference rows meet it. Not worth another test run
+- No test checks the real trained weights' S2 confidences. `test_s2_bearings_carry_real_output_and_the_same_geometry` only needs them non-empty. Two tests in `tests/sim/test_media.py` now catch forced-zero confidences and an RGB model on the thermal path (9 of 9 sabotages), with real loading and inference, but on checkpoints built to give a known answer. So damaged weights that only output zeros would pass; the real share is reported, with no target, as the plan says
+- CPU timing against the plan: inference at 4 and 1 threads meets 1,000 frames on both cameras. Short: tracker, 976 looks on thermal and 642 on RGB; decode, one value per clip (55 and 36, covering 4,215 and 2,762 kept frames), so its p50 and p95 are per clip; audio, 3,130 windows but a single thread setting the report does not name, and WAV reading untimed. Validation alone closes these only with new code: one pass gives 964 and 584 looks, decode needs per-frame timing, and audio needs a thread setting. `evaluate_media.py --split val` is the wrong tool, because it appends to `attempts.jsonl` and labels its report HELD-OUT
 - The audio classifier does not beat its baseline: 0.750 clean against 0.773 for always answering `engine`, which is 34 of 44 test clips. Nine engine clips are called background
 - Sustained live inference is unproven: S2 with all three models keeps real time (125 s wall clock, check 18) only through a per-frame memo. By calculation, 6 unmemoised streams at one look per 0.6 s need about 864 ms of CPU per simulated second (RGB 82.5 ms and thermal 90.3 ms at 4 threads)
 - The CUDA path has run for real: the user's T4 completed 20 epochs, and its weights load and evaluate on this CPU. Whether that run resumed is not recorded, so resuming on a GPU stays unproven. No CPU run of thermal exists to compare with
@@ -110,7 +110,7 @@
 ## Session log (newest first)
 
 ### 2026-11-06 to 11-07 — Phase 2, in progress
-- Done: RGB and thermal detectors, tracker, M-of-N, audio classifier, SNR mixing, hybrid link, recorder, opt-in CUDA training and all three test reports. Every check that can run before merging passes on `ff71287`: 544 tests pass with none skipped, and a fresh clone with no data or models gives 524 passed, 20 skipped. All planned sabotage checks were caught; 2 extra probes of the all-model S2 test were not (see Known issues).
+- Done: RGB and thermal detectors, tracker, M-of-N, audio classifier, SNR mixing, hybrid link, recorder, opt-in CUDA training and all three test reports. Every check that can run before merging passes on `ff71287`: 546 tests pass with none skipped, and a fresh clone with no data or models gives 526 passed, 20 skipped. All planned sabotage checks were caught; 2 extra probes of the all-model S2 test were not, which led to two new tests that catch 9 of 9.
 - Decisions: see the log above. Stricter scene-based splits replaced neighbouring clip numbers after a leak check.
 - Issues / mocks: see the lists above. Thermal training was killed by the low-memory reaper at epoch 16 and kept nothing, which led to per-epoch checkpoints and then training on a T4.
 - Next step: see Current status.
