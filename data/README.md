@@ -29,7 +29,7 @@ This records published terms and is not legal advice. Have counsel review before
 - **URL:** https://zenodo.org/records/4060432
 - **Licence:** the dataset is CC BY. Each clip has its own licence, set by its Freesound uploader. The record says commercial use requires contacting the authors.
 - **Rights:** declared per clip by each uploader.
-- **Used for:** CC0 clips labelled `Engine`, excluding any also labelled as speech or human voice. At most 266 clips from 152 uploaders in the `eval` set.
+- **Used for:** CC0 clips labelled `Engine`, excluding any also labelled as speech or human voice. 226 clips from 133 uploaders in the `eval` set, read out of the multi-part zip by HTTP range requests, so 278 MB is stored instead of a 6.2 GB download.
 - **A proxy only:** these are mostly road vehicles. They are not recordings of one-way attack drones.
 
 ### SSDLite320 MobileNetV3 starting weights

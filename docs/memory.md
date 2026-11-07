@@ -5,9 +5,10 @@
 
 ## Current status
 
-- **Current phase:** Phase 2 — Station AI (not started)
-- **Last session:** 2026-11-06, finished Phase 1
-- **Next step:** plan Phase 2 and get approval, including the new dependencies and dataset licences it needs (`rules.md` §4, §5)
+- **Current phase:** Phase 2 — Station AI, in progress on `phase-2-station-ai`, not merged
+- **Last session:** 2026-11-07
+- **Blocked on:** the thermal detector is not trained. Claude Code's low-memory reaper killed the run at epoch 16 (82 min); it restarts only when the user asks
+- **Next step:** train thermal (`uv run python scripts/train_detector.py --modality thermal`, about 105 min; keep the laptop awake and close other programs), then run `uv run python scripts/evaluate_media.py --model look_thermal --split test` alone, then acceptance checks 6, 14, 16, 17, 18, 23, tick `phases.md`, merge. Sabotage checks and the other acceptance checks already pass
 - **Start sessions from `cuas-demo/`**, or `CLAUDE.md` will not auto-load
 
 ## Decisions log
@@ -36,6 +37,9 @@
 | 2026-11-06 | Recordings: Svanström dataset, excluding its 49 YouTube clips and helicopter audio; FSD50K CC0 `Engine` clips as a proxy | Their rights are unverified; the Drone Audio Dataset bars defence and surveillance use (`data/README.md`) |
 | 2026-11-06 | Split by scene group: neighbouring clip numbers sharing bin and drone type, joined with clips whose signatures are within 32 of 256 bits | The dataset has no session IDs, and neighbouring numbers alone left 15 of 38 RGB test clips with a near-identical training clip. Still a stand-in that cannot prove two groups are separate flights |
 | 2026-11-06 | Clips are matched to simulated range; M-of-N does not drop bearings | Mixing all bins would overstate results; keeping geometry leaves Phase 1 bearings identical |
+| 2026-11-06 | FSD50K clips read by HTTP range requests with our own zip directory reader | Stores only the selected clips instead of downloading 6.2 GB; `zipfile` refuses a multi-part zip64 archive |
+| 2026-11-07 | Look period 0.6 s; the media link refuses a period that is not whole ticks | `round(0.5 / 0.2)` silently gave 0.4 s |
+| 2026-11-07 | Detector training saves a checkpoint each epoch and resumes from it | A low-memory kill cost 82 minutes because weights were saved only at the end |
 | 2026-11-06 | Use Superpowers (official marketplace version) for focused debugging, testing and code review when useful; skip its brainstorming and writing-plans; ask before separate worktrees or subagents (rules in `CLAUDE.md`) | `docs/phases.md`, `docs/rules.md` and approval in Plan Mode stay the one project workflow |
 
 ## Mocks and stubs in use
@@ -44,8 +48,9 @@
 - Pickets: simulated
 - Zoom camera: crop from high-resolution clip
 - Hand-off: JSON export only
-- Bearing `class_probs` and `snapshot_ref`: empty until Phase 2
-- Picket engine guess and loudness: noisy simulated values (`sim/picket.py`) until Phase 2
+- Bearing `class_probs` and `snapshot_ref`: real with `--recorded-media`; empty without it, and on S1 camera bearings because no fixed-wing footage exists
+- Picket engine guess: real classifier with `--recorded-media`, otherwise a noisy simulated value
+- Picket loudness: always simulated (`sim/picket.py`)
 - Sensor health: simulated sensors never report a fault
 - National air picture: not in the demo
 
@@ -56,11 +61,29 @@
 - Determinism is proven for the same lockfile on the same machine, not byte for byte across machines; Phase 6's second-machine check should compare behaviour
 - `nvidia-smi` is not available on the dev machine, so it probably has no NVIDIA GPU; this affects Phase 2 training and the open GPU question
 - SSDLite's coarse features may miss small targets; 85% of thermal drone clips show targets 15 px wide or smaller
+- False drone tracks on RGB: 7 of 19 non-drone test clips, even after M-of-N
+- RGB test results rest on few scenes: the 17 drone clips come from 3 scene groups, so the intervals are too narrow. The Distant drone miss rate is 0.085 on test but 0.817 on validation, so the test split is much easier there
+- The audio classifier does not beat its baseline: 0.750 clean against 0.773 for always answering `engine`, which is 34 of 44 test clips. Nine engine clips are called background
+- Sustained live inference is unproven: S2 keeps real time only through a per-frame memo. By calculation, 6 unmemoised streams at one look per 0.6 s need about 825 ms of CPU per simulated second
+- This laptop has 7.7 GB of RAM, and long training competes with everything else open. The training time budget is wall clock, so it also counts sleep
+- S4's dust reduces simulated range but is not applied to the frames
 - The simulator's 800 m RGB range for a quadcopter is a start value this footage cannot support: the dataset's Distant bin starts at 60 m
 - The engine class is mostly road vehicles: a proxy, not evidence of detecting a one-way attack drone
 - The dataset has no fixed-wing drone, so S1 camera bearings have no real look evidence
 - Phase 3: `Track.status` has no `sector` value though `design.md` A6 needs one; A6 also uses `scipy`, which is not in the `architecture.md` stack, so expect a dependency request
 - Phase 4: `design.md` A10 does not say which range or grid coverage uses, and S4's result depends on it. Paper calculation at S4's visibility 0.5: `important` zone with quadcopter RGB range gives 100% clear and 55% in dust (works); perimeter with attack drone RGB stays at 100% (warning never fires); perimeter with quadcopter RGB is 45% even in clear air (warning always on)
+
+## Measured results
+
+### Recorded media, held-out split (`scripts/evaluate_media.py`, `runs/eval/`)
+
+- **RGB detector** (weights `7aa15d48`, threshold 0.15 from validation, second evaluation of these weights on test): drone clips confirmed 17 of 17 (95% interval 0.816 to 1.000); other clips with a false drone track 7 of 19 (0.191 to 0.590); median 1.2 s to confirm. Drone frames: precision 0.805, recall 0.837, and 0.673, 0.700 at IoU 0.5. Drone miss rate: close 0.283, medium 0.159, distant 0.085. Inference mean 82.5 ms at 4 threads, 102.4 ms at 1
+- **Audio classifier** (weights `2457d275`, first evaluation on test, 44 clips; the engine class is a proxy): accuracy 0.750 clean (0.606 to 0.854), then 0.750, 0.636, 0.523, 0.273 at +20, +10, 0, -10 dB. Misses 9, 9, 13, 18, 31; false detections 0 throughout. 4.1 ms per 1 s window
+- **Thermal detector:** not measured, because it is not trained yet
+
+### Simulator (`cuas.metrics.evaluator`; simulator results, not real-world performance)
+
+- S2 seed 7: 2,027 bearings from 3 stations, quad-1 seen st1=853, st2=658, st3=516. Geometry is identical with and without recorded media
 
 ## Open questions (copy of `prd.md` §10, tick when answered)
 
@@ -70,6 +93,12 @@
 - [ ] GPU laptop available for the live demo?
 
 ## Session log (newest first)
+
+### 2026-11-06 to 11-07 — Phase 2, in progress
+- Done: RGB detector, tracker, M-of-N, audio classifier, SNR mixing, hybrid link, recorder, reports for RGB and sound, and all sabotage checks caught (the plan's 10 plus variants). 531 tests pass, 1 skips until thermal exists.
+- Decisions: see the log above. Stricter scene-based splits replaced neighbouring clip numbers after a leak check.
+- Issues / mocks: see the lists above. Thermal training was killed by the low-memory reaper at epoch 16 and kept nothing, which led to per-epoch checkpoints.
+- Next step: see Current status.
 
 ### 2026-11-06 — Between Phase 1 and Phase 2
 - Done: added user-level tools outside this repo (`karpathy-guidelines` skill, Superpowers plugin) and set the rules for using them in `CLAUDE.md`.

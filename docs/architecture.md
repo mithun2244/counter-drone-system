@@ -82,8 +82,8 @@ cuas-demo/
 │   ├── clock.py              # single simulated clock
 │   ├── config.py             # typed site config, truth-free scenario metadata
 │   ├── geometry.py           # bearing calculation, shared by simulator and tracker
-│   ├── sim/                  # scenario loader, trajectories, station + picket simulation, ground truth log
-│   ├── station/              # video detector, audio classifier, bearing builder, recorder
+│   ├── sim/                  # scenario loader, trajectories, station + picket simulation, ground truth log, hybrid media and sound links, SNR mixing
+│   ├── station/              # video detector, local tracker, M-of-N, mel and audio classifier, recorder
 │   ├── gateway/              # validation, time alignment, rejection log
 │   ├── control/
 │   │   ├── visibility.py
@@ -93,10 +93,14 @@ cuas-demo/
 │   │   └── scheduler.py      # zoom camera assignment
 │   ├── evidence/             # store, hashing, tamper-evident log, hand-off export
 │   ├── dashboard/            # FastAPI app, WebSocket, static HTML/JS
-│   └── metrics/              # run report, evaluator (the only reader of ground truth)
+│   └── metrics/              # run report, evaluator (the only reader of ground truth); splits, label reader, recorded-media report
 ├── scripts/
 │   ├── run_demo.py           # python scripts/run_demo.py --scenario s1
-│   └── download_data.py      # fetch public datasets into data/
+│   ├── download_data.py      # fetch public datasets into data/
+│   ├── prepare_media.py      # read labels, write config/media_manifest.yaml
+│   ├── train_detector.py     # fine-tune a detector; resumes after a kill
+│   ├── train_audio.py        # train the audio classifier
+│   └── evaluate_media.py     # held-out reports in runs/eval/
 ├── tests/                    # pytest, mirrors src/ layout
 ├── data/                     # datasets (gitignored)
 ├── models/                   # trained weights (gitignored)

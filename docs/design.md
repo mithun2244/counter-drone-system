@@ -51,6 +51,8 @@ Each scenario also carries metadata: title, venue and a display label per zone. 
 5. Publish a `BearingDetection` with class probabilities and a snapshot reference.
 6. Record clip and audio to `runs/<run_id>/station_<id>/`, with a SHA-256 hash per file.
 
+**In the hybrid demo,** M-of-N sets the look evidence but does not drop bearings: the simulator decides a detection happened, and an unconfirmed look publishes zero confidence. That keeps Phase 1's geometry identical. A real camera node would apply step 3 as written.
+
 ### A4. Gateway
 
 Rejects a message (and logs a `RejectedMessage`) if:
