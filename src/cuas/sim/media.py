@@ -18,10 +18,11 @@ from cuas.media_manifest import ClipEntry, load_manifest
 from cuas.recordings import decode_every, frame_rate, read_wav
 from cuas.schemas import SensorKind
 from cuas.sim.rng import stream
-from cuas.sim.sound_link import SoundLink, engine_probabilities
+from cuas.sim.sound_link import OnOpen, SoundLink, engine_probabilities
 from cuas.sim.station import Look
 from cuas.station.detector import load_trained
 from cuas.station.look import CachedDetector, LookStream
+from cuas.station.recorder import Recorder
 from cuas.station.sound import load_sound_model
 
 # No fixed-wing drone is in the footage, so an attack drone has no clips and no real look.
@@ -71,8 +72,10 @@ class MediaLink:
         tick_s: float,
         seed: int,
         sound: SoundLink | None = None,
+        on_open: OnOpen | None = None,
     ) -> None:
         self._sound = sound
+        self._on_open = on_open
         self._load_frames = load_frames
         self._models = models
         self._settings = settings
@@ -153,6 +156,8 @@ class MediaLink:
         clip = clips[int(rng.integers(len(clips)))]
         if clip.id not in self._frames:
             self._frames[clip.id] = self._load_frames(clip)
+        if self._on_open:
+            self._on_open(key[0], clip)
         frames = self._frames[clip.id]
         width = frames[0].shape[1]
         look = LookStream(self._settings, model.classes, model.high_score, width)
@@ -218,6 +223,7 @@ def build_sound_link(
     look_every_ticks: int,
     wind_mps: float,
     seed: int,
+    on_open: OnOpen,
 ) -> SoundLink | None:
     weights = models_dir / "sound.pt"
     if not weights.exists():
@@ -229,14 +235,36 @@ def build_sound_link(
         return read_wav(data_dir / clip.path, settings.sample_rate)
 
     return SoundLink(
-        clips, load_audio, model.classify, settings, look_every_ticks, wind_mps, seed
+        clips,
+        load_audio,
+        model.classify,
+        settings,
+        look_every_ticks,
+        wind_mps,
+        seed,
+        on_open,
     )
+
+
+def recording_saver(run_dir: Path, data_dir: Path) -> OnOpen:
+    """Keeps each recording a station or picket uses, once, under an opaque name."""
+    recorder = Recorder(run_dir)
+    saved: set[tuple[str, str]] = set()
+
+    def save(owner: str, clip: ClipEntry) -> None:
+        if (owner, clip.id) not in saved:
+            saved.add((owner, clip.id))
+            path = data_dir / clip.path
+            recorder.save(owner, clip.id, path.suffix, path.read_bytes())
+
+    return save
 
 
 def build_media_link(
     config_dir: Path,
     data_dir: Path,
     models_dir: Path,
+    run_dir: Path,
     ai: StationAiSettings,
     tick_s: float,
     wind_mps: float,
@@ -247,8 +275,9 @@ def build_media_link(
         raise FileNotFoundError(f"no trained models in {models_dir}")
     clips = load_manifest(config_dir).clips
     look_every_ticks = round(ai.look.period_s / tick_s)
+    save = recording_saver(run_dir, data_dir)
     sound = build_sound_link(
-        clips, data_dir, models_dir, ai, look_every_ticks, wind_mps, seed
+        clips, data_dir, models_dir, ai, look_every_ticks, wind_mps, seed, save
     )
     return MediaLink(
         clips,
@@ -258,4 +287,5 @@ def build_media_link(
         tick_s,
         seed,
         sound,
+        save,
     )

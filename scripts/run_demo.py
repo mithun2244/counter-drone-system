@@ -148,6 +148,7 @@ def build_media(
         CONFIG_DIR,
         DATA_DIR,
         MODELS_DIR,
+        ROOT / "runs" / f"{args.scenario}_seed{seed}",
         site.station_ai,
         site.simulation.tick_s,
         wind_mps,

@@ -10,10 +10,11 @@ import pytest
 from cuas.config import SiteConfig
 from cuas.media_manifest import ClipEntry
 from cuas.schemas import BearingDetection, PicketAlert
-from cuas.sim.media import LookModel, MediaLink, distance_bin
+from cuas.sim.media import LookModel, MediaLink, distance_bin, recording_saver
 from cuas.sim.station import Look
 from cuas.station.detector import Box
 from cuas.station.look import CachedDetector
+from cuas.station.recorder import verify_recordings
 
 CLASSES = ("drone", "bird", "airplane", "helicopter")
 HIGH = 0.5
@@ -309,3 +310,38 @@ async def test_pickets_report_the_classifier_and_their_geometry_is_unchanged(
     assert [(a.t, a.picket_id, a.bearing_deg) for a in alerts] == [
         (a.t, a.picket_id, a.bearing_deg) for a in plain_alerts
     ]
+
+
+def test_each_clip_used_is_reported_once_per_stream(site: SiteConfig) -> None:
+    opened: list[tuple[str, str]] = []
+    media = MediaLink(
+        [entry(OPAQUE)],
+        frames_for,
+        {"rgb": model_saying("drone")},
+        site.station_ai.look,
+        TICK,
+        1,
+        None,
+        lambda owner, clip: opened.append((owner, clip.id)),
+    )
+    looks(media)
+    assert opened == [("st1", OPAQUE)]
+
+
+def test_recording_saver_keeps_each_clip_once_per_owner_with_an_opaque_name(
+    tmp_path,
+) -> None:
+    data = tmp_path / "data"
+    source = data / "svanstrom" / "V_DRONE_001.mp4"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"clip")
+    save = recording_saver(tmp_path / "run", data)
+    clip = entry(OPAQUE).model_copy(update={"path": "svanstrom/V_DRONE_001.mp4"})
+    save("st1", clip)
+    save("st1", clip)
+    save("st2", clip)
+    saved = tmp_path / "run" / "station_st1" / f"{OPAQUE}.mp4"
+    assert saved.read_bytes() == b"clip"
+    assert (tmp_path / "run" / "station_st2" / f"{OPAQUE}.mp4").exists()
+    assert verify_recordings(tmp_path / "run") == []
+    assert "DRONE" not in saved.name

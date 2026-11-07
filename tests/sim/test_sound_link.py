@@ -170,3 +170,20 @@ def test_engine_probabilities_need_both_engine_classes() -> None:
 
 def test_engine_probabilities_need_some_evidence() -> None:
     assert engine_probabilities({"electric_drone": 0.0, "engine": 0.0}) is None
+
+
+def test_each_recording_and_its_noise_are_reported_once(site: SiteConfig) -> None:
+    opened: list[tuple[str, str]] = []
+    media = SoundLink(
+        clips(),
+        load_audio,
+        lambda window: {"background": 1.0},
+        site.station_ai.sound,
+        LOOK_EVERY_TICKS,
+        0.0,
+        1,
+        lambda owner, clip: opened.append((owner, clip.id)),
+    )
+    for tick in range(10):
+        media.hear(KEY, "quadcopter", 100.0, tick)
+    assert opened == [("st1", TONE_CLIP), ("st1", NOISE_CLIP)]
