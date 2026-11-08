@@ -75,6 +75,52 @@ async def test_work_before_the_first_tick_is_caught_up_once_started() -> None:
     assert clock.now == 0.2
 
 
+async def test_pause_holds_the_next_tick_until_resume() -> None:
+    clock = SimClock(0.2, pace=2.0)  # one tick is 0.1 s of wall time
+    clock.start()
+    await clock.tick()
+    clock.pause()
+    assert clock.paused
+
+    async def two_ticks() -> None:
+        await clock.tick()
+        await clock.tick()
+
+    task = asyncio.create_task(two_ticks())
+    await asyncio.sleep(0.3)
+    assert not task.done()
+    assert clock.now == pytest.approx(0.4)  # counted, but held
+    started = time.perf_counter()
+    clock.resume()
+    await task
+    # The held tick returns at once; the next waits its own 0.1 s, with no race to catch up.
+    assert 0.08 <= time.perf_counter() - started <= 0.5
+    assert clock.now == pytest.approx(0.6)
+
+
+async def test_a_new_pace_applies_from_now_on() -> None:
+    clock = SimClock(0.2, pace=1.0)
+    clock.start()
+    await clock.tick()
+    clock.set_pace(5.0)  # one tick is now 0.04 s
+    started = time.perf_counter()
+    for _ in range(5):
+        await clock.tick()
+    assert 0.15 <= time.perf_counter() - started <= 0.6
+    assert clock.pace == 5.0
+
+
+def test_a_fast_clock_has_no_pace_to_change() -> None:
+    with pytest.raises(ValueError):
+        SimClock(0.2).set_pace(2.0)
+
+
+async def test_a_pace_must_be_positive() -> None:
+    clock = SimClock(0.2, pace=1.0)
+    with pytest.raises(ValueError):
+        clock.set_pace(0.0)
+
+
 @pytest.mark.parametrize(
     "kwargs", [{"tick_s": 0.0}, {"tick_s": -1.0}, {"tick_s": 0.2, "pace": 0.0}]
 )
