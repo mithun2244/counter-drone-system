@@ -1,5 +1,7 @@
 """Hand-calculated cases for the threat score (docs/design.md A8)."""
 
+from dataclasses import replace
+
 import pytest
 
 from cuas.config import ApprovedFlight, SiteConfig, ThreatSettings, ZoneLabels
@@ -84,7 +86,7 @@ def classified(
         p_attack_drone=0.0,
         evidence=ClueEvidence(move=0.8 if move_reason else None),
     )
-    return Classified(track, track_class, None, move_reason, False)
+    return Classified(track, track_class, None, move_reason, False, velocity)
 
 
 @pytest.fixture
@@ -173,3 +175,23 @@ def test_ranking_is_by_level_then_time_to_impact_not_score() -> None:
         ]
     )
     assert [a.track_id for a in ranked] == ["trk-b", "trk-d", "trk-a", "trk-e", "trk-c"]
+
+
+@pytest.mark.parametrize(
+    ("position", "velocity", "expected"),
+    [
+        ((-300.0, 0.0, 80.0), None, None),  # too new for a fitted velocity
+        ((-300.0, 0.0, 80.0), (0.5, 0.0, 0.0), None),  # still: heading nowhere
+        ((0.0, 50.0, 70.0), None, 0.0),  # inside the zone, whatever the velocity
+        ((-300.0, 0.0, 80.0), (10.0, 0.0, 0.0), 20.0),
+    ],
+)
+def test_time_to_impact_needs_a_fitted_moving_velocity(
+    ranker: ThreatRanker, position, velocity, expected
+) -> None:
+    result = ranker.assess(0.0, classified(0.9, position, velocity or (0.0, 0.0, 0.0)))
+    if velocity is None:
+        result = ranker.assess(0.0, replace(classified(0.9, position), velocity=None))
+    assert result.time_to_impact_s == (
+        None if expected is None else pytest.approx(expected)
+    )

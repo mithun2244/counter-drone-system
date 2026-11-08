@@ -207,6 +207,9 @@ class MoveSettings(ConfigModel):
     """A longer gap between fresh fixes restarts the persistence count."""
     drone_like: Probability
     bird_like: Probability
+    velocity_window_s: Positive
+    """Velocity for time to impact is a least-squares fit over this much fresh history."""
+    velocity_min_span_s: Positive
 
 
 class ClassifySettings(ConfigModel):
@@ -242,6 +245,8 @@ class ThreatSettings(ConfigModel):
     urgency_floor_s: Positive
     urgency_at_floor: Probability
     urgency_beyond: Probability
+    still_speed_mps: Positive
+    """Slower than this, a track is heading nowhere: no time to impact unless inside."""
     approved_flights: tuple[ApprovedFlight, ...]
 
     @model_validator(mode="after")

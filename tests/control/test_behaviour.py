@@ -153,3 +153,24 @@ def test_one_odd_fix_does_not_break_a_ten_second_window(settings: MoveSettings) 
     out = dict(clue_over(odd, settings))
     first_drone_like = min(t for t, p in out.items() if p == settings.drone_like)
     assert first_drone_like == pytest.approx(8.0)
+
+
+def hovers_then_leaves(t: float):
+    """Still for 5 s, then off at 12 m/s, like a quadcopter leaving a waypoint."""
+    return (5.0, -3.0, 60.0) if t < 5.0 else (5.0 + 12.0 * (t - 5.0), -3.0, 60.0)
+
+
+def test_hovering_once_seen_stays_for_the_track(settings: MoveSettings) -> None:
+    """A7 counts any hovering, and no bird track ever hovered in the Phase 4 measurement."""
+    out = dict(clue_over(path(hovers_then_leaves, 25.0), settings))
+    assert {p for t, p in out.items() if t >= 3.0} == {settings.drone_like}
+
+
+def test_fitted_velocity_is_exact_on_a_straight_line(settings: MoveSettings) -> None:
+    clue = MoveClue(settings)
+    for fix in path(line(50.0), 1.8):
+        clue.add(fix)
+    assert clue.velocity() is None  # under 2 s of fresh fixes
+    for fix in path(line(50.0), 6.0)[10:]:
+        clue.add(fix)
+    assert list(clue.velocity()) == pytest.approx([50.0, 0.0, 0.0])

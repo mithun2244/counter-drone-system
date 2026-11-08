@@ -14,8 +14,8 @@ import numpy as np
 from cuas.config import MoveSettings
 
 HOVERING, FAST_STRAIGHT, BIRD_LIKE = (
-    "hovering",
-    "fast straight flight",
+    "seen hovering",
+    "sustained fast straight flight",
     "wandering flight",
 )
 MIN_FIXES = 4
@@ -84,6 +84,7 @@ class MoveClue:
         self._latest: Features | None = None
         self._fast_s = 0.0
         self._last_fast_t: float | None = None
+        self._latched: str | None = None
 
     @property
     def latest(self) -> Features | None:
@@ -102,16 +103,37 @@ class MoveClue:
             self._last_fast_t = fix.t
         else:
             self._fast_s, self._last_fast_t = 0.0, None
+        if self._latched is None and self._latest is not None:
+            if self._latest.hover_fraction >= settings.hover_fraction:
+                self._latched = HOVERING
+            elif self._fast_s >= settings.fast_persistence_s:
+                self._latched = FAST_STRAIGHT
 
     def reason(self) -> str | None:
-        """What the behaviour looks like, or ``None`` while there is too little history."""
+        """What the behaviour looks like, or ``None`` while there is too little history.
+
+        Hovering or sustained fast flight, once seen, stays for the track: birds never do
+        either, and A7 counts any hovering.
+        """
         if self._latest is None:
             return None
-        if self._latest.hover_fraction >= self._settings.hover_fraction:
-            return HOVERING
-        if self._fast_s >= self._settings.fast_persistence_s:
-            return FAST_STRAIGHT
-        return BIRD_LIKE
+        return self._latched or BIRD_LIKE
+
+    def velocity(self) -> np.ndarray | None:
+        """A least-squares fit over recent fresh fixes, steadier than the filter's velocity."""
+        settings = self._settings
+        if not self._fixes:
+            return None
+        now = self._fixes[-1].t
+        recent = [f for f in self._fixes if f.t >= now - settings.velocity_window_s]
+        if len(recent) < MIN_FIXES or now - recent[0].t < settings.velocity_min_span_s:
+            return None
+        times = np.array([f.t for f in recent])
+        positions = np.array([f.position for f in recent])
+        centred = times - times.mean()
+        return (centred @ (positions - positions.mean(axis=0))) / float(
+            centred @ centred
+        )
 
     def p_move(self) -> float | None:
         """P(drone) from behaviour, or ``None`` while there is too little history."""

@@ -111,8 +111,10 @@ classify:  # design.md A7; all start values
     fast_speed_cv: 0.2
     fast_persistence_s: 5.0  # of fresh fixes; coasting never counts
     fast_max_gap_s: 1.0  # a longer gap between fresh fixes restarts persistence
-    drone_like: 0.8
+    drone_like: 0.8  # once seen, hovering or sustained fast flight stays for the track
     bird_like: 0.15
+    velocity_window_s: 5.0  # time to impact uses a fit over this much fresh history
+    velocity_min_span_s: 2.0  # no time to impact before this much
 
 threat:  # design.md A8
   red: 0.6
@@ -122,6 +124,7 @@ threat:  # design.md A8
   urgency_floor_s: 180.0
   urgency_at_floor: 0.2
   urgency_beyond: 0.1
+  still_speed_mps: 1.0
   approved_flights: []  # none in any scenario
 
 alerts:  # alert identity is separate from track identity

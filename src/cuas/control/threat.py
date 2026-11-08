@@ -106,7 +106,7 @@ class ThreatRanker:
         track = classified.track
         x, y, _ = track.position_enu_m
         tti = time_to_impact(
-            (x, y), track.velocity_mps[:2], self._critical.polygon_enu_m
+            (x, y), self._ground_velocity(classified), self._critical.polygon_enu_m
         )
         zone = self._critical if tti is not None else self._zone_at((x, y))
         friendly = approved(track.position_enu_m, t, settings.approved_flights)
@@ -125,6 +125,13 @@ class ThreatRanker:
             tti,
             self._reasons(classified, zone, tti, friendly),
         )
+
+    def _ground_velocity(self, classified: Classified) -> Point:
+        """The fitted velocity, or none at all: a new, coasting or still track is heading nowhere."""
+        v = classified.velocity
+        if v is None or math.hypot(v[0], v[1]) < self._settings.still_speed_mps:
+            return (0.0, 0.0)
+        return (float(v[0]), float(v[1]))
 
     def _zone_at(self, point: Point) -> Zone | None:
         return next((z for z in self._zones if inside(point, z.polygon_enu_m)), None)

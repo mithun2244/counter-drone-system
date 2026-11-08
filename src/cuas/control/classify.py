@@ -79,8 +79,10 @@ class Classified:
     track_class: TrackClass
     features: Features | None
     move_reason: str | None
-    """``hovering``, ``fast straight flight`` or ``wandering flight``; ``None`` without history."""
+    """``seen hovering``, ``sustained fast straight flight`` or ``wandering flight``."""
     engine_heard: bool
+    velocity: np.ndarray | None = None
+    """Fitted over recent fresh fixes; ``None`` before enough history."""
 
 
 class Classifier:
@@ -219,6 +221,7 @@ class Classifier:
             evidence.move.latest,
             evidence.move.reason(),
             bool(evidence.sounds),
+            evidence.move.velocity(),  # fitted to past fresh fixes, never a prediction
         )
 
     def _look(self, t: float, evidence: _Evidence) -> float | None:
