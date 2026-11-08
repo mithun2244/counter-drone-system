@@ -5,10 +5,20 @@
 
 ## Current status
 
-- **Current phase:** Phase 3 — Gateway and shared tracker is done. Phase 4 has not started
-- **Last session:** 2026-11-07
+- **Current phase:** Phase 4 — Decision layer, in progress on `phase-4-decision`
+- **Last session:** 2026-11-08
 - **Blocked on:** nothing
-- **Next step:** when the user asks, plan Phase 4 in Plan Mode on a new branch, without starting code until approved. Its plan must cover the four Phase 3 follow-ups under Known issues. Do not rerun the held-out evaluations
+- **Next step:** the merge is held at `2147174` while recorded-media S3's real-time miss is fixed. The user reviews the timings and output diff, then decides on the `--no-ff` merge. Mapping docs wait for Phase 5. Do not rerun the held-out evaluations
+- **Post-merge check 14, decided by the user on 2026-11-08:** the frozen gate (`tests/test_decision.py`) was run once, on `ce4ea52`, and is not rerun on `main`. After the merge: the regular suite on `main` (`--ignore=tests/test_decision.py`), the baseline observation digests, and Track identity with the branch
+- **Regular suite vs frozen gate:** `tests/test_decision.py` ran once on the frozen change (139 of 139). Later suite runs pass `--ignore=tests/test_decision.py`, so the frozen gate is not rerun to collect metrics. Baseline output since then is shown unchanged by byte comparison instead
+- **Phase 4 gate seeds, declared on 2026-11-07 before any run:** S1 gates on its own seed (1001), 7 and 201–220; S3 on its own seed (3003), 7 and 201–210. Development uses seeds 1–19 except 7 only
+- **Seed 7 withdrawn from the gates (2026-11-07):** a wiring smoke test ran S1–S4 on seed 7 before the rule was frozen, so it is no longer unseen. Replaced by seed 221 for S1 and 211 for S3, declared before either is run. Smoke tests use development seeds only
+- **Rule frozen at commit `2ded003` (2026-11-08)** before any gate seed ran: movement clue with a latch, time to impact from a 5 s least-squares fit. The gate tests are `tests/test_decision.py`
+- **First gate run, on `2ded003` (2026-11-08): 67 of 68 passed. S1 seed 216 failed** with 1 of 160 batches of two or more reds listed out of true arrival order, at t = 76.0 s. atk-3's track had just started, and its time to impact from just over 2 s of fixes was 26.49 s against a true 33.8 s. That put it ahead of atk-2 at 26.59 s against a true 28.8 s. The next batch had the right order. The first gate set stays in the suite as regression cases
+- **Second gate seeds, declared on 2026-11-08 before any run:** S1 301–322; S3 301–312; S4 301–312 through every test that runs S4 (coverage, with S2 on the same seed; stale rises; one alert per drone). Regression cases: S1 seed 216, and S4 seed 10 for a red alert through a gap
+- **Time-to-impact change frozen at commit `ce4ea52` (2026-11-08)**, before any second gate seed ran: 3 s of fresh fixes instead of 2 s, with a reach-back after gaps to a real fix at most 6.5 s old (`design.md` A8)
+- **Paired S3 zoom comparison seeds, declared on 2026-11-08 before any comparison run:** S3's own seed (3003) and seeds 1–4, each at 0, 1 and 2 zoom cameras with recorded media. Reported only, with no target. Seed 5 was used for a smoke test of the script
+- **Second gate run, on `ce4ea52` (2026-11-08): 139 of 139 passed**, run once. It covered 70 fresh-seed tests (S1 22, S3 12, S4 36), both regression cases, and the first gate set as regression cases
 - **Start sessions from `cuas-demo/`**, or `CLAUDE.md` will not auto-load
 
 ## Decisions log
@@ -39,6 +49,11 @@
 | 2026-11-06 | Clips are matched to simulated range; M-of-N does not drop bearings | Mixing all bins would overstate results; keeping geometry leaves Phase 1 bearings identical |
 | 2026-11-06 | FSD50K clips read by HTTP range requests with our own zip directory reader | Stores only the selected clips instead of downloading 6.2 GB; `zipfile` refuses a multi-part zip64 archive |
 | 2026-11-07 | Look period 0.6 s; the media link refuses a period that is not whole ticks | `round(0.5 / 0.2)` silently gave 0.4 s |
+| 2026-11-07 | Movement clue (`design.md` A7): drone-like if hover fraction ≥ 0.2, with hover from 2 s of position change, or if fast, straight and steady flight lasts 5 s of fresh fixes. A7's sharp turns and straightness alone are dropped. Coasting never counts, and never raises an alert | Measured on Phase 3 tracks, seeds 1–19 except 7: A7 as written turned 208 of 313 S3 bird tracks red, because birds turn constantly and fly straight for 10 s at a time. Approved by the user with these conditions |
+| 2026-11-08 | Zoom (`design.md` A9) gives class evidence only, and only with recorded media. A task takes effect one 0.6 s period after it is issued, so the scheduler aims 1.5 periods ahead. A target within 1° gets a real RGB look on a held-out clip chosen as if 4× closer, avoiding the clips wide cameras use for it. A zoom look on a frame the track already used as a wide look is not counted. Zoom bearings never open or close a batch. The demo default stays one zoom camera per station | Approved by the user. Paired S3 comparison (5 seeds): zoom reduced false alerts overall (37, then 24 with one camera, 21 with two), did not speed up the quadcopter's red alert, and did not change tracks |
+| 2026-11-08 | Mast bias is reported by `scripts/mast_bias.py` through a `MastBias` wrapper on the sensor bus, not under a pytest marker as the plan said | It is a report with no pass or fail, like the zoom comparison. The wrapper leaves the simulator and pipeline unchanged |
+| 2026-11-08 | Time to impact comes from a least-squares fit to real fixes over the last 5 s, published once they span 3 s. After a gap the fit reaches back to the newest real fix at least 3 s old, never older than 6.5 s. Coasting predictions never enter it | With 2 s, a new track's early estimate jumped the queue (S1 seed 216, first gate run). With 3 s and no reach-back, a 2.2 s gap in S4 seed 10 dropped a red alert to info for one batch. A live track can need a 6.0 s fix: up to 2.8 s in the window plus a gap of up to 3.2 s, because the tracker applies fixes before its loss check. Development seeds: 36 of 54 S1 drones reach red 0.6 to 1.2 s later, and nothing else changed. Approved by the user |
+| 2026-11-07 | Phase 4 runs with no class data gate S1 and S3; recorded media and mast bias are reported separately. `alert_id` is kept apart from `track_id`; zoom supports classification but never position | Approved by the user on 2026-11-07, decisions 1 to 9 of the Phase 4 plan |
 | 2026-11-07 | Shared tracker: a 2-station fix that other bearings could have paired with differently neither starts a track nor counts towards confirming one. Confirmation needs corroborated fixes: 3 stations, or nothing else unexplained (`design.md` A6) | Rays from different drones cross where nothing is. `design.md` as written confirmed such ghosts, and a throwaway prototype gave exactly 3 S1 tracks on only 2 of 10 seeds. With this rule the real code gives 3 on all 22 seeds tested |
 | 2026-11-07 | The bearing gate includes the track's own uncertainty; rays must also meet within 4 bearing sigmas; a fix within 30 m of a live track updates it | Prototype, S1 over 20 seeds: removing each of these gave exactly 3 tracks on 9, 19 and 0 seeds |
 | 2026-11-07 | `SectorTrack` is its own message, with no position, range or elevation field. Acoustic bearings never place a target in 3D | It cannot carry a 3D claim by construction, and it closes the old issue that `Track.status` had no `sector` value |
@@ -57,7 +72,7 @@
 
 - Station geometry, bearings and acoustic direction: simulated
 - Pickets: simulated
-- Zoom camera: crop from high-resolution clip
+- Zoom camera: simulated pointing and field of view; with `--recorded-media`, a real RGB look on a held-out clip chosen as if the target were 4× closer, not a crop of the wide camera's frame. Without recorded media it sees nothing
 - Hand-off: JSON export only
 - Bearing `class_probs` and `snapshot_ref`: real with `--recorded-media`; empty without it, and on S1 camera bearings because no fixed-wing footage exists
 - Picket engine guess: real classifier with `--recorded-media`, otherwise a noisy simulated value
@@ -96,6 +111,10 @@
 - **Follow-up, kept open by the user on 2026-11-07:** **re-acquisition under a new ID.** S2 picks its target up again under a new ID on 2 of 22 seeds, and S4 on 1 of 7, after coverage gaps at the edge of range. They never overlap
 - Station acoustic wedges also appear near tracked targets: 3 in S1 seed 7. A likely cause, not checked case by case: a 3-sigma gate in two dimensions leaves about 1% of bearings outside
 - The test suite now takes about 5 to 8 minutes here (717 tests), mostly from the 44 seeded S1 and S2 acceptance runs and the real-media tests
+- **`prd.md` time to alert (≤ 5 s from the first 2-station detection to red) is missed** and stays marked missed. Baseline, development seeds: all 108 drones over 5 s, worst 65.0 s; in S1 the 15° rule delays the first 3D fix by a median 20.7 s. Recorded-media S3: the quadcopter takes 19.2 to 30.6 s on 5 seeds, the same at 0, 1 and 2 zoom cameras
+- **Recorded-media S3 alerts on birds.** With real models, birds and false tracks raise 4 to 10 alerts per run with no zoom (5 seeds), because the detectors give some bird clips drone looks (Phase 2's false drone tracks). Zoom lowers this but never removes it. Baseline S3, which has no class data, raises none
+- **Real time for recorded-media S3, fixed on 2026-11-08:** it was 100, 101 and 102 s at 0, 1 and 2 zoom cameras, against 97.2 s allowed. Profiling showed tick 0 costs about 2.6 s (model inference 2.2 s on the first frame of every stream, clip decoding 0.4 s). Pacing started only after tick 0, so that time was never caught up. `SimClock.start()` now starts pacing when the run starts. That is a pacing fix, not a speedup. Now 94.6, 94.5 and 94.5 s, with every output byte-identical to before. The run is up to 4.6 s behind real time in its first seconds and on time from 30 s. Startup before the run is 3.6 s. Baseline S1 (121 s) and S3 (91 s) keep real time
+- **Mast bias** (`runs/robustness/mast_bias.md`; reported only): with st1 off by 0.2°, S1 has exactly 3 tracks on 17 of 18 development seeds and the worst target median is 9.0 m; at 0.5°, 9 of 18, 6 false tracks, worst target median 25.7 m and red order wrong on 6 seeds. S3 birds never reached amber or red at either bias. A real site needs mast calibration first
 - Phase 4: `design.md` A10 does not say which range or grid coverage uses, and S4's result depends on it. Paper calculation at S4's visibility 0.5: `important` zone with quadcopter RGB range gives 100% clear and 55% in dust (works); perimeter with attack drone RGB stays at 100% (warning never fires); perimeter with quadcopter RGB is 45% even in clear air (warning always on)
 
 ## Exceptions to the Phase 2 plan
@@ -126,6 +145,20 @@ Approved by the user on 2026-11-07, for the Phase 2 demo. The plan's CPU time re
 - Seed 7, all three models: digest `sha256:134cb33f6b12005771cf400130813388c678112cc3ed483c90833f0cda5299c0`. Two fast runs and one real-time run are byte-identical
 - Counted from the saved output with a one-off script, not the metrics script: bearings with non-zero drone confidence, RGB 1,121 of 1,127 and thermal 736 of 820. Acoustic top class on 80 bearings: `electric_drone` 64, `background` 12, `engine` 4
 
+### Phase 4 (simulator results, not real-world performance)
+
+- **Gates, baseline simulator:** first run on `2ded003` 67 of 68 (S1 seed 216 order); second run on `ce4ea52` 139 of 139, on S1 301–322, S3 301–312 and S4 301–312 never run before
+- **Development seeds** (1–19 except 7), frozen rule: 0 bird or ghost alerts, every drone one alert, S1 red order wrong in 0 of 2,926 batches, no red alert without a time to impact. 36 of 54 S1 drones reach red 0.6–1.2 s later than with the 2 s minimum
+- **Coverage:** S4 54.8% with the warning set; S2 100%
+- **Digests, seed 7:** S1 `ca3cfe6d`, S2 `aacb735a`, recorded-media S2 at zoom 0 `134cb33f`, all unchanged. Recorded-media S3 with two zoom cameras is byte-identical across two processes
+
+### Paired S3 zoom comparison (`scripts/compare_zoom.py`, commit `98b14e1`; simulator geometry with real model output on held-out clips; reported only)
+
+- Seeds 3003 and 1–4, each at 0, 1 and 2 zoom cameras per station, same scenario inputs and recordings. Tracks byte-identical across the three on every seed
+- False alerts (alert IDs on birds or false tracks), summed over 5 seeds: 37 with no zoom, 24 with 1, 21 with 2. False amber or red assessments: 1,050, 447, 487. Per seed not consistent: seed 4 got worse with 1 camera (4 to 5 alerts, 123 to 163 assessments), and a second camera was better than one on 2 seeds and worse on 2
+- The quadcopter reached red in all 15 runs, at the same time with 0, 1 or 2 cameras on every seed: time to red from the `prd.md` start event 19.2, 30.6, 25.6, 24.4 and 21.8 s. No improvement from zoom
+- Zoom bearings sharing a frame with a wide look of the same target, which the classifier does not count: 114 to 397 of 990 to 1,326 with 1 camera, 206 to 972 of 2,255 to 2,689 with 2. Few held-out clips stand in: RGB drone distant 4, bird distant 2, bird medium 6
+
 ### Simulator (`cuas.metrics.evaluator`; simulator results, not real-world performance)
 
 - S2 seed 7: 2,027 bearings from 3 stations, quad-1 seen st1=853, st2=658, st3=516. Geometry is identical with and without recorded media
@@ -142,6 +175,12 @@ Approved by the user on 2026-11-07, for the Phase 2 demo. The plan's CPU time re
 - [ ] GPU laptop available for the live demo?
 
 ## Session log (newest first)
+
+### 2026-11-07 to 11-08 — Phase 4
+- Done: movement clue, fusion, threat ranking, alert identity, coverage, zoom scheduler, zoom looks from recorded media, alert evaluator, gate tests, paired zoom comparison, mast-bias report, `design.md` A7 to A10. The rule was frozen before each gate run. The first gate run failed on S1 seed 216 and was kept on record; the second passed 139 of 139. 10 of 10 zoom sabotages and 4 of 4 time-to-impact sabotages were caught.
+- Decisions: see the log above. Seed 7 was withdrawn from the gates after a smoke test saw it. A Phase 1 `run_demo` test now expects the header to say zoom looks need recorded media, not that zoom is unused.
+- Issues / mocks: see the lists above. Real time is missed for recorded-media S3, and the `prd.md` 5 s time to alert is missed.
+- Next step: see Current status.
 
 ### 2026-11-07 — Phase 3
 - Done: gateway, triangulation, filter, association, shared tracker, sector tracks, pipeline wiring and track evaluator. A throwaway in-memory prototype tested the design before any code. 717 tests pass, and a fresh clone with no data or models gives 696 passed, 21 skipped. 18 of 18 sabotage checks caught, one after a stronger test was added. Every acceptance check that can run before the merge passes. The user approved the merge, including the three-bus design; this was committed before the merge, so check 19's result is in the report to the user.

@@ -78,8 +78,8 @@ def test_default_seed_is_the_scenarios_own() -> None:
     assert "seed: 2002" in run_fast("s2")
 
 
-def test_zoom_per_station_defaults_to_one_and_says_it_is_unused() -> None:
-    assert "zoom_per_station: 1 (not used until Phase 4)" in run_fast("s2")
+def test_zoom_per_station_defaults_to_one_and_says_zoom_needs_recorded_media() -> None:
+    assert "zoom_per_station: 1 (zoom looks need --recorded-media)" in run_fast("s2")
 
 
 @pytest.mark.parametrize("zoom", ["0", "2"])

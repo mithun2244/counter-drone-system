@@ -119,5 +119,73 @@ def test_bad_tracker_and_gateway_values_fail_on_load(
         SiteConfig.model_validate(raw)
 
 
+def test_decision_layer_values_match_the_design(site: SiteConfig) -> None:
+    assert (site.classify.prior, site.classify.weights) == (
+        0.1,
+        {"look": 1.0, "move": 1.0, "sound": 1.0},
+    )
+    assert (site.threat.red, site.threat.amber, site.threat.zone_share) == (
+        0.6,
+        0.3,
+        0.5,
+    )
+    assert site.threat.approved_flights == ()
+    assert (site.coverage.zone, site.coverage.warning_below_pct) == ("important", 80.0)
+    assert site.zoom.period_s == 0.6
+
+
+@pytest.mark.parametrize(
+    ("section", "changes"),
+    [
+        ("threat", {"amber": 0.7}),
+        ("threat", {"urgency_full_s": 200.0}),
+        ("classify", {"prior": 0.0}),
+        ("classify", {"clue_floor": 0.5}),
+        ("zoom", {"magnification": 0.5}),
+        ("coverage", {"zone": "car park"}),
+        ("coverage", {"warning_below_pct": 0.0}),
+        ("alerts", {"relink_window_s": 0.0}),
+    ],
+    ids=str,
+)
+def test_bad_decision_layer_values_fail_on_load(
+    config_dir: Path, section: str, changes: dict[str, object]
+) -> None:
+    raw = raw_site(config_dir)
+    raw[section] = {**raw[section], **changes}
+    with pytest.raises(ValidationError):
+        SiteConfig.model_validate(raw)
+
+
+def test_a_bad_movement_value_fails_on_load(config_dir: Path) -> None:
+    raw = raw_site(config_dir)
+    raw["classify"]["move"]["hover_fraction"] = 1.5
+    with pytest.raises(ValidationError):
+        SiteConfig.model_validate(raw)
+
+
+def test_time_to_impact_fit_values_match_the_design(site: SiteConfig) -> None:
+    move = site.classify.move
+    assert (
+        move.velocity_window_s,
+        move.velocity_min_span_s,
+        move.velocity_max_fix_age_s,
+    ) == (5.0, 3.0, 6.5)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [{"velocity_min_span_s": 6.0}, {"velocity_max_fix_age_s": 4.0}],
+    ids=str,
+)
+def test_fit_spans_out_of_order_fail_on_load(
+    config_dir: Path, changes: dict[str, float]
+) -> None:
+    raw = raw_site(config_dir)
+    raw["classify"]["move"] = {**raw["classify"]["move"], **changes}
+    with pytest.raises(ValidationError):
+        SiteConfig.model_validate(raw)
+
+
 def test_scenario_metadata_holds_no_truth() -> None:
     assert set(ScenarioMetadata.model_fields) == {"id", "title", "venue", "zone_labels"}

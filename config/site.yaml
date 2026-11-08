@@ -93,6 +93,62 @@ tracker:  # design.md A5 and A6; all start values
   acoustic_sector_sigmas: 3.0  # a sector's half-width, in bearing sigmas
   sector_lost_after_s: 6.0
 
+classify:  # design.md A7; all start values
+  prior: 0.1
+  weights: {look: 1.0, move: 1.0, sound: 1.0}
+  clue_floor: 0.02  # each clue is held within [0.02, 0.98]
+  picket_engine_heard: 0.9  # birds have no engine
+  attack_speed_mps: 30.0
+  zoom_look_after_s: 1.5
+  move:  # set on Phase 3 tracks, seeds 1-19 except 7 (docs/memory.md)
+    window_s: 10.0
+    min_history_s: 3.0
+    hover_speed_mps: 1.0
+    hover_baseline_s: 2.0  # speed from position change, steadier than the filter's velocity
+    hover_fraction: 0.2
+    fast_speed_mps: 30.0
+    fast_straightness: 0.97
+    fast_speed_cv: 0.2
+    fast_persistence_s: 5.0  # of fresh fixes; coasting never counts
+    fast_max_gap_s: 1.0  # a longer gap between fresh fixes restarts persistence
+    drone_like: 0.8  # once seen, hovering or sustained fast flight stays for the track
+    bird_like: 0.15
+    velocity_window_s: 5.0  # time to impact uses a fit over this much fresh history
+    velocity_min_span_s: 3.0  # no time to impact before this much; 2 s let a new track jump the queue
+    velocity_max_fix_age_s: 6.5  # reach-back limit; a live track can need 6.0 s (2.8 s window + 3.2 s gap)
+
+threat:  # design.md A8
+  red: 0.6
+  amber: 0.3
+  zone_share: 0.5
+  urgency_full_s: 30.0
+  urgency_floor_s: 180.0
+  urgency_at_floor: 0.2
+  urgency_beyond: 0.1
+  still_speed_mps: 1.0
+  approved_flights: []  # none in any scenario
+
+alerts:  # alert identity is separate from track identity
+  relink_window_s: 10.0
+  relink_gate_sigmas: 3.0
+  relink_max_speed_mps: 80.0
+  relink_margin_m: 30.0
+
+zoom:  # design.md A9
+  period_s: 0.6  # whole ticks; A9's 0.5 s is not
+  dwell_s: 3.0
+  preempt_margin: 0.2
+  magnification: 4.0
+  half_fov_deg: 1.0
+
+coverage:  # design.md A10
+  zone: important
+  cell_m: 25.0
+  design_target: quadcopter
+  sensor: rgb
+  min_stations: 2
+  warning_below_pct: 80.0
+
 station_ai:  # real models on recorded media; all start values
   split:
     fractions: {train: 0.7, test: 0.15, val: 0.15}  # ties go to the earlier split

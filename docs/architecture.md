@@ -82,7 +82,7 @@ cuas-demo/
 │   ├── clock.py              # single simulated clock
 │   ├── config.py             # typed site config, truth-free scenario metadata
 │   ├── geometry.py           # bearing calculation, shared by simulator and tracker
-│   ├── sim/                  # scenario loader, trajectories, station + picket simulation, ground truth log, hybrid media and sound links, SNR mixing
+│   ├── sim/                  # scenario loader, trajectories, station + picket simulation, zoom cameras, ground truth log, hybrid media and sound links, SNR mixing
 │   ├── station/              # video detector, local tracker, M-of-N, mel and audio classifier, recorder
 │   ├── gateway/              # validation and rejection log
 │   ├── pipeline.py           # wires the gateway and control layer between buses; never sees ground truth
@@ -92,10 +92,12 @@ cuas-demo/
 │   │   ├── association.py    # bearing gate and Hungarian assignment
 │   │   ├── tracker.py        # shared 3D tracker (A6)
 │   │   ├── sectors.py        # acoustic sector tracks: wedges, never a position
-│   │   ├── layer.py          # batches the gateway's output for the trackers
-│   │   ├── visibility.py
+│   │   ├── layer.py          # batches the gateway's output for the trackers; zoom bearings never set a batch
+│   │   ├── behaviour.py      # movement features, move clue, fitted velocity for time to impact
 │   │   ├── classify.py       # fusion of look + movement + sound
 │   │   ├── threat.py         # zones, time-to-impact, score, level
+│   │   ├── alerts.py         # alert identity, stale and re-acquisition rules
+│   │   ├── coverage.py       # coverage % from reported visibility
 │   │   └── scheduler.py      # zoom camera assignment
 │   ├── evidence/             # store, hashing, tamper-evident log, hand-off export
 │   ├── dashboard/            # FastAPI app, WebSocket, static HTML/JS
@@ -106,7 +108,8 @@ cuas-demo/
 │   ├── prepare_media.py      # read labels, write config/media_manifest.yaml
 │   ├── train_detector.py     # fine-tune a detector; resumes after a kill; CPU by default, opt-in CUDA (docs/colab_gpu.md)
 │   ├── train_audio.py        # train the audio classifier
-│   └── evaluate_media.py     # held-out reports in runs/eval/
+│   ├── evaluate_media.py     # held-out reports in runs/eval/
+│   └── compare_zoom.py       # paired S3 run at 0, 1 and 2 zoom cameras, recorded media
 ├── tests/                    # pytest, mirrors src/ layout
 ├── data/                     # datasets (gitignored)
 ├── models/                   # trained weights (gitignored)
@@ -120,13 +123,14 @@ All parts talk only through typed messages on the bus. This mirrors the real sys
 | Message | From → To | Key fields |
 | --- | --- | --- |
 | `SensorStatus` | station, picket → gateway | sensor_id, ok, visibility_factor, t |
-| `BearingDetection` | station → gateway | station_id, sensor (rgb, thermal, acoustic), t, azimuth_deg, elevation_deg, sigma_deg, class_probs, snapshot_ref |
+| `BearingDetection` | station → gateway | station_id, sensor (rgb, thermal, acoustic, zoom), t, azimuth_deg, elevation_deg, sigma_deg, class_probs, snapshot_ref |
 | `PicketAlert` | picket → gateway | picket_id, t, bearing_deg (coarse), loudness, engine_type_probs |
 | `Track` | tracker → classify, threat, dashboard | track_id, t, position_enu_m, velocity_mps, covariance, n_stations, status (tentative, confirmed, lost) |
 | `SectorTrack` | tracker → classify, threat, dashboard | sector_id, t, sensor_id, origin_enu_m, bearing_deg, half_width_deg, status (active, lost) |
-| `TrackClass` | classify → threat | track_id, p_drone, p_bird, p_attack_drone, evidence (look, move, sound) |
-| `ThreatAssessment` | threat → scheduler, dashboard, evidence | track_id, score, level, zone, time_to_impact_s, reasons |
-| `ZoomTask` | scheduler → station | station_id, camera_id, track_id, azimuth_deg, elevation_deg |
+| `TrackClass` | classify → threat | track_id, t, p_drone, p_bird, p_attack_drone, evidence (look, move, sound) |
+| `ThreatAssessment` | threat → scheduler, dashboard, evidence | track_id, t, score, level, zone, time_to_impact_s, reasons, alert_id |
+| `CoverageStatus` | visibility → scheduler, dashboard | t, coverage_pct, warning |
+| `ZoomTask` | scheduler → station | station_id, t, camera_id, track_id, azimuth_deg, elevation_deg |
 | `EvidenceRecord` | evidence → dashboard | alert_id, track_id, clip_path, sha256, prev_hash |
 | `RejectedMessage` | gateway → log | reason, raw |
 

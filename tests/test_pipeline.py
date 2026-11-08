@@ -5,21 +5,38 @@ from collections.abc import AsyncIterator
 import pytest
 
 from cuas.bus import WILDCARD, InProcessBus
-from cuas.config import SiteConfig
+from cuas.config import SiteConfig, ZoneLabels
 from cuas.geometry import bearing_to
 from cuas.metrics.track_evaluator import TrackReport, evaluate_tracks
 from cuas.pipeline import control_layer, run_control, start_pipeline
 from cuas.schemas import (
     BearingDetection,
+    CoverageStatus,
     Message,
     RejectedMessage,
     SectorTrack,
+    ThreatAssessment,
     Track,
+    TrackClass,
+    ZoomTask,
 )
 from cuas.sim.scenario import load_scenario
 
 ALL_SCENARIOS = ["s1", "s2", "s3", "s4"]
 TARGET_TYPES = ["attack_drone", "quadcopter", "friendly_drone", "bird"]
+
+
+def values(item: object) -> list[str]:
+    """Every value in a message, without field names: ``p_bird`` is a fixed schema key."""
+    if isinstance(item, dict):
+        return [v for value in item.values() for v in values(value)]
+    if isinstance(item, list | tuple):
+        return [v for value in item for v in values(value)]
+    return [str(item)]
+
+
+def tracks_only(messages: list[Message]) -> list[Message]:
+    return [m for m in messages if isinstance(m, Track)]
 
 
 def dumps(messages: list[Message]) -> list[str]:
@@ -44,13 +61,20 @@ async def test_no_control_message_names_a_target(
     _, ingested, controlled, truth = await record_pipeline(scenario_id, seed=7)
     words = {*TARGET_TYPES, *(state.target_id for state in truth.states)}
     for message in [*ingested, *controlled]:
-        text = message.model_dump_json()
+        text = " ".join(values(message.model_dump()))
         assert not [word for word in words if word in text], text
 
 
-async def test_only_tracks_and_sectors_leave_the_control_layer(record_pipeline) -> None:
+async def test_only_control_messages_leave_the_control_layer(record_pipeline) -> None:
     _, _, controlled, _ = await record_pipeline("s1", seed=7)
-    assert {type(m) for m in controlled} == {Track, SectorTrack}
+    assert {type(m) for m in controlled} == {
+        Track,
+        SectorTrack,
+        TrackClass,
+        ThreatAssessment,
+        ZoomTask,
+        CoverageStatus,
+    }
 
 
 async def test_heard_but_never_seen_gives_wedges_and_no_3d_position(
@@ -76,7 +100,8 @@ async def test_a_message_the_gateway_rejects_never_reaches_the_tracker(
     """A bearing from far in the future would move the tracker's clock if it got through."""
     sensor, ingest, control = InProcessBus(), InProcessBus(), InProcessBus()
     output = control.subscribe(WILDCARD)
-    pipeline = start_pipeline(sensor, ingest, control, site, lambda: 0.0)
+    labels = ZoneLabels(critical="c", important="i", perimeter="p")
+    pipeline = start_pipeline(sensor, ingest, control, site, labels, lambda: 0.0)
     target = (300.0, 900.0, 80.0)
     for t in (0.0, 0.2, 0.4, 1000.0):
         for station in site.stations:
@@ -105,20 +130,21 @@ async def replay(messages: list[Message]) -> AsyncIterator[Message]:
 
 
 async def test_replaying_the_accepted_messages_alone_gives_the_same_tracks(
-    record_pipeline, site: SiteConfig
+    record_pipeline, site: SiteConfig, config_dir
 ) -> None:
     """With no simulator in the process, the same input gives the same output."""
     _, ingested, live, _ = await record_pipeline("s1", seed=7)
     accepted = [m for m in ingested if not isinstance(m, RejectedMessage)]
     sink = InProcessBus()
     tap = sink.subscribe(WILDCARD)
-    await run_control(control_layer(site), replay(accepted), sink)
+    labels = load_scenario(config_dir, "s1").metadata.zone_labels
+    await run_control(control_layer(site, labels), replay(accepted), sink)
     await sink.close()
     assert dumps([m async for m in tap]) == dumps(live)
 
 
 async def test_class_data_never_changes_the_tracks(
-    record_pipeline, site: SiteConfig
+    record_pipeline, site: SiteConfig, config_dir
 ) -> None:
     """Made-up class scores and snapshots on every bearing must leave the tracks unchanged."""
     _, ingested, live, _ = await record_pipeline("s1", seed=7)
@@ -136,9 +162,11 @@ async def test_class_data_never_changes_the_tracks(
     ]
     sink = InProcessBus()
     tap = sink.subscribe(WILDCARD)
-    await run_control(control_layer(site), replay(labelled), sink)
+    labels = load_scenario(config_dir, "s1").metadata.zone_labels
+    await run_control(control_layer(site, labels), replay(labelled), sink)
     await sink.close()
-    assert dumps([m async for m in tap]) == dumps(live)
+    replayed = [m async for m in tap]
+    assert dumps(tracks_only(replayed)) == dumps(tracks_only(live))
 
 
 async def test_target_order_leaves_no_trace_in_the_tracks(

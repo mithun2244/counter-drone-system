@@ -84,18 +84,18 @@ Done when:
 **Goal:** each track gets a class, a threat score and a zoom camera.
 
 Tasks:
-- [ ] Behaviour features and rules (`design.md` A7)
-- [ ] Log-odds fusion of look, move and sound
-- [ ] Threat ranking with zones, TTI, approved flights and reasons (`design.md` A8)
-- [ ] Zoom scheduler with dwell and pre-emption (`design.md` A9)
-- [ ] Paired S3 comparison: same seed at `zoom_per_station` 0, 1 and 2, reported by the metrics script
-- [ ] Visibility model and coverage % (`design.md` A10)
+- [x] Behaviour features and rules (`design.md` A7)
+- [x] Log-odds fusion of look, move and sound
+- [x] Threat ranking with zones, TTI, approved flights and reasons (`design.md` A8)
+- [x] Zoom scheduler with dwell and pre-emption (`design.md` A9)
+- [x] Paired S3 comparison: same seed at `zoom_per_station` 0, 1 and 2, reported by the metrics script
+- [x] Visibility model and coverage % (`design.md` A10)
 
 Done when:
-- [ ] S3: birds never reach amber or red; the quadcopter reaches red
-- [ ] S1: the three red alerts are ordered by TTI
-- [ ] S4: coverage drops below 80% and the warning flag is set
-- [ ] Unit tests for the threat score formula with hand-calculated cases
+- [x] S3: birds never reach amber or red; the quadcopter reaches red (baseline simulator, as approved; with recorded media, birds do reach amber or red, see `memory.md`)
+- [x] S1: the three red alerts are ordered by TTI (by true arrival, on the second set of unseen gate seeds; the first set failed on one seed, see `memory.md`)
+- [x] S4: coverage drops below 80% and the warning flag is set
+- [x] Unit tests for the threat score formula with hand-calculated cases
 
 ---
 

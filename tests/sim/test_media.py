@@ -202,6 +202,29 @@ def test_each_stream_is_independent(site: SiteConfig) -> None:
     assert len(chosen) > 1
 
 
+def clip_of(look: Look) -> str:
+    return look.snapshot_ref.split(":")[0]
+
+
+def test_zoom_looks_with_the_rgb_model_on_a_clip_no_wide_camera_uses(
+    site: SiteConfig,
+) -> None:
+    """A frame a wide camera already showed is not independent evidence, so avoid its clip."""
+    media = link(site, [entry(f"{i:04d}") for i in range(3)], model_saying("drone"))
+    wide = {
+        clip_of(media.look(s, "rgb", "t1", "quadcopter", 300.0, 0.0))
+        for s in ("st1", "st2")
+    }
+    zoom = media.look("st3", "zoom", "t1", "quadcopter", 300.0, 0.0)
+    assert clip_of(zoom) not in wide
+
+
+def test_zoom_shares_the_only_clip_rather_than_seeing_nothing(site: SiteConfig) -> None:
+    media = link(site, [entry("0000")], model_saying("drone"))
+    media.look("st1", "rgb", "t1", "quadcopter", 300.0, 0.0)
+    assert clip_of(media.look("st1", "zoom", "t1", "quadcopter", 300.0, 0.0)) == "0000"
+
+
 def test_clip_choice_is_fixed_by_the_seed(site: SiteConfig) -> None:
     clips = [entry(f"{i:04d}") for i in range(8)]
     refs = [link(site, clips, model_saying("drone"), seed=7) for _ in range(2)]

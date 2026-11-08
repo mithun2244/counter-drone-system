@@ -33,6 +33,8 @@ CAMERA_LABELS: Mapping[TargetType, str] = {
 }
 BINS_NEAREST_FIRST = ("close", "medium", "distant")
 HELD_OUT = "test"
+# A zoom camera is a magnified RGB camera: RGB model, RGB clips.
+LOOKS_LIKE: Mapping[SensorKind, SensorKind] = {"zoom": "rgb"}
 
 
 @dataclass(frozen=True)
@@ -114,7 +116,7 @@ class MediaLink:
                 (station_id, sensor, target_id), target_type, range_m, tick
             )
         label = CAMERA_LABELS.get(target_type)
-        model = self._models.get(sensor)
+        model = self._models.get(LOOKS_LIKE.get(sensor, sensor))
         if label is None or model is None:
             return None
         key = (station_id, sensor, target_id)
@@ -151,7 +153,15 @@ class MediaLink:
         model: LookModel,
         tick: int,
     ) -> _Stream:
-        clips = self._candidates(sensor, label, wanted)
+        clips = self._candidates(LOOKS_LIKE.get(sensor, sensor), label, wanted)
+        if sensor in LOOKS_LIKE:
+            # Not a clip any wide camera shows this target with, where another exists.
+            wide = {
+                state.clip.id
+                for (_, other, target_id), state in self._streams.items()
+                if target_id == key[2] and other not in LOOKS_LIKE
+            }
+            clips = [clip for clip in clips if clip.id not in wide] or clips
         rng = stream(self._seed, "clip", *key, wanted)
         clip = clips[int(rng.integers(len(clips)))]
         if clip.id not in self._frames:

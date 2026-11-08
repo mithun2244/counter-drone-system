@@ -2,7 +2,7 @@
 
 import pytest
 
-from cuas.config import SiteConfig
+from cuas.config import SiteConfig, ZoneLabels
 from cuas.control.layer import ControlLayer
 from cuas.geometry import bearing_to
 from cuas.schemas import (
@@ -20,12 +20,7 @@ TICK = 0.2
 
 @pytest.fixture
 def layer(site: SiteConfig) -> ControlLayer:
-    return ControlLayer(
-        site.tracker,
-        {s.id: s.position_enu_m for s in site.stations},
-        {p.id: p.position_enu_m for p in site.pickets},
-        site.picket_settings.bearing_error_deg,
-    )
+    return ControlLayer(site, ZoneLabels(critical="c", important="i", perimeter="p"))
 
 
 def bearings(site: SiteConfig, t: float, sensors=("rgb", "thermal"), target=TARGET):
@@ -59,9 +54,9 @@ def test_a_batch_waits_for_a_later_message_and_flush_ends_it(
 ) -> None:
     assert feed(layer, bearings(site, 0.0)) == []
     first = feed(layer, bearings(site, TICK))
-    assert [(type(m).__name__, m.t) for m in first] == [("Track", 0.0)]
+    assert [m.t for m in first if isinstance(m, Track)] == [0.0]
     last = layer.flush()
-    assert [(type(m).__name__, m.t) for m in last] == [("Track", TICK)]
+    assert [m.t for m in last if isinstance(m, Track)] == [TICK]
     assert layer.flush() == []
 
 
@@ -106,7 +101,8 @@ def test_an_acoustic_bearing_on_a_3d_track_makes_no_wedge(
             layer, bearings(site, k * TICK, sensors=("rgb", "thermal", "acoustic"))
         )
     out += layer.flush()
-    assert {type(m) for m in out} == {Track}
+    assert not [m for m in out if isinstance(m, SectorTrack)]
+    assert [m for m in out if isinstance(m, Track)]
 
 
 def test_statuses_keep_time_moving_so_an_unseen_track_is_lost(

@@ -8,6 +8,7 @@ from cuas import schemas
 from cuas.schemas import (
     BearingDetection,
     ClueEvidence,
+    CoverageStatus,
     EvidenceRecord,
     Message,
     PicketAlert,
@@ -51,6 +52,7 @@ SAMPLES: list[Message] = [
     ),
     TrackClass(
         track_id="trk1",
+        t=3.0,
         p_drone=0.9,
         p_bird=0.1,
         p_attack_drone=0.8,
@@ -58,14 +60,17 @@ SAMPLES: list[Message] = [
     ),
     ThreatAssessment(
         track_id="trk1",
+        t=3.0,
         score=0.7,
         level="red",
         zone="critical",
         time_to_impact_s=24.0,
         reasons=("fast straight flight",),
+        alert_id="alert-1",
     ),
     ZoomTask(
         station_id="st1",
+        t=3.0,
         camera_id="z1",
         track_id="trk1",
         azimuth_deg=10.0,
@@ -85,6 +90,7 @@ SAMPLES: list[Message] = [
         reports=1,
         status="active",
     ),
+    CoverageStatus(t=5.0, coverage_pct=55.0, warning=True),
 ]
 SAMPLE_IDS = [type(sample).__name__ for sample in SAMPLES]
 
@@ -104,7 +110,7 @@ def architecture_messages() -> dict[str, list[str]]:
 
 def test_every_architecture_message_and_key_field_has_a_schema() -> None:
     messages = architecture_messages()
-    assert len(messages) == 10
+    assert len(messages) == 11
     for name, fields in messages.items():
         model = getattr(schemas, name)
         assert issubclass(model, Message)
@@ -144,8 +150,8 @@ def models_in_schemas() -> list[type[BaseModel]]:
 
 def test_no_schema_has_a_ground_truth_field() -> None:
     assert (
-        len(models_in_schemas()) == 12
-    )  # 10 messages, ClueEvidence and the Message base
+        len(models_in_schemas()) == 13
+    )  # 11 messages, ClueEvidence and the Message base
     for model in models_in_schemas():
         for field in model.model_fields:
             assert not re.search("target|true|truth", field), (

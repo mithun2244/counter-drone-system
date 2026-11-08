@@ -38,7 +38,8 @@ def sensor_id(message: Message) -> str:
 
 def known_sensors(site: SiteConfig) -> frozenset[str]:
     """Every sensor ID the site configures. Sensor positions come from the site, never a message."""
-    cameras = {f"{s.id}.{kind}" for s in site.stations for kind in site.sensors}
+    kinds = [*site.sensors, *(["zoom"] if site.zoom_per_station else [])]
+    cameras = {f"{s.id}.{kind}" for s in site.stations for kind in kinds}
     return frozenset(cameras | {p.id for p in site.pickets})
 
 

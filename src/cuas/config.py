@@ -189,6 +189,118 @@ class TrackerSettings(ConfigModel):
     sector_lost_after_s: Positive
 
 
+class MoveSettings(ConfigModel):
+    """The behaviour clue (design.md A7), from fresh fixes only."""
+
+    window_s: Positive
+    min_history_s: Positive
+    hover_speed_mps: Positive
+    hover_baseline_s: Positive
+    """Hover speed comes from position change over this long, steadier than the filter's."""
+    hover_fraction: Probability
+    fast_speed_mps: Positive
+    fast_straightness: Probability
+    fast_speed_cv: Positive
+    fast_persistence_s: Positive
+    """Fast, straight, steady flight must last this long on fresh fixes to count."""
+    fast_max_gap_s: Positive
+    """A longer gap between fresh fixes restarts the persistence count."""
+    drone_like: Probability
+    bird_like: Probability
+    velocity_window_s: Positive
+    """Velocity for time to impact is a least-squares fit over this much fresh history."""
+    velocity_min_span_s: Positive
+    """No time to impact until the fitted fixes span this long."""
+    velocity_max_fix_age_s: Positive
+    """After a gap the fit may reach back to a real fix this old, and no older."""
+
+    @model_validator(mode="after")
+    def _velocity_spans_ordered(self) -> Self:
+        if not (
+            self.velocity_min_span_s
+            <= self.velocity_window_s
+            <= self.velocity_max_fix_age_s
+        ):
+            raise ValueError(
+                "need velocity_min_span_s <= velocity_window_s <= velocity_max_fix_age_s"
+            )
+        return self
+
+
+class ClassifySettings(ConfigModel):
+    """Log-odds fusion of look, move and sound (design.md A7)."""
+
+    prior: Annotated[float, Field(gt=0.0, lt=1.0)]
+    weights: dict[Literal["look", "move", "sound"], NonNegative]
+    clue_floor: Annotated[float, Field(gt=0.0, lt=0.5)]
+    """Every clue is held within [clue_floor, 1 - clue_floor], so none is ever certain."""
+    picket_engine_heard: Probability
+    attack_speed_mps: Positive
+    zoom_look_after_s: NonNegative
+    move: MoveSettings
+
+
+class ApprovedFlight(ConfigModel):
+    """A friendly corridor and time window (design.md A8)."""
+
+    corridor_enu_m: tuple[tuple[float, float], ...]
+    min_altitude_m: float
+    max_altitude_m: float
+    start_s: NonNegative
+    end_s: NonNegative
+
+
+class ThreatSettings(ConfigModel):
+    """``score = P_hostile * (zone_share * zone_w + (1 - zone_share) * urgency)`` (design.md A8)."""
+
+    red: Probability
+    amber: Probability
+    zone_share: Probability
+    urgency_full_s: Positive
+    urgency_floor_s: Positive
+    urgency_at_floor: Probability
+    urgency_beyond: Probability
+    still_speed_mps: Positive
+    """Slower than this, a track is heading nowhere: no time to impact unless inside."""
+    approved_flights: tuple[ApprovedFlight, ...]
+
+    @model_validator(mode="after")
+    def _ordered(self) -> Self:
+        if not self.amber < self.red or not self.urgency_full_s < self.urgency_floor_s:
+            raise ValueError("need amber < red and urgency_full_s < urgency_floor_s")
+        return self
+
+
+class AlertSettings(ConfigModel):
+    """When a new track continues an earlier alert instead of raising one."""
+
+    relink_window_s: Positive
+    relink_gate_sigmas: Positive
+    relink_max_speed_mps: Positive
+    relink_margin_m: NonNegative
+
+
+class ZoomSettings(ConfigModel):
+    """The zoom scheduler (design.md A9)."""
+
+    period_s: Positive
+    dwell_s: Positive
+    preempt_margin: Probability
+    magnification: Annotated[float, Field(ge=1.0)]
+    half_fov_deg: Positive
+
+
+class CoverageSettings(ConfigModel):
+    """Coverage % (design.md A10): cells of one zone reachable by enough stations."""
+
+    zone: ZoneId
+    cell_m: Positive
+    design_target: TargetType
+    sensor: SensorKind
+    min_stations: Annotated[int, Field(ge=1)]
+    warning_below_pct: Annotated[float, Field(gt=0.0, le=100.0)]
+
+
 class SiteConfig(ConfigModel):
     """The baseline every scenario shares."""
 
@@ -202,6 +314,11 @@ class SiteConfig(ConfigModel):
     station_ai: StationAiSettings
     gateway: GatewaySettings
     tracker: TrackerSettings
+    classify: ClassifySettings
+    threat: ThreatSettings
+    alerts: AlertSettings
+    zoom: ZoomSettings
+    coverage: CoverageSettings
 
     @model_validator(mode="after")
     def _position_sensors_exist(self) -> Self:

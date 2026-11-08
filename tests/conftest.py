@@ -8,6 +8,7 @@ from cuas.clock import SimClock
 from cuas.config import SiteConfig, load_site
 from cuas.pipeline import start_pipeline
 from cuas.schemas import Message
+from cuas.schemas.topics import ZOOM_TASK
 from cuas.sim.engine import run_scenario
 from cuas.sim.scenario import Scenario, load_scenario
 from cuas.sim.truth import TruthLog
@@ -65,16 +66,21 @@ def record_pipeline(config_dir: Path) -> Callable[..., Awaitable[RecordedPipelin
         *,
         pace: float | None = None,
         media: object = None,
+        zoom: int | None = None,
     ) -> RecordedPipeline:
-        site = load_site(config_dir)
+        site = load_site(config_dir, zoom_per_station=zoom)
         if isinstance(scenario, str):
             scenario = load_scenario(config_dir, scenario)
         sensor, ingest, control = InProcessBus(), InProcessBus(), InProcessBus()
         clock = SimClock(site.simulation.tick_s, pace=pace)
         taps = [bus.subscribe(WILDCARD) for bus in (sensor, ingest, control)]
-        pipeline = start_pipeline(sensor, ingest, control, site, lambda: clock.now)
+        labels = scenario.metadata.zone_labels
+        zoom_tasks = control.subscribe(ZOOM_TASK)
+        pipeline = start_pipeline(
+            sensor, ingest, control, site, labels, lambda: clock.now
+        )
         truth = await run_scenario(
-            scenario, site, sensor, clock, seed=seed, media=media
+            scenario, site, sensor, clock, seed=seed, media=media, zoom_tasks=zoom_tasks
         )
         await sensor.close()
         await pipeline

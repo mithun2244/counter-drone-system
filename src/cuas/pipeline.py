@@ -10,20 +10,40 @@ import asyncio
 from collections.abc import AsyncIterator, Callable
 
 from cuas.bus import WILDCARD, Bus
-from cuas.config import SiteConfig
+from cuas.config import SiteConfig, ZoneLabels
 from cuas.control.layer import ControlLayer
 from cuas.gateway.gateway import Gateway, known_sensors, run_gateway
-from cuas.schemas import Message, Track
-from cuas.schemas.topics import GATEWAY_ACCEPTED, SECTOR_TRACK, TRACK
+from cuas.schemas import (
+    CoverageStatus,
+    Message,
+    SectorTrack,
+    ThreatAssessment,
+    Track,
+    TrackClass,
+    ZoomTask,
+)
+from cuas.schemas.topics import (
+    COVERAGE,
+    GATEWAY_ACCEPTED,
+    SECTOR_TRACK,
+    THREAT,
+    TRACK,
+    TRACK_CLASS,
+    ZOOM_TASK,
+)
+
+TOPICS: dict[type[Message], str] = {
+    Track: TRACK,
+    SectorTrack: SECTOR_TRACK,
+    TrackClass: TRACK_CLASS,
+    ThreatAssessment: THREAT,
+    ZoomTask: ZOOM_TASK,
+    CoverageStatus: COVERAGE,
+}
 
 
-def control_layer(site: SiteConfig) -> ControlLayer:
-    return ControlLayer(
-        site.tracker,
-        {s.id: s.position_enu_m for s in site.stations},
-        {p.id: p.position_enu_m for p in site.pickets},
-        site.picket_settings.bearing_error_deg,
-    )
+def control_layer(site: SiteConfig, labels: ZoneLabels) -> ControlLayer:
+    return ControlLayer(site, labels)
 
 
 def start_pipeline(
@@ -31,6 +51,7 @@ def start_pipeline(
     ingest_bus: Bus,
     control_bus: Bus,
     site: SiteConfig,
+    labels: ZoneLabels,
     now: Callable[[], float],
 ) -> asyncio.Task[None]:
     """Subscribe now, before anything is published, then run until the sensor bus closes."""
@@ -41,7 +62,7 @@ def start_pipeline(
         _run(
             gateway,
             observations,
-            control_layer(site),
+            control_layer(site, labels),
             accepted,
             ingest_bus,
             control_bus,
@@ -55,9 +76,9 @@ async def run_control(
     """The control layer as a task: every accepted message in order, then the last batch."""
     async for message in accepted:
         for output in layer.ingest(message):
-            await sink.publish(_topic(output), output)
+            await sink.publish(TOPICS[type(output)], output)
     for output in layer.flush():
-        await sink.publish(_topic(output), output)
+        await sink.publish(TOPICS[type(output)], output)
 
 
 async def _run(
@@ -73,7 +94,3 @@ async def _run(
     await ingest_bus.close()
     await control
     await control_bus.close()
-
-
-def _topic(message: Message) -> str:
-    return TRACK if isinstance(message, Track) else SECTOR_TRACK
