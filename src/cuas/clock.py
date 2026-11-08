@@ -24,6 +24,14 @@ class SimClock:
     def now(self) -> float:
         return self._ticks * self.tick_s
 
+    def start(self) -> None:
+        """Pace from this moment, so the work of the first tick is caught up like any other.
+
+        Without it, pacing starts at the first ``tick`` and the first tick's work adds to the run.
+        """
+        if self._pace is not None:
+            self._wall_start = asyncio.get_running_loop().time()
+
     async def tick(self) -> None:
         """Advance one tick and let other tasks run, holding the pace if one is set."""
         self._ticks += 1

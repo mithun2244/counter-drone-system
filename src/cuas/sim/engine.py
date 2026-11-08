@@ -38,6 +38,7 @@ async def run_scenario(
     """
     if clock.now != 0.0:
         raise ValueError("run_scenario needs a fresh clock")
+    clock.start()
     run_seed = scenario.seed if seed is None else seed
     wind_factor = scenario.environment.wind_range_factor(site.simulation)
     stations = [

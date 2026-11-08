@@ -65,6 +65,16 @@ async def test_pace_holds_simulated_time_to_wall_time(
     assert clock.now == 5 * 0.2
 
 
+async def test_work_before_the_first_tick_is_caught_up_once_started() -> None:
+    clock = SimClock(0.2, pace=2.0)  # one tick is 0.1 s of wall time
+    clock.start()
+    await asyncio.sleep(0.1)  # the first tick's work
+    started = time.perf_counter()
+    await clock.tick()
+    assert time.perf_counter() - started < 0.05
+    assert clock.now == 0.2
+
+
 @pytest.mark.parametrize(
     "kwargs", [{"tick_s": 0.0}, {"tick_s": -1.0}, {"tick_s": 0.2, "pace": 0.0}]
 )
