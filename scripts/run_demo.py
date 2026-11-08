@@ -16,6 +16,7 @@ from pathlib import Path
 from cuas.bus import WILDCARD, InProcessBus
 from cuas.clock import SimClock
 from cuas.config import SiteConfig, load_site
+from cuas.metrics.alert_evaluator import AlertReport, evaluate_alerts
 from cuas.metrics.evaluator import TargetSummary, summarize
 from cuas.metrics.track_evaluator import TrackReport, evaluate_tracks
 from cuas.pipeline import start_pipeline
@@ -245,6 +246,32 @@ def print_track_evaluation(report: TrackReport) -> None:
         print(f"[evaluator] {target}: {count} confirmed track(s){when}")
 
 
+def print_alert_evaluation(report: AlertReport) -> None:
+    print(
+        f"[evaluator] alerts: {len(report.alert_owner)} raised, {report.wrong_alarms} amber or "
+        f"red assessments on birds, false or unconfirmed tracks, {report.stale_rises} "
+        "rises without a fresh fix"
+    )
+    print(
+        f"[evaluator] red order: {report.red_batches} batches with 2 or more reds, "
+        f"{report.out_of_order_batches} out of true arrival order"
+    )
+    for target, count in report.alerts_per_target.items():
+        red = report.first_red.get(target)
+        when = (
+            ""
+            if red is None
+            else f", first red at t={red[0]:.1f} s, {red[1]:.1f} s after its track started"
+        )
+        print(f"[evaluator] {target}: {count} alert(s){when}")
+    if report.coverage:
+        lowest = min(pct for _, pct, _ in report.coverage)
+        warned = any(warning for _, _, warning in report.coverage)
+        print(
+            f"[evaluator] coverage: lowest {lowest:.1f}%, warning {'set' if warned else 'not set'}"
+        )
+
+
 def build_media(
     args: argparse.Namespace, site: SiteConfig, wind_mps: float, seed: int
 ) -> LookSource | None:
@@ -294,6 +321,7 @@ async def run(args: argparse.Namespace, site: SiteConfig) -> None:
     print_evaluation(summarize(truth))
     tracks = [m for m in controlled if isinstance(m, Track)]
     print_track_evaluation(evaluate_tracks(truth, tracks))
+    print_alert_evaluation(evaluate_alerts(truth, controlled))
 
 
 def main() -> None:

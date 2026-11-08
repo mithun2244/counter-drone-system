@@ -11,6 +11,7 @@
 - **Next step:** build the approved Phase 4 plan step by step. Run the gate seeds only once the movement rule is frozen; if a gate fails, stop and show the user. Do not merge until the user has reviewed the acceptance results. Do not rerun the held-out evaluations
 - **Phase 4 gate seeds, declared on 2026-11-07 before any run:** S1 gates on its own seed (1001), 7 and 201–220; S3 on its own seed (3003), 7 and 201–210. Development uses seeds 1–19 except 7 only
 - **Seed 7 withdrawn from the gates (2026-11-07):** a wiring smoke test ran S1–S4 on seed 7 before the rule was frozen, so it is no longer unseen. Replaced by seed 221 for S1 and 211 for S3, declared before either is run. Smoke tests use development seeds only
+- **Rule frozen at commit `2ded003` (2026-11-08)** before any gate seed ran: movement clue with a latch, time to impact from a 5 s least-squares fit. The gate tests are `tests/test_decision.py`
 - **Start sessions from `cuas-demo/`**, or `CLAUDE.md` will not auto-load
 
 ## Decisions log

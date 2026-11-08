@@ -52,7 +52,7 @@ def evaluate_tracks(truth: TruthLog, tracks: Sequence[Track]) -> TrackReport:
         positions[state.t][state.target_id] = np.asarray(state.position_enu_m)
         types[state.target_id] = state.target_type
     confirmed = [m for m in tracks if m.status == "confirmed"]
-    owner, false = _owners(confirmed, positions)
+    owner, false = owners(confirmed, positions)
     errors: defaultdict[str, list[float]] = defaultdict(list)
     after_flight = 0
     for message in confirmed:
@@ -90,7 +90,7 @@ def _distance(message: Track, target: np.ndarray) -> float:
     return float(np.linalg.norm(np.asarray(message.position_enu_m) - target))
 
 
-def _owners(
+def owners(
     confirmed: list[Track], positions: dict[float, dict[str, np.ndarray]]
 ) -> tuple[dict[str, str], set[str]]:
     """Each track's target, and the tracks whose median distance to every target is too far."""
