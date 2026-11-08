@@ -67,6 +67,7 @@ class _Evidence:
     move: MoveClue
     looks: list[float] = field(default_factory=list)
     zoom_looks: list[tuple[float, float]] = field(default_factory=list)
+    wide_frames: set[str] = field(default_factory=set)
     sounds: list[float] = field(default_factory=list)
     piston: list[float] = field(default_factory=list)
 
@@ -139,7 +140,9 @@ class Classifier:
         for bearing in bearings:
             if bearing.class_probs:
                 groups[(bearing.station_id, bearing.sensor)].append(bearing)
-        for (station_id, sensor), found in sorted(groups.items()):
+        # Zoom last, so every wide frame of this batch is known before a zoom look is counted.
+        order = sorted(groups.items(), key=lambda g: (g[0][1] == "zoom", g[0]))
+        for (station_id, sensor), found in order:
             origin = self._stations[station_id]
             distances2 = np.array(
                 [
@@ -164,10 +167,15 @@ class Classifier:
         evidence = self._evidence[track_id]
         if sensor in CAMERAS:
             p = look_probability(bearing.class_probs)
-            if p is not None and sensor == "zoom":
-                evidence.zoom_looks.append((t, p))
-            elif p is not None:
-                evidence.looks.append(p)
+            if sensor != "zoom":
+                if bearing.snapshot_ref is not None:
+                    evidence.wide_frames.add(bearing.snapshot_ref)
+                if p is not None:
+                    evidence.looks.append(p)
+            elif p is not None and bearing.snapshot_ref not in evidence.wide_frames:
+                evidence.zoom_looks.append(
+                    (t, p)
+                )  # a frame already seen wide adds nothing
             return
         p = sound_probability(bearing.class_probs)
         if p is not None:

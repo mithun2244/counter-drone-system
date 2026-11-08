@@ -17,6 +17,9 @@ from cuas.schemas import SensorStatus, Track, ZoomTask
 from cuas.schemas.base import Vector3
 
 FULL_VISIBILITY = 1.0
+# A task takes effect one period after it is issued and holds until the next one, so it aims
+# where the track will be halfway through that period.
+LEAD_PERIODS = 1.5
 
 
 @dataclass
@@ -120,9 +123,11 @@ class ZoomScheduler:
 
     def _task(self, t: float, camera: tuple[str, str], track: Track) -> ZoomTask:
         station_id, camera_id = camera
-        azimuth, elevation, _ = bearing_to(
-            self._stations[station_id], track.position_enu_m
+        lead_s = LEAD_PERIODS * self._settings.period_s
+        ahead = (
+            np.asarray(track.position_enu_m) + np.asarray(track.velocity_mps) * lead_s
         )
+        azimuth, elevation, _ = bearing_to(self._stations[station_id], ahead.tolist())
         return ZoomTask(
             station_id=station_id,
             t=t,

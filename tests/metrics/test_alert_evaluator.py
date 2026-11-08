@@ -2,7 +2,7 @@
 
 from cuas.metrics.alert_evaluator import FALSE, UNCONFIRMED, evaluate_alerts
 from cuas.schemas import ThreatAssessment, Track
-from cuas.sim.truth import TargetState, TruthLog
+from cuas.sim.truth import BearingTruth, TargetState, TruthLog
 
 A_AT, B_AT, BIRD_AT = (0.0, 500.0, 80.0), (0.0, 900.0, 80.0), (600.0, 0.0, 60.0)
 
@@ -125,3 +125,39 @@ def test_first_red_is_timed_from_the_start_of_its_track() -> None:
         threat("trk-1", 4.0, "red", "alert-1"),
     ]
     assert evaluate_alerts(TRUTH, messages).first_red == {"atk-1": (4.0, 3.0)}
+
+
+def seen_from(station_id: str, t: float, sensor: str = "rgb") -> BearingTruth:
+    return BearingTruth(
+        t, "atk-1", "attack_drone", station_id, sensor, 0.0, 1.0, 500.0, 3000.0
+    )
+
+
+def test_time_to_red_runs_from_the_first_tick_two_stations_saw_it() -> None:
+    """prd.md: from the first 2-station detection. One station at 0 s, or a 2-station tick of
+    acoustic and zoom bearings at 1 s, is not one; rgb and thermal from two stations at 2 s is."""
+    truth = TruthLog(
+        states=TRUTH.states,
+        bearings=[
+            seen_from("st1", 0.0),
+            seen_from("st1", 1.0, "acoustic"),
+            seen_from("st2", 1.0, "zoom"),
+            seen_from("st1", 2.0, "thermal"),
+            seen_from("st3", 2.0),
+        ],
+    )
+    messages = [track("trk-1", 4.0, A_AT), threat("trk-1", 4.0, "red", "alert-1")]
+    assert evaluate_alerts(truth, messages).time_to_red == {"atk-1": 2.0}
+
+
+def test_wrong_alerts_count_alerts_not_assessments() -> None:
+    messages = [
+        track("trk-1", 0.0, BIRD_AT),
+        threat("trk-1", 0.0, "amber", "alert-1"),
+        track("trk-1", 1.0, BIRD_AT),
+        threat("trk-1", 1.0, "red", "alert-1"),
+        track("trk-2", 1.0, A_AT),
+        threat("trk-2", 1.0, "red", "alert-2"),
+    ]
+    report = evaluate_alerts(TRUTH, messages)
+    assert (report.wrong_alerts, report.wrong_alarms) == (1, 2)

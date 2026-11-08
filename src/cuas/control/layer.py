@@ -4,6 +4,9 @@ It reads the gateway's accepted messages in order. Bearings within ``batch_windo
 other are handled together, so a batch is processed once a later message shows that its time
 has passed. Sensor statuses arrive every second, which keeps time moving when nothing is seen.
 Running every part in one stage, on the same batch, keeps the output deterministic.
+
+Zoom bearings are class evidence only. They wait for the next batch and never start or close
+one, so the tracker sees the same batches, and gives the same tracks, with or without zoom.
 """
 
 from cuas.config import SiteConfig, ZoneLabels
@@ -15,6 +18,8 @@ from cuas.control.sectors import SectorTracker
 from cuas.control.threat import ThreatRanker, rank
 from cuas.control.tracker import SharedTracker
 from cuas.schemas import BearingDetection, Message, PicketAlert, SensorStatus
+
+ZOOM = "zoom"
 
 
 class ControlLayer:
@@ -52,9 +57,13 @@ class ControlLayer:
         )
         self._batch_t: float | None = None
         self._pending: list[BearingDetection] = []
+        self._zoom_looks: list[BearingDetection] = []
 
     def ingest(self, message: Message) -> list[Message]:
         """Take one accepted message. Returns whatever it makes ready to publish."""
+        if isinstance(message, BearingDetection) and message.sensor == ZOOM:
+            self._zoom_looks.append(message)
+            return []
         out: list[Message] = []
         if (
             self._batch_t is not None
@@ -86,12 +95,12 @@ class ControlLayer:
         return self._process() if self._batch_t is not None else []
 
     def _process(self) -> list[Message]:
-        t, bearings = self._batch_t, self._pending
-        self._batch_t, self._pending = None, []
+        t, bearings, zoom = self._batch_t, self._pending, self._zoom_looks
+        self._batch_t, self._pending, self._zoom_looks = None, [], []
         tracks = self._tracker.update(t, bearings)
         out: list[Message] = [*tracks, *self._heard_only(t, bearings)]
         out.extend(self._sectors.expire(t))
-        classified = self._classifier.update(t, tracks, bearings)
+        classified = self._classifier.update(t, tracks, [*bearings, *zoom])
         raw = [self._ranker.assess(t, c) for c in classified]
         threats = rank(self._alerts.update(t, tracks, raw))
         out.extend(c.track_class for c in classified)
@@ -105,10 +114,7 @@ class ControlLayer:
         """Wedges for bearings that cannot place a target and that no 3D track explains."""
         wedges: list[Message] = []
         for bearing in bearings:
-            if (
-                bearing.sensor in self._settings.position_sensors
-                or bearing.sensor == "zoom"
-            ):
+            if bearing.sensor in self._settings.position_sensors:
                 continue
             if self._tracker.accounts_for(bearing):
                 continue  # heard, and already placed in 3D by the cameras

@@ -30,7 +30,7 @@ from cuas.schemas import (
     Track,
     ZoomTask,
 )
-from cuas.schemas.topics import GATEWAY_REJECTED
+from cuas.schemas.topics import GATEWAY_REJECTED, ZOOM_TASK
 from cuas.sim.engine import run_scenario
 from cuas.sim.scenario import Scenario, available_scenarios, load_scenario
 from cuas.sim.station import LookSource
@@ -203,7 +203,9 @@ def print_header(scenario: Scenario, site: SiteConfig, seed: int) -> None:
         f"perimeter={labels.perimeter}"
     )
     print(f"seed: {seed}")
-    print(f"zoom_per_station: {site.zoom_per_station} (not used until Phase 4)")
+    print(
+        f"zoom_per_station: {site.zoom_per_station} (zoom looks need --recorded-media)"
+    )
 
 
 def print_evaluation(summaries: list[TargetSummary]) -> None:
@@ -311,7 +313,13 @@ async def run(args: argparse.Namespace, site: SiteConfig) -> None:
     )
     media = build_media(args, site, scenario.environment.wind_mps, seed)
     truth = await run_scenario(
-        scenario, site, sensor_bus, clock, seed=seed, media=media
+        scenario,
+        site,
+        sensor_bus,
+        clock,
+        seed=seed,
+        media=media,
+        zoom_tasks=control_bus.subscribe(ZOOM_TASK),
     )
     await sensor_bus.close()
     await printer

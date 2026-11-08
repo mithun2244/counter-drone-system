@@ -18,6 +18,7 @@ RANKS = {"info": 0, "amber": 1, "red": 2}
 DRONE_TYPES = {"attack_drone", "quadcopter", "friendly_drone"}
 FALSE, UNCONFIRMED = "false track", "unconfirmed track"
 FRESH_STATIONS = 2
+WIDE_CAMERAS = {"rgb", "thermal"}
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,10 @@ class AlertReport:
     alerts_per_target: dict[str, int]
     first_red: dict[str, tuple[float, float]]
     """Per target: time of its first red, and seconds since the track carrying it started."""
+    time_to_red: dict[str, float]
+    """prd.md section 8: seconds from the first tick wide cameras on 2 stations saw it to red."""
+    wrong_alerts: int
+    """Alerts that belong to anything but a drone."""
     wrong_alarms: int
     """Amber or red assessments on anything that is not a drone: birds, false or unconfirmed tracks."""
     wrong_alarm_tracks: dict[str, str]
@@ -74,11 +79,20 @@ def evaluate_alerts(truth: TruthLog, messages: Sequence[Message]) -> AlertReport
         if a.level == "red" and is_drone(a.track_id) and target not in first_red:
             first_red[target] = (a.t, a.t - started[a.track_id])
     red_batches, out_of_order = _order(threats, belongs, arrival)
+    seen_by_two = _first_two_station_detection(truth)
     counted = Counter(alert_owner.values())
     return AlertReport(
         alert_owner=alert_owner,
         alerts_per_target={t: counted.get(t, 0) for t in sorted(types)},
         first_red=first_red,
+        time_to_red={
+            target: red_t - seen_by_two[target]
+            for target, (red_t, _) in first_red.items()
+            if target in seen_by_two
+        },
+        wrong_alerts=sum(
+            1 for o in alert_owner.values() if types.get(o) not in DRONE_TYPES
+        ),
         wrong_alarms=sum(
             1 for a in threats if a.level != "info" and not is_drone(a.track_id)
         ),
@@ -92,6 +106,18 @@ def evaluate_alerts(truth: TruthLog, messages: Sequence[Message]) -> AlertReport
             if isinstance(m, CoverageStatus)
         ),
     )
+
+
+def _first_two_station_detection(truth: TruthLog) -> dict[str, float]:
+    stations: defaultdict[tuple[str, float], set[str]] = defaultdict(set)
+    for b in truth.bearings:
+        if b.sensor in WIDE_CAMERAS:
+            stations[(b.target_id, b.t)].add(b.station_id)
+    first: dict[str, float] = {}
+    for (target, t), seen in sorted(stations.items(), key=lambda kv: kv[0][1]):
+        if len(seen) >= FRESH_STATIONS:
+            first.setdefault(target, t)
+    return first
 
 
 def _alert_owners(threats, belongs) -> dict[str, str]:

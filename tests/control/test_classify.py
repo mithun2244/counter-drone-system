@@ -103,9 +103,15 @@ def track(
 
 
 def looking_at(
-    site: SiteConfig, at, t: float, sensor: str, class_probs
+    site: SiteConfig,
+    at,
+    t: float,
+    sensor: str,
+    class_probs,
+    station_index: int = 0,
+    frame: str | None = None,
 ) -> BearingDetection:
-    station = site.stations[0]
+    station = site.stations[station_index]
     azimuth, elevation, _ = bearing_to(station.position_enu_m, at)
     return BearingDetection(
         station_id=station.id,
@@ -115,6 +121,7 @@ def looking_at(
         elevation_deg=elevation,
         sigma_deg=site.sensors.get(sensor, site.sensors["rgb"]).sigma_deg,
         class_probs=class_probs,
+        snapshot_ref=frame,
     )
 
 
@@ -271,3 +278,39 @@ def test_a_lost_track_forgets_its_evidence(
     )
     out = by_id(classifier.update(0.4, [track("trk-1", TARGET, 0.4)], []))
     assert out["trk-1"].evidence.look is None
+
+
+WIDE, ZOOMED = {"drone": 0.2, "bird": 0.8}, {"drone": 0.9, "bird": 0.1}
+
+
+@pytest.mark.parametrize(
+    ("zoom_frame", "look"),
+    [("f:7", 0.2), ("g:3", 0.9)],
+    ids=["same frame as a wide look", "another frame"],
+)
+def test_a_zoom_look_on_a_frame_already_seen_wide_is_not_counted(
+    classifier: Classifier, site: SiteConfig, zoom_frame: str, look: float
+) -> None:
+    wide = looking_at(site, TARGET, 0.0, "rgb", WIDE, frame="f:7")
+    classifier.update(0.0, [track("trk-1", TARGET, 0.0)], [wide])
+    for k in range(1, 10):
+        zoom = looking_at(site, TARGET, k * 0.2, "zoom", ZOOMED, frame=zoom_frame)
+        out = by_id(
+            classifier.update(k * 0.2, [track("trk-1", TARGET, k * 0.2)], [zoom])
+        )
+    assert out["trk-1"].evidence.look == pytest.approx(look)
+
+
+def test_wide_frames_from_any_station_count_before_zoom_in_the_same_batch(
+    classifier: Classifier, site: SiteConfig
+) -> None:
+    """st1's zoom and st2's wide camera show the same frame at once: not two looks."""
+    zoom = looking_at(site, TARGET, 0.0, "zoom", ZOOMED, frame="f:7")
+    wide = looking_at(site, TARGET, 0.0, "rgb", WIDE, station_index=1, frame="f:7")
+    classifier.update(0.0, [track("trk-1", TARGET, 0.0)], [zoom, wide])
+    for k in range(1, 10):
+        zoom = looking_at(site, TARGET, k * 0.2, "zoom", ZOOMED, frame="f:7")
+        out = by_id(
+            classifier.update(k * 0.2, [track("trk-1", TARGET, k * 0.2)], [zoom])
+        )
+    assert out["trk-1"].evidence.look == pytest.approx(0.2)

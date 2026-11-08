@@ -15,6 +15,7 @@
 - **First gate run, on `2ded003` (2026-11-08): 67 of 68 passed. S1 seed 216 failed** with 1 of 160 batches of two or more reds listed out of true arrival order, at t = 76.0 s. atk-3's track had just started, and its time to impact from just over 2 s of fixes was 26.49 s against a true 33.8 s. That put it ahead of atk-2 at 26.59 s against a true 28.8 s. The next batch had the right order. The first gate set stays in the suite as regression cases
 - **Second gate seeds, declared on 2026-11-08 before any run:** S1 301–322; S3 301–312; S4 301–312 through every test that runs S4 (coverage, with S2 on the same seed; stale rises; one alert per drone). Regression cases: S1 seed 216, and S4 seed 10 for a red alert through a gap
 - **Time-to-impact change frozen at commit `ce4ea52` (2026-11-08)**, before any second gate seed ran: 3 s of fresh fixes instead of 2 s, with a reach-back after gaps to a real fix at most 6.5 s old (`design.md` A8)
+- **Paired S3 zoom comparison seeds, declared on 2026-11-08 before any comparison run:** S3's own seed (3003) and seeds 1–4, each at 0, 1 and 2 zoom cameras with recorded media. Reported only, with no target. Seed 5 was used for a smoke test of the script
 - **Second gate run, on `ce4ea52` (2026-11-08): 139 of 139 passed**, run once. It covered 70 fresh-seed tests (S1 22, S3 12, S4 36), both regression cases, and the first gate set as regression cases
 - **Start sessions from `cuas-demo/`**, or `CLAUDE.md` will not auto-load
 
@@ -67,7 +68,7 @@
 
 - Station geometry, bearings and acoustic direction: simulated
 - Pickets: simulated
-- Zoom camera: crop from high-resolution clip
+- Zoom camera: simulated pointing and field of view; with `--recorded-media`, a real RGB look on a held-out clip chosen as if the target were 4× closer, not a crop of the wide camera's frame. Without recorded media it sees nothing
 - Hand-off: JSON export only
 - Bearing `class_probs` and `snapshot_ref`: real with `--recorded-media`; empty without it, and on S1 camera bearings because no fixed-wing footage exists
 - Picket engine guess: real classifier with `--recorded-media`, otherwise a noisy simulated value

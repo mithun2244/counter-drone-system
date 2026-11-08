@@ -18,13 +18,15 @@ def scheduler(site: SiteConfig, per_station: int = 1) -> ZoomScheduler:
     )
 
 
-def track(track_id: str, at, status: str = "confirmed") -> Track:
+def track(
+    track_id: str, at, status: str = "confirmed", velocity=(0.0, 0.0, 0.0)
+) -> Track:
     cov = tuple(tuple(1.0 if i == j else 0.0 for j in range(6)) for i in range(6))
     return Track(
         track_id=track_id,
         t=0.0,
         position_enu_m=at,
-        velocity_mps=(0.0, 0.0, 0.0),
+        velocity_mps=velocity,
         covariance=cov,
         n_stations=3,
         status=status,
@@ -50,6 +52,15 @@ def test_the_nearest_camera_takes_a_track_and_points_at_it(site: SiteConfig) -> 
     [task] = scheduler(site).update(0.0, [track("trk-1", NEAR_ST1)], {"trk-1": 0.9})
     assert (task.station_id, task.camera_id, task.track_id) == ("st1", "z1", "trk-1")
     azimuth, elevation, _ = bearing_to(site.stations[0].position_enu_m, NEAR_ST1)
+    assert (task.azimuth_deg, task.elevation_deg) == pytest.approx((azimuth, elevation))
+
+
+def test_a_moving_track_is_aimed_at_where_it_will_be(site: SiteConfig) -> None:
+    """A task takes effect a period after issue and holds for one more: aim 1.5 periods ahead."""
+    moving = track("trk-1", NEAR_ST1, velocity=(10.0, 0.0, 0.0))
+    [task] = scheduler(site).update(0.0, [moving], {"trk-1": 0.9})
+    ahead = (NEAR_ST1[0] + 10.0 * 1.5 * site.zoom.period_s, *NEAR_ST1[1:])
+    azimuth, elevation, _ = bearing_to(site.stations[0].position_enu_m, ahead)
     assert (task.azimuth_deg, task.elevation_deg) == pytest.approx((azimuth, elevation))
 
 

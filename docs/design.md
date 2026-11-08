@@ -152,7 +152,7 @@ Every assessment carries **reasons** in plain words, for example `"heading to Pr
 
 ### A9. Zoom scheduler
 
-Runs every 0.5 s:
+Runs every 0.6 s, a whole number of 0.2 s ticks (0.5 s is not):
 
 1. Sort tracks by threat score, highest first.
 2. For each track, pick the nearest free zoom camera that can see it (in range, in view, visibility OK).
@@ -160,6 +160,12 @@ Runs every 0.5 s:
 4. After 1.5 s or more of zoom on a track, use the zoom crop's detector confidence as `p_look`.
 
 `zoom_per_station` in `site.yaml` sets the zoom cameras per station: 0, 1 or 2, default 1, overridable with `--zoom-per-station`.
+
+**Zoom gives class evidence only, never a position.** The tracker never triangulates a zoom bearing. Zoom bearings also wait for the next batch and never open or close one, so the tracks are byte-identical at 0, 1 and 2 zoom cameras.
+
+**In the simulator, zoom needs recorded media.** A task takes effect one scheduler period after it is issued and holds until the next one, so it aims where the track will be 1.5 periods ahead. A target within 1° of where a camera points gets a real RGB look from a held-out clip, chosen as if the target were 4× closer, and avoiding the clip the same station's wide camera is using. Without recorded media, tasks are still published but nothing is seen. Each tick, the simulator waits for the pipeline to settle, so the tasks it sees never depend on run speed.
+
+**A zoom look on a frame the track already used as a wide-camera look is not counted.** It is the same picture, so it is not independent evidence. Zoom looks replace wide-camera looks rather than adding a second look clue.
 
 ### A10. Visibility model
 
