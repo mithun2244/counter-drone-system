@@ -8,7 +8,7 @@
 - **Current phase:** Phase 4 — Decision layer, in progress on `phase-4-decision`
 - **Last session:** 2026-11-08
 - **Blocked on:** nothing
-- **Next step:** show the user the second gate result, then continue the plan from step 9 (zoom looks from recorded media). Do not merge until the user has reviewed the acceptance results. Do not rerun the held-out evaluations
+- **Next step:** show the user the paired S3 zoom comparison. Then the rest of the plan: mast-bias robustness report, real-time and cross-process checks with recorded media and zoom, `design.md` A7 and A10, `phases.md` ticks, fresh clone. Do not merge until the user has reviewed the acceptance results. Do not rerun the held-out evaluations
 - **Phase 4 gate seeds, declared on 2026-11-07 before any run:** S1 gates on its own seed (1001), 7 and 201–220; S3 on its own seed (3003), 7 and 201–210. Development uses seeds 1–19 except 7 only
 - **Seed 7 withdrawn from the gates (2026-11-07):** a wiring smoke test ran S1–S4 on seed 7 before the rule was frozen, so it is no longer unseen. Replaced by seed 221 for S1 and 211 for S3, declared before either is run. Smoke tests use development seeds only
 - **Rule frozen at commit `2ded003` (2026-11-08)** before any gate seed ran: movement clue with a latch, time to impact from a 5 s least-squares fit. The gate tests are `tests/test_decision.py`
@@ -107,6 +107,8 @@
 - **Follow-up, kept open by the user on 2026-11-07:** **re-acquisition under a new ID.** S2 picks its target up again under a new ID on 2 of 22 seeds, and S4 on 1 of 7, after coverage gaps at the edge of range. They never overlap
 - Station acoustic wedges also appear near tracked targets: 3 in S1 seed 7. A likely cause, not checked case by case: a 3-sigma gate in two dimensions leaves about 1% of bearings outside
 - The test suite now takes about 5 to 8 minutes here (717 tests), mostly from the 44 seeded S1 and S2 acceptance runs and the real-media tests
+- **`prd.md` time to alert (≤ 5 s from the first 2-station detection to red) is missed** and stays marked missed. Baseline, development seeds: all 108 drones over 5 s, worst 65.0 s; in S1 the 15° rule delays the first 3D fix by a median 20.7 s. Recorded-media S3: the quadcopter takes 19.2 to 30.6 s on 5 seeds, the same at 0, 1 and 2 zoom cameras
+- **Recorded-media S3 alerts on birds.** With real models, birds and false tracks raise 4 to 10 alerts per run with no zoom (5 seeds), because the detectors give some bird clips drone looks (Phase 2's false drone tracks). Zoom lowers this but never removes it. Baseline S3, which has no class data, raises none
 - Phase 4: `design.md` A10 does not say which range or grid coverage uses, and S4's result depends on it. Paper calculation at S4's visibility 0.5: `important` zone with quadcopter RGB range gives 100% clear and 55% in dust (works); perimeter with attack drone RGB stays at 100% (warning never fires); perimeter with quadcopter RGB is 45% even in clear air (warning always on)
 
 ## Exceptions to the Phase 2 plan
@@ -136,6 +138,13 @@ Approved by the user on 2026-11-07, for the Phase 2 demo. The plan's CPU time re
 
 - Seed 7, all three models: digest `sha256:134cb33f6b12005771cf400130813388c678112cc3ed483c90833f0cda5299c0`. Two fast runs and one real-time run are byte-identical
 - Counted from the saved output with a one-off script, not the metrics script: bearings with non-zero drone confidence, RGB 1,121 of 1,127 and thermal 736 of 820. Acoustic top class on 80 bearings: `electric_drone` 64, `background` 12, `engine` 4
+
+### Paired S3 zoom comparison (`scripts/compare_zoom.py`, commit `98b14e1`; simulator geometry with real model output on held-out clips; reported only)
+
+- Seeds 3003 and 1–4, each at 0, 1 and 2 zoom cameras per station, same scenario inputs and recordings. Tracks byte-identical across the three on every seed
+- False alerts (alert IDs on birds or false tracks), summed over 5 seeds: 37 with no zoom, 24 with 1, 21 with 2. False amber or red assessments: 1,050, 447, 487. Per seed not consistent: seed 4 got worse with 1 camera (4 to 5 alerts, 123 to 163 assessments), and a second camera was better than one on 2 seeds and worse on 2
+- The quadcopter reached red in all 15 runs, at the same time with 0, 1 or 2 cameras on every seed: time to red from the `prd.md` start event 19.2, 30.6, 25.6, 24.4 and 21.8 s. No improvement from zoom
+- Zoom bearings sharing a frame with a wide look of the same target, which the classifier does not count: 114 to 397 of 990 to 1,326 with 1 camera, 206 to 972 of 2,255 to 2,689 with 2. Few held-out clips stand in: RGB drone distant 4, bird distant 2, bird medium 6
 
 ### Simulator (`cuas.metrics.evaluator`; simulator results, not real-world performance)
 
