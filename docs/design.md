@@ -101,19 +101,26 @@ Three clues per track, each giving P(drone):
 
 | Clue | Source | Notes |
 | --- | --- | --- |
-| Look `p_look` | Video detector class confidence (average over track) | Zoom crops override wide-camera values when available |
-| Move `p_move` | Behaviour rules on track history (≥ 3 s) | See below |
-| Sound `p_sound` | Audio classifier | Missing if out of hearing range |
+| Look `p_look` | Video detector class confidence: the drone share of a confirmed look, averaged over the track | An all-zero look is unconfirmed and is skipped. Zoom looks replace wide-camera looks after 1.5 s of zoom, and a zoom look on a frame the track already used as a wide look is not counted (A9) |
+| Move `p_move` | Behaviour rules on the track's own fresh fixes (≥ 3 s) | See below |
+| Sound `p_sound` | Station audio classifier: 1 − the background share. A picket that heard an engine in a wedge reaching the track: 0.9 | Missing if out of hearing range |
 
-**Behaviour features:**
+Each clue is held within 0.02–0.98, so no single clue is ever certain.
+
+**Behaviour features**, over the last 10 s of fresh fixes (`n_stations ≥ 2` on a confirmed track; coasting predictions never count), once there are 3 s of them:
 
 - mean speed
-- speed variation
+- speed variation (standard deviation ÷ mean)
 - straightness (start-to-end distance ÷ path length)
-- hover fraction (time with speed < 1 m/s)
-- turn rate
+- hover fraction: the share of fixes that moved less than 1 m/s over the previous 2 s. Position change is used because the filter's velocity jitters above 1 m/s even when a target is still
 
-Drone-like: high straightness, any hovering, sharp turns. Bird-like: curvy path, steady 5–20 m/s, no hovering *(start rules)*.
+**Rule (verified in Phase 4):**
+
+- **Drone-like, `p_move` = 0.8**, if the track is seen hovering (hover fraction ≥ 0.2), or if it flies fast (≥ 30 m/s), straight (≥ 0.97) and steadily (speed variation ≤ 0.2) for 5 s of fresh fixes in a row. A gap of more than 1 s between fresh fixes, or a window that fails, restarts the 5 s. Once seen, either one stays for the track.
+- **Otherwise "wandering flight", `p_move` = 0.15.**
+- Sharp turns and straightness alone are not used. Measured on Phase 3 tracks (seeds 1–19 except 7), birds turn about 49°/s and fly straight for 10 s at a time, and the rule as first written turned 208 of 313 S3 bird tracks red. Hover separates them: birds at most 0.08, the quadcopter 1.00.
+- Frozen at commit `2ded003` before any gate seed ran. On the unseen gate seeds, birds and ghost tracks never reached amber or red in baseline S3 (12 of 12 seeds, then 12 of 12 fresh seeds).
+- Cost: a drone no picket heard needs 3 s of history plus 5 s of fast flight before it looks drone-like. This is one reason the `prd.md` 5 s time-to-alert target is missed.
 
 **Fusion in log-odds.** Missing clues are skipped:
 
@@ -124,7 +131,7 @@ prior = 0.1,  w_look = w_move = w_sound = 1.0   (start values)
 
 **Attack drone vs quadcopter:**
 
-- attack drone if P_drone is high, speed > 30 m/s and the engine type is piston;
+- attack drone if P_drone is high, speed > 30 m/s and the engine type is piston: `P_attack = P_drone × P(piston)`, with P(piston) = 0.5 when no engine was heard, and 0 at 30 m/s or slower;
 - quadcopter if P_drone is high and the target hovers or is slow.
 
 ### A8. Threat ranking
@@ -170,8 +177,11 @@ Runs every 0.6 s, a whole number of 0.2 s ticks (0.5 s is not):
 ### A10. Visibility model
 
 - Each scenario sets a `visibility_factor` between 0 and 1 for cameras (dust, haze) and a `wind_mps` that shortens acoustic range.
-- **Coverage %** is the share of site grid cells (25 m cells) seen by at least 2 stations within the reduced range.
-- If coverage drops below 80% *(start value)*, the dashboard shows a "coverage reduced" warning.
+- **Coverage %** is the share of site grid cells (25 m cells) seen by at least 2 stations within the reduced range. Phase 4 fixed what that means, because S4's result depends on it:
+  - **Area:** the `important` zone, which contains the critical zone.
+  - **Range:** a quadcopter's RGB range (800 m) × the visibility each station's camera reports in its `SensorStatus`, never the scenario's own value. A cell counts if its distance is strictly less than that range.
+  - In clear air this gives 100%, and in S4's dust (visibility 0.5) 54.8%. The alternatives fail: the perimeter with attack-drone range never warns, and with quadcopter range it always warns.
+- If coverage drops below 80% *(start value)*, the dashboard shows a "coverage reduced" warning. The control layer publishes a `CoverageStatus` (`t`, `coverage_pct`, `warning`) whenever the figure changes.
 
 ### A11. Evidence
 
