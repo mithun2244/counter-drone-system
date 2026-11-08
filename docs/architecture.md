@@ -59,7 +59,8 @@ flowchart TB
 | Audio classification | **Real model** on recorded clips | Same model on live microphones |
 | Acoustic direction (DOA) | Simulator computes bearing + noise | GCC-PHAT on real microphone array |
 | Pickets | Simulator triggers by distance | Real picket units |
-| Zoom camera | Crop from high-resolution clip | Real PTZ camera |
+| Zoom camera | Simulated pointing; with recorded media, a held-out RGB clip as if 4× closer | Real PTZ camera |
+| Site map | Local vector drawing of the fictional site from `site.yaml` ([mapping.md](mapping.md)) | Surveyed, client-approved map with MapLibre GL JS and self-hosted PMTiles ([mapping.md](mapping.md)) |
 | Time sync | One simulated clock | PTP hardware |
 | Message bus | In-process async queues | Network bus (MQTT or SAPIENT) |
 | Hand-off | JSON file export | Link to MOI / PSS / MoD operations room |
@@ -71,7 +72,7 @@ flowchart TB
 ```
 cuas-demo/
 ├── CLAUDE.md                 # loaded by Claude Code every session
-├── docs/                     # prd, architecture, design, rules, phases, memory
+├── docs/                     # prd, architecture, design, mapping, rules, phases, memory
 ├── config/
 │   ├── site.yaml             # stations, pickets, zones, camera specs
 │   ├── media_manifest.yaml   # recorded clips: hashes, labels, train/val/test split (no media)
@@ -162,7 +163,7 @@ Rules:
 | Audio | `numpy` mel-spectrogram + small PyTorch CNN | Light and trainable on a laptop; current `librosa` needs Python 3.12 |
 | Tracking maths | `numpy`, `scipy` (Hungarian assignment) | The constant-velocity filter is about 25 lines of numpy, so `filterpy` is not needed; `scipy` is already locked |
 | Config | YAML + Pydantic settings | One place for site and scenario values |
-| Dashboard | FastAPI + WebSocket + plain HTML/JS canvas | Real-time, no heavy frontend build |
+| Dashboard | FastAPI + WebSocket + plain HTML/JS canvas; a local vector site map ([mapping.md](mapping.md)) | Real-time, no heavy frontend build, works offline |
 | Evidence | SQLite + files + SHA-256 hash chain | Simple, tamper-evident |
 | Tests | `pytest`, `pytest-asyncio` | Standard |
 | Lint/format | `ruff` | One fast tool |
