@@ -1,3 +1,5 @@
+from pydantic import Field
+
 from cuas.schemas.base import Message, Probability, SimTime
 
 
@@ -16,3 +18,6 @@ class TrackClass(Message):
     p_bird: Probability
     p_attack_drone: Probability
     evidence: ClueEvidence
+    looks: dict[str, str] = Field(default_factory=dict)
+    """The latest frame matched to this track from each camera, by ``station.sensor``:
+    the opaque ``snapshot_ref`` of its bearing. Empty without recorded media."""

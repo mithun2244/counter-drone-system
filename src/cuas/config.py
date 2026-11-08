@@ -290,6 +290,20 @@ class ZoomSettings(ConfigModel):
     half_fov_deg: Positive
 
 
+class DashboardSettings(ConfigModel):
+    """What the dashboard stream carries (docs/dashboard_contract.md)."""
+
+    frame_period_s: Positive
+    """A frame every this much simulated time: 2.5 a second at real time for 0.4 s."""
+    trail_s: Positive
+    trail_step_s: Positive
+    picket_flash_s: Positive
+    class_threshold: Probability
+    """A card says attack or drone once that probability reaches this, else unclassified."""
+    map_margin_fraction: NonNegative
+    """Space around the outermost pickets and zones, as a share of the site's extent."""
+
+
 class CoverageSettings(ConfigModel):
     """Coverage % (design.md A10): cells of one zone reachable by enough stations."""
 
@@ -319,6 +333,7 @@ class SiteConfig(ConfigModel):
     alerts: AlertSettings
     zoom: ZoomSettings
     coverage: CoverageSettings
+    dashboard: DashboardSettings
 
     @model_validator(mode="after")
     def _position_sensors_exist(self) -> Self:

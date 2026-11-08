@@ -149,6 +149,14 @@ coverage:  # design.md A10
   min_stations: 2
   warning_below_pct: 80.0
 
+dashboard:  # docs/dashboard_contract.md
+  frame_period_s: 0.4  # 2.5 frames a second at real time; prd.md FR-11 asks for at least 2
+  trail_s: 20.0  # design.md B2
+  trail_step_s: 0.5
+  picket_flash_s: 3.0
+  class_threshold: 0.5
+  map_margin_fraction: 0.1
+
 station_ai:  # real models on recorded media; all start values
   split:
     fractions: {train: 0.7, test: 0.15, val: 0.15}  # ties go to the earlier split
