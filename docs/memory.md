@@ -8,13 +8,14 @@
 - **Current phase:** Phase 4 — Decision layer, in progress on `phase-4-decision`
 - **Last session:** 2026-11-08
 - **Blocked on:** nothing
-- **Next step:** run `tests/test_decision.py` once on the second gate seeds, now that the time-to-impact change is frozen. If a gate fails, stop and show the user before tuning. Then continue the plan from step 9. Do not merge until the user has reviewed the acceptance results. Do not rerun the held-out evaluations
+- **Next step:** show the user the second gate result, then continue the plan from step 9 (zoom looks from recorded media). Do not merge until the user has reviewed the acceptance results. Do not rerun the held-out evaluations
 - **Phase 4 gate seeds, declared on 2026-11-07 before any run:** S1 gates on its own seed (1001), 7 and 201–220; S3 on its own seed (3003), 7 and 201–210. Development uses seeds 1–19 except 7 only
 - **Seed 7 withdrawn from the gates (2026-11-07):** a wiring smoke test ran S1–S4 on seed 7 before the rule was frozen, so it is no longer unseen. Replaced by seed 221 for S1 and 211 for S3, declared before either is run. Smoke tests use development seeds only
 - **Rule frozen at commit `2ded003` (2026-11-08)** before any gate seed ran: movement clue with a latch, time to impact from a 5 s least-squares fit. The gate tests are `tests/test_decision.py`
 - **First gate run, on `2ded003` (2026-11-08): 67 of 68 passed. S1 seed 216 failed** with 1 of 160 batches of two or more reds listed out of true arrival order, at t = 76.0 s. atk-3's track had just started, and its time to impact from just over 2 s of fixes was 26.49 s against a true 33.8 s. That put it ahead of atk-2 at 26.59 s against a true 28.8 s. The next batch had the right order. The first gate set stays in the suite as regression cases
 - **Second gate seeds, declared on 2026-11-08 before any run:** S1 301–322; S3 301–312; S4 301–312 through every test that runs S4 (coverage, with S2 on the same seed; stale rises; one alert per drone). Regression cases: S1 seed 216, and S4 seed 10 for a red alert through a gap
-- **Time-to-impact change frozen in the commit that adds these lines (2026-11-08)**, before any second gate seed ran: 3 s of fresh fixes instead of 2 s, with a reach-back after gaps to a real fix at most 6.5 s old (`design.md` A8)
+- **Time-to-impact change frozen at commit `ce4ea52` (2026-11-08)**, before any second gate seed ran: 3 s of fresh fixes instead of 2 s, with a reach-back after gaps to a real fix at most 6.5 s old (`design.md` A8)
+- **Second gate run, on `ce4ea52` (2026-11-08): 139 of 139 passed**, run once. It covered 70 fresh-seed tests (S1 22, S3 12, S4 36), both regression cases, and the first gate set as regression cases
 - **Start sessions from `cuas-demo/`**, or `CLAUDE.md` will not auto-load
 
 ## Decisions log
