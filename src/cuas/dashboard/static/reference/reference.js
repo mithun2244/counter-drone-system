@@ -1,0 +1,198 @@
+// Reference page for the dashboard contract (docs/dashboard_contract.md). Plain JS, no libraries,
+// nothing loaded from outside this server. It proves the stream works; it is not the dashboard.
+"use strict";
+
+const state = { profiles: [], run: null, frame: null, selected: null };
+const $ = (id) => document.getElementById(id);
+const LEVEL_COLOUR = { red: "#ff5c5c", amber: "#ffb347", info: "#9aa" };
+const esc = (text) => String(text).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+function connect() {
+  const scheme = location.protocol === "https:" ? "wss" : "ws";
+  const socket = new WebSocket(`${scheme}://${location.host}/ws`);
+  socket.onmessage = (event) => receive(JSON.parse(event.data));
+  socket.onclose = () => setTimeout(connect, 1000);
+}
+
+function receive(message) {
+  if (message.type === "hello") {
+    state.profiles = message.profiles;
+    state.run = message.run;
+    state.frame = message.frame;
+    fillProfiles();
+  } else if (message.type === "run") {
+    state.run = message;
+  } else if (message.type === "frame") {
+    state.frame = message;
+  }
+  draw();
+}
+
+function fillProfiles() {
+  $("profile").innerHTML = state.profiles
+    .map((p) => `<option value="${esc(p.profile_id)}">${esc(p.venue)}</option>`).join("");
+  fillScenarios();
+}
+
+function fillScenarios() {
+  const profile = state.profiles.find((p) => p.profile_id === $("profile").value);
+  $("scenario").innerHTML = (profile ? profile.scenarios : [])
+    .map((s) => `<option value="${esc(s.scenario_id)}">${esc(s.scenario_id)}: ${esc(s.title)}</option>`).join("");
+}
+
+async function post(path, body) {
+  const response = await fetch(path, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  const reply = await response.json();
+  $("message").textContent = response.ok ? "" : reply.detail;
+  return response.ok ? reply : null;
+}
+
+function startRun() {
+  const body = {
+    profile_id: $("profile").value,
+    scenario_id: $("scenario").value,
+    recorded_media: $("media").checked,
+  };
+  if ($("zoom").value !== "") body.zoom_per_station = Number($("zoom").value);
+  post("/api/runs", body);
+}
+
+function draw() {
+  const run = state.run;
+  const frame = state.frame;
+  $("run-title").textContent = run ? `${run.title} · ${run.venue} · ${run.state} · ${run.speed}x` : "idle";
+  $("clock").textContent = frame ? `t = ${frame.t.toFixed(1)} s` : "";
+  drawMap(run, frame);
+  drawQueue(frame);
+  drawStatus(frame);
+}
+
+function toScreen(site, canvas) {
+  const b = site.bounds;
+  const scale = Math.min(canvas.width / (b.max_x - b.min_x), canvas.height / (b.max_y - b.min_y));
+  return {
+    scale,
+    at: (x, y) => [(x - b.min_x) * scale, canvas.height - (y - b.min_y) * scale],
+  };
+}
+
+function drawMap(run, frame) {
+  const canvas = $("map");
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!run) return;
+  const view = toScreen(run.site, canvas);
+  for (const zone of run.site.zones) {  // outermost first
+    ctx.beginPath();
+    zone.polygon.forEach(([x, y], i) => (i ? ctx.lineTo(...view.at(x, y)) : ctx.moveTo(...view.at(x, y))));
+    ctx.closePath();
+    ctx.fillStyle = `rgba(80, 110, 160, ${0.12 + 0.25 * zone.weight})`;
+    ctx.fill();
+    const [lx, ly] = view.at(zone.polygon[0][0], zone.polygon[0][1]);
+    ctx.fillStyle = "#cfd8e3";
+    ctx.fillText(zone.label, lx + 4, ly - 4);
+  }
+  const heard = new Set(frame ? frame.pickets_heard.map((p) => p.picket_id) : []);
+  for (const picket of run.site.pickets) {
+    const [x, y] = view.at(picket.x, picket.y);
+    ctx.fillStyle = heard.has(picket.picket_id) ? "#ffb347" : "#667";
+    ctx.beginPath(); ctx.arc(x, y, heard.has(picket.picket_id) ? 6 : 3, 0, 2 * Math.PI); ctx.fill();
+  }
+  for (const station of run.site.stations) {
+    const [x, y] = view.at(station.x, station.y);
+    ctx.fillStyle = "#dde"; ctx.fillRect(x - 5, y - 5, 10, 10);
+    ctx.fillText(station.station_id, x + 7, y + 4);
+  }
+  if (frame) {
+    for (const wedge of frame.pre_alerts) drawWedge(ctx, view, wedge);
+    for (const track of frame.tracks) drawTrack(ctx, view, track);
+  }
+  drawScaleAndNorth(ctx, view, canvas);
+}
+
+function drawWedge(ctx, view, wedge) {
+  const [x, y] = view.at(wedge.x, wedge.y);
+  const reach = 2000 * view.scale;
+  const toCanvas = (deg) => ((deg - 90) * Math.PI) / 180;  // azimuth clockwise from north
+  ctx.fillStyle = "rgba(255, 179, 71, 0.18)";
+  ctx.beginPath(); ctx.moveTo(x, y);
+  ctx.arc(x, y, reach, toCanvas(wedge.bearing_deg - wedge.half_width_deg), toCanvas(wedge.bearing_deg + wedge.half_width_deg));
+  ctx.closePath(); ctx.fill();
+}
+
+function drawTrack(ctx, view, track) {
+  const colour = LEVEL_COLOUR[track.level] || "#888";
+  ctx.strokeStyle = colour;
+  ctx.beginPath();
+  track.trail.forEach(([, x, y], i) => (i ? ctx.lineTo(...view.at(x, y)) : ctx.moveTo(...view.at(x, y))));
+  ctx.stroke();
+  const [x, y] = view.at(track.x, track.y);
+  const [vx, vy] = view.at(track.x + 5 * track.vx, track.y + 5 * track.vy);
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(vx, vy); ctx.stroke();
+  ctx.fillStyle = colour;
+  ctx.beginPath(); ctx.arc(x, y, 4, 0, 2 * Math.PI); ctx.fill();
+  ctx.fillText(`${track.track_id} ${track.level || track.status}`, x + 6, y - 6);  // never colour alone
+}
+
+function drawScaleAndNorth(ctx, view, canvas) {
+  const metres = 1000;
+  const length = metres * view.scale;
+  ctx.strokeStyle = "#ddd"; ctx.fillStyle = "#ddd";
+  ctx.beginPath(); ctx.moveTo(20, canvas.height - 20); ctx.lineTo(20 + length, canvas.height - 20); ctx.stroke();
+  ctx.fillText(`${metres} m`, 20, canvas.height - 26);
+  ctx.beginPath(); ctx.moveTo(canvas.width - 30, 50); ctx.lineTo(canvas.width - 30, 20); ctx.stroke();
+  ctx.fillText("N", canvas.width - 34, 15);
+}
+
+function drawQueue(frame) {
+  const items = frame ? frame.alerts : [];  // in the order sent: never re-sorted
+  $("alerts").innerHTML = items.length ? items.map((a) => `
+    <li class="${esc(a.level)}${a.alert_id === state.selected ? " selected" : ""}" data-alert="${esc(a.alert_id)}">
+      <strong>${esc(a.level.toUpperCase())}</strong> ${esc(a.class_key)} ${(100 * a.confidence).toFixed(0)}%
+      · TTI ${a.tti_s === null ? "none" : a.tti_s.toFixed(0) + " s"} · ${esc(a.zone_label || "")}
+      <br>${esc(a.reasons.join(", "))}${a.label ? ` · labelled ${esc(a.label)}` : ""}
+    </li>`).join("") : "<li>All clear</li>";
+  if (frame) {
+    for (const pre of frame.pre_alerts) {
+      $("alerts").insertAdjacentHTML("beforeend", `<li class="amber">Engine heard, ${esc(pre.compass)}, unconfirmed (${esc(pre.sensor_id)})</li>`);
+    }
+  }
+}
+
+function drawStatus(frame) {
+  if (!frame) { $("status").textContent = ""; return; }
+  const faults = frame.sensors.filter((s) => !s.ok).map((s) => s.sensor_id);
+  const coverage = frame.coverage ? `${frame.coverage.pct.toFixed(1)}%` : "not yet";
+  $("status").innerHTML = `Coverage ${coverage}<br>Sensor faults: ${faults.length ? esc(faults.join(", ")) : "none"}<br>`
+    + `Evidence head: ${frame.evidence_head ? frame.evidence_head.seq : "none"}`;
+  $("banner").style.display = frame.coverage && frame.coverage.warning ? "block" : "none";
+  $("banner").textContent = frame.coverage ? `Coverage ${frame.coverage.pct.toFixed(0)}%: reduced` : "";
+}
+
+function selectAlert(event) {
+  const item = event.target.closest("li[data-alert]");
+  if (!item || !state.frame) return;
+  state.selected = item.dataset.alert;
+  const card = state.frame.alerts.find((a) => a.alert_id === state.selected);
+  const look = card && card.looks[0];
+  if (look) {
+    $("clip").src = look.clip_url;
+    $("clip").currentTime = look.at_s;
+    $("clip-note").textContent = `${look.source} at ${look.at_s.toFixed(1)} s`;
+  } else {
+    $("clip").removeAttribute("src");
+    $("clip-note").textContent = "No recording for this alert.";
+  }
+  draw();
+}
+
+$("profile").addEventListener("change", fillScenarios);
+$("go").addEventListener("click", startRun);
+$("alerts").addEventListener("click", selectAlert);
+document.querySelectorAll("[data-action]").forEach((b) =>
+  b.addEventListener("click", () => post("/api/run/control", { action: b.dataset.action })));
+document.querySelectorAll("[data-speed]").forEach((b) =>
+  b.addEventListener("click", () => post("/api/run/control", { action: "speed", speed: Number(b.dataset.speed) })));
+connect();

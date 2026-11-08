@@ -5,12 +5,15 @@ description = "Passive counter-drone detection demo. Detect and report only."
 requires-python = ">=3.11"
 dependencies = [
     "av>=18.1.0",
+    "fastapi>=0.162.2",
     "numpy>=2.4.6",
     "pydantic>=2.14.3",
     "pyyaml>=6.0.3",
     "scipy>=1.17.1",
     "torch>=2.15.0",
     "torchvision>=0.29.2",
+    "uvicorn>=0.54.0",
+    "websockets>=17.4",
 ]
 
 [build-system]
@@ -19,6 +22,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pytest>=9.2.0",
     "pytest-asyncio>=1.4.1.post1",
     "ruff>=0.17.4",

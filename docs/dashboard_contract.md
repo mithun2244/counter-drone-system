@@ -14,9 +14,20 @@
 
 ## Transport
 
-- **Stream:** a WebSocket at `/ws`. Every message is one JSON text frame.
+- **Stream:** a WebSocket at `/ws`. Every message is one JSON text frame. Clients send nothing on it.
 - **Actions:** HTTP JSON under `/api/` (below).
-- **Where:** the server binds to `127.0.0.1` only. Every asset is served locally; the dashboard must load nothing from the internet (`docs/mapping.md`).
+- **Where:** the server binds to `127.0.0.1` only. Every asset is served locally; the dashboard must load nothing from the internet (`docs/mapping.md`). The API documentation pages (`/docs`, `/redoc`, `/openapi.json`) are off, because they load assets from a CDN.
+
+**Mount paths**
+
+| Path | What |
+| --- | --- |
+| `/` | The operator dashboard, served from `src/cuas/dashboard/static/app/`. Until `index.html` exists there, `/` redirects to `/reference/` |
+| `/reference/` | The reference page, from `src/cuas/dashboard/static/reference/`. It checks the contract end to end and is kept separate from the dashboard |
+| `/ws` | The stream |
+| `/api/...` | The HTTP API |
+
+**Run it:** `uv run python scripts/run_demo.py --dashboard --replay docs/samples/s1_seed1001.jsonl` serves a sample through the real server, then open `http://127.0.0.1:8000/`. Start the run the sample holds (S1 at the processing plant). Pause and speed work; the run ends when the sample does. Live runs arrive in step 5.
 
 ## Conventions
 
@@ -129,7 +140,7 @@ The B4 card is "Engine heard, `compass`, unconfirmed".
 
 ## HTTP API
 
-Arrives in step 4 of the Phase 5 plan. Errors return `{"detail": "..."}`: `404` for an unknown alert or clip, `409` if a run is already active, `422` for a bad body.
+Served now, except label and export, which arrive with the evidence store (step 6). Errors return `{"detail": "..."}`, always a string: `404` for an unknown alert, clip, profile or scenario; `409` if a run is already active, or for control with no run; `422` for a bad body.
 
 | Request | Body | Returns |
 | --- | --- | --- |
@@ -151,7 +162,7 @@ Arrives in step 4 of the Phase 5 plan. Errors return `{"detail": "..."}`: `404` 
 
 **Regenerate a sample:** `uv run python scripts/record_stream.py --scenario s2 [--seed N] [--recorded-media]`. Recorded-media samples reference local recordings, so they go to `runs/samples/` and are never committed.
 
-**Replay:** from step 4, the server can play any sample through the real `/ws` with `--replay FILE`.
+**Replay:** `--dashboard --replay FILE` plays any sample through the real `/ws`, paced by its simulated time. A recorded-media sample's clips are served too, from the folder `record_stream.py` leaves beside it.
 
 ## Known limits of version 1
 

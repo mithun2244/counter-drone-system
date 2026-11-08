@@ -72,6 +72,17 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="run real models on held-out recordings for look evidence",
     )
+    parser.add_argument(
+        "--dashboard",
+        action="store_true",
+        help="serve the dashboard locally; the operator starts runs from it",
+    )
+    parser.add_argument(
+        "--replay",
+        type=Path,
+        help="with --dashboard: play a recorded contract stream instead of live runs",
+    )
+    parser.add_argument("--port", type=int, help="dashboard port (default: site.yaml)")
     return parser.parse_args()
 
 
@@ -332,9 +343,29 @@ async def run(args: argparse.Namespace, site: SiteConfig) -> None:
     print_alert_evaluation(evaluate_alerts(truth, controlled))
 
 
+async def serve_dashboard(args: argparse.Namespace, site: SiteConfig) -> None:
+    from cuas.dashboard.replay import ReplayLauncher
+    from cuas.dashboard.server import Hub, create_app, serve
+
+    if args.replay is None:
+        raise SystemExit(
+            "live dashboard runs arrive in Phase 5 step 5; use --replay FILE"
+        )
+    launcher = ReplayLauncher(args.replay, site.simulation.tick_s)
+    host, port = site.dashboard.host, args.port or site.dashboard.port
+    print(f"dashboard: http://{host}:{port}/  (reference page: /reference/)")
+    await serve(create_app(Hub(launcher)), host, port)
+
+
 def main() -> None:
     args = parse_args()
+    if args.replay and not args.dashboard:
+        print("--replay needs --dashboard", file=sys.stderr)
+        sys.exit(USAGE_ERROR)
     site = load_site(CONFIG_DIR, zoom_per_station=args.zoom_per_station)
+    if args.dashboard:
+        asyncio.run(serve_dashboard(args, site))
+        return
     print("hello")
     print(
         f"loaded site.yaml: {len(site.stations)} stations, "

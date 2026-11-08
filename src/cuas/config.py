@@ -302,6 +302,9 @@ class DashboardSettings(ConfigModel):
     """A card says attack or drone once that probability reaches this, else unclassified."""
     map_margin_fraction: NonNegative
     """Space around the outermost pickets and zones, as a share of the site's extent."""
+    host: Literal["127.0.0.1", "localhost"]
+    """Local only: the demo has no authentication and makes no outside connections."""
+    port: Annotated[int, Field(ge=1024, le=65535)]
 
 
 class CoverageSettings(ConfigModel):
