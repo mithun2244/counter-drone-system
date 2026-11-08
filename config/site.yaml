@@ -114,7 +114,8 @@ classify:  # design.md A7; all start values
     drone_like: 0.8  # once seen, hovering or sustained fast flight stays for the track
     bird_like: 0.15
     velocity_window_s: 5.0  # time to impact uses a fit over this much fresh history
-    velocity_min_span_s: 2.0  # no time to impact before this much
+    velocity_min_span_s: 3.0  # no time to impact before this much; 2 s let a new track jump the queue
+    velocity_max_fix_age_s: 6.5  # reach-back limit; a live track can need 6.0 s (2.8 s window + 3.2 s gap)
 
 threat:  # design.md A8
   red: 0.6

@@ -146,6 +146,8 @@ level      = red if score ≥ 0.6, amber if 0.3 ≤ score < 0.6, info if lower
 
 **TTI (time to impact)** is computed by projecting the track's velocity onto the nearest critical zone. If the closest approach misses the zone, TTI is none.
 
+The velocity is a least-squares fit to real position fixes (`n_stations ≥ 2`) over the last 5 s. Coasting predictions never enter it. A track has no TTI until its fixes span 3 s, and a pending TTI scores as "no zone ahead". After a gap the 5 s window can hold less than 3 s, so the fit reaches back to the newest real fix at least 3 s old, but never to one older than 6.5 s. A live track can need 6.0 s: up to 2.8 s in the window plus a gap of up to 3.2 s, because the tracker applies a batch's fixes before it checks for loss after 3 s. So a red alert keeps its TTI through a gap, and the limit sits off a 0.2 s tick so rounding cannot decide it. On the development seeds the oldest fix used was 6.0 s. Below 1 m/s the track is going nowhere. Set in Phase 4 on seeds 1–19 except 7: with 2 s, a new track's early estimate jumped the queue (S1 seed 216); with 3 s and no reach-back, a red alert dropped for one batch after a gap (S4 seed 10).
+
 Every assessment carries **reasons** in plain words, for example `"heading to Processing Unit, 24 s"` or `"fast straight flight + piston engine"`.
 
 ### A9. Zoom scheduler

@@ -216,6 +216,29 @@ def test_coasting_never_adds_movement_history(classifier: Classifier) -> None:
     assert out["trk-1"].evidence.move is None
 
 
+def test_coasting_never_counts_towards_the_velocity_for_time_to_impact(
+    classifier: Classifier,
+) -> None:
+    """2.8 s of fresh fixes, then 2 s of coasting: still short of 3 s of fresh history."""
+    for k in range(25):
+        at = (300.0 + 10.0 * k, 900.0, 80.0)
+        (out,) = classifier.update(
+            k * 0.2, [track("trk-1", at, k * 0.2, n=3 if k < 15 else 0)], []
+        )
+    assert out.velocity is None
+
+
+def test_coasting_predictions_never_enter_the_fit(classifier: Classifier) -> None:
+    """Fresh fixes on a 50 m/s line, with a coasting stretch placed 200 m off it."""
+    for k in range(40):
+        fresh = not 15 <= k < 26
+        at = (300.0 + 10.0 * k, 900.0 if fresh else 1100.0, 80.0)
+        (out,) = classifier.update(
+            k * 0.2, [track("trk-1", at, k * 0.2, n=3 if fresh else 0)], []
+        )
+    assert list(out.velocity) == pytest.approx([50.0, 0.0, 0.0])
+
+
 def test_fresh_hovering_fixes_give_a_drone_like_move_clue(
     classifier: Classifier, site: SiteConfig
 ) -> None:

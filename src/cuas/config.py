@@ -210,6 +210,21 @@ class MoveSettings(ConfigModel):
     velocity_window_s: Positive
     """Velocity for time to impact is a least-squares fit over this much fresh history."""
     velocity_min_span_s: Positive
+    """No time to impact until the fitted fixes span this long."""
+    velocity_max_fix_age_s: Positive
+    """After a gap the fit may reach back to a real fix this old, and no older."""
+
+    @model_validator(mode="after")
+    def _velocity_spans_ordered(self) -> Self:
+        if not (
+            self.velocity_min_span_s
+            <= self.velocity_window_s
+            <= self.velocity_max_fix_age_s
+        ):
+            raise ValueError(
+                "need velocity_min_span_s <= velocity_window_s <= velocity_max_fix_age_s"
+            )
+        return self
 
 
 class ClassifySettings(ConfigModel):

@@ -1,11 +1,14 @@
 """Alert identity: stale predictions, re-acquisition and separate drones."""
 
+import numpy as np
 import pytest
 
-from cuas.config import SiteConfig
+from cuas.config import SiteConfig, ZoneLabels
 from cuas.control.alerts import AlertKeeper
-from cuas.control.threat import Assessment
-from cuas.schemas import Track
+from cuas.control.behaviour import HOVERING, Fix, MoveClue
+from cuas.control.classify import Classified
+from cuas.control.threat import Assessment, ThreatRanker
+from cuas.schemas import ClueEvidence, Track, TrackClass
 
 RED, AMBER, INFO = ("red", 0.9), ("amber", 0.4), ("info", 0.1)
 
@@ -163,3 +166,61 @@ def test_live_tracks_never_take_each_others_alert(keeper: AlertKeeper) -> None:
     )
     assert out["trk-1"][1] == "alert-1"
     assert out["trk-2"][1] == "alert-2"
+
+
+# S4 seed 10's gap, 50 s earlier: last fresh fix at 8.2 s, the next at 10.6 s
+GAP_FROM, GAP_TO, TURN_AT, TICK = 8.2, 10.6, 9.4, 0.2
+SPEED = 12.0
+LABELS = ZoneLabels(critical="c", important="i", perimeter="p")
+
+
+def east_of_centre(t: float, turns_away: bool) -> float:
+    """East at 12 m/s from 600 m west of the centre; optionally back west from 9.4 s."""
+    if turns_away and t > TURN_AT:
+        return -600.0 + SPEED * TURN_AT - SPEED * (t - TURN_AT)
+    return -600.0 + SPEED * t
+
+
+def through_the_gap(site: SiteConfig, turns_away: bool) -> list[tuple[float, str]]:
+    """Real fit, ranker and keeper. No fresh fix between 8.2 s and 10.6 s, only coasting."""
+    clue, keeper = MoveClue(site.classify.move), AlertKeeper(site.alerts)
+    ranker = ThreatRanker(site.threat, site.zones, LABELS)
+    track_class = TrackClass(
+        track_id="trk-1",
+        t=0.0,
+        p_drone=0.8,
+        p_bird=0.2,
+        p_attack_drone=0.0,
+        evidence=ClueEvidence(move=0.8),
+    )
+    out = []
+    for k in range(round(16.0 / TICK) + 1):
+        t = k * TICK
+        fresh = not GAP_FROM + 1e-9 < t < GAP_TO - 1e-9
+        at = (east_of_centre(t, turns_away), 0.0, 80.0)
+        if fresh:
+            clue.add(Fix(t, np.asarray(at), np.zeros(3)))
+        tr = track("trk-1", t, at=at, n=3 if fresh else 0, velocity=(SPEED, 0.0, 0.0))
+        assessed = ranker.assess(
+            t, Classified(tr, track_class, None, HOVERING, False, clue.velocity())
+        )
+        (alert,) = keeper.update(t, [tr], [assessed])
+        out.append((t, alert.level))
+    return out
+
+
+def test_a_red_alert_does_not_flicker_through_a_gap(site: SiteConfig) -> None:
+    """With a 5 s window alone, 13.4 s would lose its time to impact and drop to info."""
+    levels = through_the_gap(site, turns_away=False)
+    first_red = next(t for t, level in levels if level == "red")
+    assert first_red < GAP_FROM
+    assert {level for t, level in levels if t >= first_red} == {"red"}
+
+
+def test_fresh_fixes_of_a_turn_away_still_clear_the_alert(site: SiteConfig) -> None:
+    """Back in view at 10.6 s flying away: cleared on a fresh fix within the 3 s span."""
+    levels = through_the_gap(site, turns_away=True)
+    cleared = next(t for t, level in levels if t >= GAP_TO and level != "red")
+    assert cleared <= GAP_TO + site.classify.move.velocity_min_span_s
+    assert "red" not in {level for t, level in levels if t >= cleared}
+    assert levels[-1][1] == "info"

@@ -93,7 +93,10 @@ class MoveClue:
     def add(self, fix: Fix) -> None:
         settings = self._settings
         self._fixes.append(fix)
-        keep_after = fix.t - settings.window_s - settings.hover_baseline_s
+        keep_after = fix.t - max(
+            settings.window_s + settings.hover_baseline_s,
+            settings.velocity_max_fix_age_s,
+        )
         self._fixes = [f for f in self._fixes if f.t >= keep_after]
         self._latest = features(self._fixes, settings)
         if self._latest is not None and self._is_fast(self._latest):
@@ -120,13 +123,29 @@ class MoveClue:
         return self._latched or BIRD_LIKE
 
     def velocity(self) -> np.ndarray | None:
-        """A least-squares fit over recent fresh fixes, steadier than the filter's velocity."""
+        """A least-squares fit over recent fresh fixes, steadier than the filter's velocity.
+
+        The fit covers the last ``velocity_window_s`` and must span ``velocity_min_span_s``.
+        After a gap the window can hold less, so the fit reaches back to the newest real fix
+        that old, never past ``velocity_max_fix_age_s``. A track that had a time to impact
+        keeps one through a gap; a new track still waits for the full span.
+        """
         settings = self._settings
         if not self._fixes:
             return None
         now = self._fixes[-1].t
-        recent = [f for f in self._fixes if f.t >= now - settings.velocity_window_s]
-        if len(recent) < MIN_FIXES or now - recent[0].t < settings.velocity_min_span_s:
+        old_enough = [
+            f
+            for f in self._fixes
+            if now - settings.velocity_max_fix_age_s
+            <= f.t
+            <= now - settings.velocity_min_span_s
+        ]
+        if not old_enough:
+            return None
+        start = min(now - settings.velocity_window_s, old_enough[-1].t)
+        recent = [f for f in self._fixes if f.t >= start]
+        if len(recent) < MIN_FIXES:
             return None
         times = np.array([f.t for f in recent])
         positions = np.array([f.position for f in recent])

@@ -164,5 +164,28 @@ def test_a_bad_movement_value_fails_on_load(config_dir: Path) -> None:
         SiteConfig.model_validate(raw)
 
 
+def test_time_to_impact_fit_values_match_the_design(site: SiteConfig) -> None:
+    move = site.classify.move
+    assert (
+        move.velocity_window_s,
+        move.velocity_min_span_s,
+        move.velocity_max_fix_age_s,
+    ) == (5.0, 3.0, 6.5)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [{"velocity_min_span_s": 6.0}, {"velocity_max_fix_age_s": 4.0}],
+    ids=str,
+)
+def test_fit_spans_out_of_order_fail_on_load(
+    config_dir: Path, changes: dict[str, float]
+) -> None:
+    raw = raw_site(config_dir)
+    raw["classify"]["move"] = {**raw["classify"]["move"], **changes}
+    with pytest.raises(ValidationError):
+        SiteConfig.model_validate(raw)
+
+
 def test_scenario_metadata_holds_no_truth() -> None:
     assert set(ScenarioMetadata.model_fields) == {"id", "title", "venue", "zone_labels"}

@@ -6,12 +6,15 @@
 ## Current status
 
 - **Current phase:** Phase 4 — Decision layer, in progress on `phase-4-decision`
-- **Last session:** 2026-11-07
+- **Last session:** 2026-11-08
 - **Blocked on:** nothing
-- **Next step:** build the approved Phase 4 plan step by step. Run the gate seeds only once the movement rule is frozen; if a gate fails, stop and show the user. Do not merge until the user has reviewed the acceptance results. Do not rerun the held-out evaluations
+- **Next step:** run `tests/test_decision.py` once on the second gate seeds, now that the time-to-impact change is frozen. If a gate fails, stop and show the user before tuning. Then continue the plan from step 9. Do not merge until the user has reviewed the acceptance results. Do not rerun the held-out evaluations
 - **Phase 4 gate seeds, declared on 2026-11-07 before any run:** S1 gates on its own seed (1001), 7 and 201–220; S3 on its own seed (3003), 7 and 201–210. Development uses seeds 1–19 except 7 only
 - **Seed 7 withdrawn from the gates (2026-11-07):** a wiring smoke test ran S1–S4 on seed 7 before the rule was frozen, so it is no longer unseen. Replaced by seed 221 for S1 and 211 for S3, declared before either is run. Smoke tests use development seeds only
 - **Rule frozen at commit `2ded003` (2026-11-08)** before any gate seed ran: movement clue with a latch, time to impact from a 5 s least-squares fit. The gate tests are `tests/test_decision.py`
+- **First gate run, on `2ded003` (2026-11-08): 67 of 68 passed. S1 seed 216 failed** with 1 of 160 batches of two or more reds listed out of true arrival order, at t = 76.0 s. atk-3's track had just started, and its time to impact from just over 2 s of fixes was 26.49 s against a true 33.8 s. That put it ahead of atk-2 at 26.59 s against a true 28.8 s. The next batch had the right order. The first gate set stays in the suite as regression cases
+- **Second gate seeds, declared on 2026-11-08 before any run:** S1 301–322; S3 301–312; S4 301–312 through every test that runs S4 (coverage, with S2 on the same seed; stale rises; one alert per drone). Regression cases: S1 seed 216, and S4 seed 10 for a red alert through a gap
+- **Time-to-impact change frozen in the commit that adds these lines (2026-11-08)**, before any second gate seed ran: 3 s of fresh fixes instead of 2 s, with a reach-back after gaps to a real fix at most 6.5 s old (`design.md` A8)
 - **Start sessions from `cuas-demo/`**, or `CLAUDE.md` will not auto-load
 
 ## Decisions log
@@ -43,6 +46,7 @@
 | 2026-11-06 | FSD50K clips read by HTTP range requests with our own zip directory reader | Stores only the selected clips instead of downloading 6.2 GB; `zipfile` refuses a multi-part zip64 archive |
 | 2026-11-07 | Look period 0.6 s; the media link refuses a period that is not whole ticks | `round(0.5 / 0.2)` silently gave 0.4 s |
 | 2026-11-07 | Movement clue (`design.md` A7): drone-like if hover fraction ≥ 0.2, with hover from 2 s of position change, or if fast, straight and steady flight lasts 5 s of fresh fixes. A7's sharp turns and straightness alone are dropped. Coasting never counts, and never raises an alert | Measured on Phase 3 tracks, seeds 1–19 except 7: A7 as written turned 208 of 313 S3 bird tracks red, because birds turn constantly and fly straight for 10 s at a time. Approved by the user with these conditions |
+| 2026-11-08 | Time to impact comes from a least-squares fit to real fixes over the last 5 s, published once they span 3 s. After a gap the fit reaches back to the newest real fix at least 3 s old, never older than 6.5 s. Coasting predictions never enter it | With 2 s, a new track's early estimate jumped the queue (S1 seed 216, first gate run). With 3 s and no reach-back, a 2.2 s gap in S4 seed 10 dropped a red alert to info for one batch. A live track can need a 6.0 s fix: up to 2.8 s in the window plus a gap of up to 3.2 s, because the tracker applies fixes before its loss check. Development seeds: 36 of 54 S1 drones reach red 0.6 to 1.2 s later, and nothing else changed. Approved by the user |
 | 2026-11-07 | Phase 4 runs with no class data gate S1 and S3; recorded media and mast bias are reported separately. `alert_id` is kept apart from `track_id`; zoom supports classification but never position | Approved by the user on 2026-11-07, decisions 1 to 9 of the Phase 4 plan |
 | 2026-11-07 | Shared tracker: a 2-station fix that other bearings could have paired with differently neither starts a track nor counts towards confirming one. Confirmation needs corroborated fixes: 3 stations, or nothing else unexplained (`design.md` A6) | Rays from different drones cross where nothing is. `design.md` as written confirmed such ghosts, and a throwaway prototype gave exactly 3 S1 tracks on only 2 of 10 seeds. With this rule the real code gives 3 on all 22 seeds tested |
 | 2026-11-07 | The bearing gate includes the track's own uncertainty; rays must also meet within 4 bearing sigmas; a fix within 30 m of a live track updates it | Prototype, S1 over 20 seeds: removing each of these gave exactly 3 tracks on 9, 19 and 0 seeds |

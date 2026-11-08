@@ -168,9 +168,50 @@ def test_hovering_once_seen_stays_for_the_track(settings: MoveSettings) -> None:
 
 def test_fitted_velocity_is_exact_on_a_straight_line(settings: MoveSettings) -> None:
     clue = MoveClue(settings)
-    for fix in path(line(50.0), 1.8):
-        clue.add(fix)
-    assert clue.velocity() is None  # under 2 s of fresh fixes
-    for fix in path(line(50.0), 6.0)[10:]:
+    for fix in path(line(50.0), 6.0):
         clue.add(fix)
     assert list(clue.velocity()) == pytest.approx([50.0, 0.0, 0.0])
+
+
+def test_a_new_track_waits_for_three_seconds_of_fresh_fixes(
+    settings: MoveSettings,
+) -> None:
+    clue = MoveClue(settings)
+    fixes = path(line(50.0), 6.0)
+    for fix in fixes[:15]:
+        clue.add(fix)
+    assert clue.velocity() is None  # 2.8 s
+    clue.add(fixes[15])
+    assert list(clue.velocity()) == pytest.approx([50.0, 0.0, 0.0])  # 3.0 s
+
+
+def with_gap(start: float, end: float, until: float) -> list[Fix]:
+    """Fresh fixes on a 50 m/s line, none strictly between ``start`` and ``end``."""
+    return [f for f in path(line(50.0), until) if not start + 1e-9 < f.t < end - 1e-9]
+
+
+def test_after_a_gap_the_fit_reaches_back_to_a_real_fix(
+    settings: MoveSettings,
+) -> None:
+    """S4 seed 10's gap: at 13.4 s the 5 s window holds only 10.6 to 13.4 s, so the fit
+    reaches back to the fix at 8.2 s, 5.2 s old, instead of losing its time to impact."""
+    clue = MoveClue(settings)
+    for fix in with_gap(8.2, 10.6, 13.4):
+        clue.add(fix)
+    assert list(clue.velocity()) == pytest.approx([50.0, 0.0, 0.0])
+
+
+@pytest.mark.parametrize(
+    ("now", "fits"),
+    [(8.0, True), (8.4, True), (8.6, False)],
+    ids=["6.0 s old, the most a live track needs", "6.4 s old", "6.6 s old"],
+)
+def test_the_fit_never_reaches_back_past_the_maximum_age(
+    settings: MoveSettings, now: float, fits: bool
+) -> None:
+    """Fixes up to 2.0 s, then only the last 2.2 s: the newest fix old enough is at 2.0 s."""
+    clue = MoveClue(settings)
+    for fix in with_gap(2.0, now - 2.2, now):
+        clue.add(fix)
+    assert settings.velocity_max_fix_age_s == 6.5
+    assert (clue.velocity() is not None) is fits
