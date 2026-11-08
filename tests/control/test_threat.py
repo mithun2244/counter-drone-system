@@ -78,6 +78,7 @@ def classified(
     )
     track_class = TrackClass(
         track_id=track_id,
+        t=0.0,
         p_drone=p_drone,
         p_bird=1.0 - p_drone,
         p_attack_drone=0.0,

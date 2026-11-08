@@ -2,13 +2,14 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from cuas.schemas.base import Message, Probability
+from cuas.schemas.base import Message, Probability, SimTime
 
 
 class ThreatAssessment(Message):
     """``zone`` is a zone ID, not a display label. Both optional fields are ``None`` if no zone is ahead."""
 
     track_id: str
+    t: SimTime
     score: Probability
     level: Literal["red", "amber", "info"]
     zone: str | None

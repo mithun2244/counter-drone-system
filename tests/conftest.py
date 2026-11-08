@@ -72,7 +72,10 @@ def record_pipeline(config_dir: Path) -> Callable[..., Awaitable[RecordedPipelin
         sensor, ingest, control = InProcessBus(), InProcessBus(), InProcessBus()
         clock = SimClock(site.simulation.tick_s, pace=pace)
         taps = [bus.subscribe(WILDCARD) for bus in (sensor, ingest, control)]
-        pipeline = start_pipeline(sensor, ingest, control, site, lambda: clock.now)
+        labels = scenario.metadata.zone_labels
+        pipeline = start_pipeline(
+            sensor, ingest, control, site, labels, lambda: clock.now
+        )
         truth = await run_scenario(
             scenario, site, sensor, clock, seed=seed, media=media
         )

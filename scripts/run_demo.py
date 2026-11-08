@@ -19,7 +19,16 @@ from cuas.config import SiteConfig, load_site
 from cuas.metrics.evaluator import TargetSummary, summarize
 from cuas.metrics.track_evaluator import TrackReport, evaluate_tracks
 from cuas.pipeline import start_pipeline
-from cuas.schemas import BearingDetection, Message, PicketAlert, SectorTrack, Track
+from cuas.schemas import (
+    BearingDetection,
+    CoverageStatus,
+    Message,
+    PicketAlert,
+    SectorTrack,
+    ThreatAssessment,
+    Track,
+    ZoomTask,
+)
 from cuas.schemas.topics import GATEWAY_REJECTED
 from cuas.sim.engine import run_scenario
 from cuas.sim.scenario import Scenario, available_scenarios, load_scenario
@@ -130,6 +139,23 @@ def describe_control(message: Message, shown: dict[str, str]) -> str | None:
             f"t={message.t:.3f} track {message.track_id} {message.status} "
             f"pos=({x:.1f},{y:.1f},{z:.1f}) stations={message.n_stations}"
         )
+    if isinstance(message, ThreatAssessment) and message.alert_id is not None:
+        state = f"{message.level} {message.track_id}"
+        if shown.get(message.alert_id) == state:
+            return None
+        shown[message.alert_id] = state
+        tti = message.time_to_impact_s
+        when = "none" if tti is None else f"{tti:.0f}s"
+        return (
+            f"t={message.t:.3f} alert {message.alert_id} {message.track_id} "
+            f"{message.level} score={message.score:.2f} tti={when} "
+            f"reasons: {'; '.join(message.reasons)}"
+        )
+    if isinstance(message, CoverageStatus):
+        return (
+            f"t={message.t:.3f} coverage {message.coverage_pct:.1f}%"
+            f"{' warning' if message.warning else ''}"
+        )
     if isinstance(message, SectorTrack):
         if shown.get(message.sector_id) == message.status:
             return None
@@ -155,10 +181,14 @@ def print_control(messages: list[Message], rejected: list[Message]) -> None:
     tracks = [m for m in messages if isinstance(m, Track)]
     confirmed = {t.track_id for t in tracks if t.status == "confirmed"}
     sectors = {m.sector_id for m in messages if isinstance(m, SectorTrack)}
+    threats = [m for m in messages if isinstance(m, ThreatAssessment)]
+    alerts = {m.alert_id for m in threats if m.alert_id is not None}
+    reds = {m.alert_id for m in threats if m.level == "red"}
+    zooms = sum(isinstance(m, ZoomTask) for m in messages)
     print(
         f"control: {len({t.track_id for t in tracks})} tracks started, "
-        f"{len(confirmed)} confirmed, {len(sectors)} sectors, "
-        f"{len(rejected)} messages rejected"
+        f"{len(confirmed)} confirmed, {len(sectors)} sectors, {len(alerts)} alerts "
+        f"({len(reds)} red), {zooms} zoom tasks, {len(rejected)} messages rejected"
     )
     print(f"control digest: sha256:{digest.hexdigest()}")
 
@@ -245,7 +275,12 @@ async def run(args: argparse.Namespace, site: SiteConfig) -> None:
     outputs = asyncio.create_task(collect(control_bus.subscribe(WILDCARD)))
     rejected = asyncio.create_task(collect(ingest_bus.subscribe(GATEWAY_REJECTED)))
     pipeline = start_pipeline(
-        sensor_bus, ingest_bus, control_bus, site, lambda: clock.now
+        sensor_bus,
+        ingest_bus,
+        control_bus,
+        site,
+        scenario.metadata.zone_labels,
+        lambda: clock.now,
     )
     media = build_media(args, site, scenario.environment.wind_mps, seed)
     truth = await run_scenario(

@@ -10,7 +10,7 @@ from cuas.config import load_site
 from cuas.media_manifest import MANIFEST_NAME, MediaManifest, load_manifest
 from cuas.metrics.mat_labels import read_label_file
 from cuas.recordings import frame_count
-from cuas.schemas import BearingDetection, PicketAlert
+from cuas.schemas import BearingDetection, PicketAlert, Track
 from cuas.sim.media import MediaLink, build_media_link
 from cuas.sim.scenario import load_scenario
 from cuas.station.detector import build_model, load_starting_weights
@@ -239,6 +239,8 @@ async def test_tracks_use_geometry_only_so_real_models_change_nothing(
     _, _, linked, _ = await record_pipeline(
         "s2", seed=SEED, media=real_media(s2_wind(), SEED)
     )
+    plain = [m for m in plain if isinstance(m, Track)]
+    linked = [m for m in linked if isinstance(m, Track)]
     assert plain
     assert [m.model_dump_json() for m in plain] == [m.model_dump_json() for m in linked]
 

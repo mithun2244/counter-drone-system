@@ -79,7 +79,7 @@ class Classified:
     track_class: TrackClass
     features: Features | None
     move_reason: str | None
-    """``hovering``, ``fast straight flight`` or ``bird-like flight``; ``None`` without history."""
+    """``hovering``, ``fast straight flight`` or ``wandering flight``; ``None`` without history."""
     engine_heard: bool
 
 
@@ -207,6 +207,7 @@ class Classifier:
         )
         message = TrackClass(
             track_id=track.track_id,
+            t=t,
             p_drone=p_drone,
             p_bird=1.0 - p_drone,
             p_attack_drone=p_attack,

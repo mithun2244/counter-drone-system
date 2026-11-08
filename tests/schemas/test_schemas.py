@@ -52,6 +52,7 @@ SAMPLES: list[Message] = [
     ),
     TrackClass(
         track_id="trk1",
+        t=3.0,
         p_drone=0.9,
         p_bird=0.1,
         p_attack_drone=0.8,
@@ -59,6 +60,7 @@ SAMPLES: list[Message] = [
     ),
     ThreatAssessment(
         track_id="trk1",
+        t=3.0,
         score=0.7,
         level="red",
         zone="critical",
@@ -68,6 +70,7 @@ SAMPLES: list[Message] = [
     ),
     ZoomTask(
         station_id="st1",
+        t=3.0,
         camera_id="z1",
         track_id="trk1",
         azimuth_deg=10.0,

@@ -126,6 +126,7 @@ class AlertKeeper:
             state.alert_id = f"alert-{self._raised}"
         return ThreatAssessment(
             track_id=track.track_id,
+            t=t,
             score=score,
             level=level,
             zone=raw.zone,

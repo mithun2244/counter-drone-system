@@ -16,7 +16,7 @@ from cuas.config import MoveSettings
 HOVERING, FAST_STRAIGHT, BIRD_LIKE = (
     "hovering",
     "fast straight flight",
-    "bird-like flight",
+    "wandering flight",
 )
 MIN_FIXES = 4
 TINY_PATH_M = 1e-6

@@ -78,7 +78,7 @@ class ZoomScheduler:
                     self._duties[camera] = _Duty(track_id, t, scores.get(track_id, 0.0))
                     busy_tracks = {d.track_id for d in self._duties.values()}
         return [
-            self._task(camera, confirmed[d.track_id])
+            self._task(t, camera, confirmed[d.track_id])
             for camera, d in sorted(self._duties.items())
         ]
 
@@ -118,13 +118,14 @@ class ZoomScheduler:
         )
         return self._distance(station_id, track) < reach
 
-    def _task(self, camera: tuple[str, str], track: Track) -> ZoomTask:
+    def _task(self, t: float, camera: tuple[str, str], track: Track) -> ZoomTask:
         station_id, camera_id = camera
         azimuth, elevation, _ = bearing_to(
             self._stations[station_id], track.position_enu_m
         )
         return ZoomTask(
             station_id=station_id,
+            t=t,
             camera_id=camera_id,
             track_id=track.track_id,
             azimuth_deg=azimuth,
