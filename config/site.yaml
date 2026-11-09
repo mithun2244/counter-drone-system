@@ -149,6 +149,26 @@ coverage:  # design.md A10
   min_stations: 2
   warning_below_pct: 80.0
 
+dashboard:  # docs/dashboard_contract.md
+  frame_period_s: 0.4  # 2.5 frames a second at real time; prd.md FR-11 asks for at least 2
+  trail_s: 20.0  # design.md B2
+  trail_step_s: 0.5
+  picket_flash_s: 3.0
+  class_threshold: 0.5
+  map_margin_fraction: 0.1
+  host: 127.0.0.1  # local only: no authentication, no outside connections
+  port: 8000
+  basemap:  # docs/mapping.md: a real basemap under the fictional site, for display only
+    name: Portsmouth, UK
+    file: portsmouth.json  # in data/basemap/, from scripts/fetch_basemap.py
+    anchor_name: Southsea Common
+    anchor_lat: 50.78497  # OSM centroid of Southsea Common (50.78425, -1.09457) moved 80 m
+    anchor_lon: -1.09457  # north, so all three stations sit on land; approved 2026-11-09
+    heading_deg: 0.0  # the site's north is true north
+    notice: "Simulated scenario: fictional site and threats drawn over Portsmouth, UK"
+    attribution: "© OpenStreetMap contributors (ODbL)"
+    simplify_m: 2.0
+
 station_ai:  # real models on recorded media; all start values
   split:
     fractions: {train: 0.7, test: 0.15, val: 0.15}  # ties go to the earlier split

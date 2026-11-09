@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>C-UAS reference page</title>
+  <link rel="stylesheet" href="reference.css">
+</head>
+<body>
+  <header>
+    <strong>Reference page</strong>
+    <span>checks the contract end to end; the operator dashboard lives at /</span>
+    <span id="run-title"></span>
+    <span id="clock"></span>
+  </header>
+  <section id="start">
+    <label>Site profile <select id="profile"></select></label>
+    <label>Scenario <select id="scenario"></select></label>
+    <label><input type="checkbox" id="media"> recorded media</label>
+    <label>Zoom cameras <select id="zoom"><option value="">default</option><option>0</option><option>1</option><option>2</option></select></label>
+    <button id="go">Start monitoring</button>
+    <button data-action="pause">Pause</button>
+    <button data-action="play">Play</button>
+    <button data-speed="1">1x</button>
+    <button data-speed="2">2x</button>
+    <button data-speed="5">5x</button>
+    <span id="message"></span>
+  </section>
+  <main>
+    <canvas id="map" width="900" height="700"></canvas>
+    <aside>
+      <div id="banner"></div>
+      <h2>Alert queue</h2>
+      <ol id="alerts"></ol>
+      <h2>Status</h2>
+      <div id="status"></div>
+      <h2>Clip</h2>
+      <video id="clip" width="320" controls muted></video>
+      <div id="clip-note">Select an alert. A simulator-only run has no recordings.</div>
+      <h2>Recorded audio</h2>
+      <div id="audio-note">Clean source audio. The classifier heard it mixed with background noise at a simulated distance and wind.</div>
+      <ul id="sounds"></ul>
+      <audio id="audio"></audio>
+    </aside>
+  </main>
+  <script src="reference.js"></script>
+</body>
+</html>

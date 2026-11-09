@@ -185,9 +185,42 @@ Runs every 0.6 s, a whole number of 0.2 s ticks (0.5 s is not):
 
 ### A11. Evidence
 
-- Each red or amber alert writes an `EvidenceRecord`: alert ID, track ID, clip paths, metadata JSON, SHA-256 of each file.
-- **Hash chain:** each record stores the previous record's hash, so changing any old record breaks the chain. `cuas verify` checks the chain.
-- The mock hand-off exports one JSON package per alert: track history, last position, class, score, reasons, clip hashes.
+Each run keeps its evidence in its own folder, `runs/<scenario>_seed<seed>_<NNN>/`, which is never reused. The evidence keeper (`cuas.evidence`) writes it. The dashboard never writes evidence: it sends the operator's requests as messages on the evidence bus and waits for the record that answers them.
+
+**What is recorded, and when.** Each record is one line of `evidence/chain.jsonl`.
+
+| Record | Written when | Files it lists, each with its SHA-256 |
+| --- | --- | --- |
+| `alert` | An alert ID first appears, at amber or red | A snapshot, `evidence/<seq>-alert-<alert_id>.json`: level, score, time to impact, zone, reasons, class probabilities, track history with every published position, and the recordings behind its look evidence. Plus those recordings themselves, from `station_<id>/` |
+| `escalation` | The alert first reaches red, if it was raised at amber | The same, as it stands then |
+| `label` | The operator confirms or dismisses | None: the label is in the record. Each label adds a record; nothing is overwritten |
+| `export` | The operator asks for the hand-off package, and for every alert once the run ends | The package, `handoff/<alert_id>-<seq>.json` |
+
+**Hash chain.** A record holds `seq` (from 1, no gaps), `kind`, the simulated time `t`, `alert_id`, `track_ids`, `files`, `details`, `request_id` (the operator request it answers, if any), `prev_hash` and `record_hash`. `record_hash` is the SHA-256 of the record's canonical JSON (sorted keys, no spaces) without `record_hash` itself. `prev_hash` is the previous record's `record_hash`, or null for the first. Changing any record changes its hash, and the next record's `prev_hash` no longer matches. Without operator requests, the same run gives the same chain byte for byte.
+
+**Hand-off package** (`docs/handoff.schema.json`, marked `"mock": true`). It holds:
+- the alert as it stands: level now and highest level reached, score, time to impact, zone, reasons, class probabilities
+- the track history and last position, with `n_stations` 0 marking coasting predictions
+- the recordings with their hashes, and the operator's labels
+- `alert_record_hash`, the record written when the alert was raised, and `chain_head`, the newest record before the export
+
+It is a JSON file only; nothing is sent anywhere.
+
+**`cuas verify RUN_DIR`** exits 0 and prints the head record's hash, or exits 1 and lists every problem. It fails if:
+- a chain line does not parse, or is not byte for byte as the store wrote it
+- `seq` skips, a `prev_hash` link is wrong, or a recomputed `record_hash` differs
+- a listed file is missing, lies outside the run folder, or no longer has its hash
+- a file under `evidence/` or `handoff/` is listed by no record
+- the recorder's hash list (`station_<id>/hashes.json`) has been edited, or a recording no longer matches it
+
+A test edits every stored file of a finished run, one at a time, by flipping one byte and by appending one, and verification fails each time. So does deleting or rewriting a middle record.
+
+**Known limit: the newest records.** Nothing outside the run folder anchors the end of the chain. Removing the newest record together with the file it lists leaves a valid, shorter chain, and `cuas verify` passes. A test pins this. Removing the record alone is caught, because its file is then listed by no record. Mitigations in the demo: every export carries the chain head at that moment, the dashboard shows the current head, and `cuas verify` prints it, so a head written down elsewhere exposes a shortened chain. A real system needs an outside anchor, such as the head signed or sent to separate storage at intervals. That belongs with Camera Law-compliant evidence storage (`phases.md`, Later).
+
+**Other limits.**
+- Labels and exports need a live run: a replay keeps no evidence, and an ended run's evidence is closed.
+- A request still queued when the run ends gets no record, and its sender is told the run has ended.
+- A recording that no alert's looks or sounds use is protected only by the recorder's hash list, which no record anchors. Alert snapshots and hand-off packages list the camera clips and microphone WAVs matched to the alert so far: a snapshot taken before any microphone heard the target lists no WAV.
 
 ---
 
@@ -229,7 +262,7 @@ Reasons: fast straight flight, piston engine
 ```
 
 - Countdown updates live.
-- **Confirm / Dismiss** are saved as labels for the learning loop.
+- **Confirm / Dismiss** are saved as labels for the learning loop: each is a `label` record in the evidence chain (A11). **Export hand-off** writes the mock package. Request and response examples are in `dashboard_contract.md`.
 - Clicking a card selects the track on the map and plays its clip.
 
 ### B4. States

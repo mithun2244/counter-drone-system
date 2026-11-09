@@ -314,3 +314,28 @@ def test_wide_frames_from_any_station_count_before_zoom_in_the_same_batch(
             classifier.update(k * 0.2, [track("trk-1", TARGET, k * 0.2)], [zoom])
         )
     assert out["trk-1"].evidence.look == pytest.approx(0.2)
+
+
+def test_a_track_class_names_the_latest_frame_from_each_camera(
+    classifier: Classifier, site: SiteConfig
+) -> None:
+    """What the clip panel and the evidence need, with no association of their own."""
+    first = looking_at(site, TARGET, 0.0, "rgb", WIDE, frame="f:7")
+    classifier.update(0.0, [track("trk-1", TARGET, 0.0)], [first])
+    later = [
+        looking_at(site, TARGET, 0.2, "rgb", WIDE, frame="f:8"),
+        looking_at(site, TARGET, 0.2, "zoom", ZOOMED, station_index=1, frame="g:3"),
+    ]
+    (out,) = classifier.update(0.2, [track("trk-1", TARGET, 0.2)], later)
+    assert out.track_class.looks == {"st1.rgb": "f:8", "st2.zoom": "g:3"}
+
+
+def test_a_track_class_names_the_latest_sound_window_from_each_microphone(
+    classifier: Classifier, site: SiteConfig
+) -> None:
+    """The recorded-audio panel and the evidence need the WAV the classifier heard."""
+    sound = {"electric_drone": 0.7, "engine": 0.1, "background": 0.2}
+    heard = looking_at(site, TARGET, 0.0, "acoustic", sound, frame="a:3")
+    unrecorded = looking_at(site, TARGET, 0.0, "acoustic", sound, station_index=1)
+    (out,) = classifier.update(0.0, [track("trk-1", TARGET, 0.0)], [heard, unrecorded])
+    assert out.track_class.looks == {"st1.acoustic": "a:3"}

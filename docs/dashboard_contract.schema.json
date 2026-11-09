@@ -1,0 +1,1364 @@
+{
+ "contract": 1,
+ "http": {
+  "ApiError": {
+   "additionalProperties": false,
+   "properties": {
+    "detail": {
+     "title": "Detail",
+     "type": "string"
+    }
+   },
+   "required": [
+    "detail"
+   ],
+   "title": "ApiError",
+   "type": "object"
+  },
+  "ExportResult": {
+   "additionalProperties": false,
+   "properties": {
+    "alert_id": {
+     "title": "Alert Id",
+     "type": "string"
+    },
+    "package": {
+     "additionalProperties": true,
+     "title": "Package",
+     "type": "object"
+    },
+    "path": {
+     "title": "Path",
+     "type": "string"
+    },
+    "sha256": {
+     "title": "Sha256",
+     "type": "string"
+    }
+   },
+   "required": [
+    "alert_id",
+    "path",
+    "sha256",
+    "package"
+   ],
+   "title": "ExportResult",
+   "type": "object"
+  },
+  "LabelRequest": {
+   "additionalProperties": false,
+   "properties": {
+    "label": {
+     "enum": [
+      "confirm",
+      "dismiss"
+     ],
+     "title": "Label",
+     "type": "string"
+    }
+   },
+   "required": [
+    "label"
+   ],
+   "title": "LabelRequest",
+   "type": "object"
+  },
+  "LabelResult": {
+   "additionalProperties": false,
+   "properties": {
+    "alert_id": {
+     "title": "Alert Id",
+     "type": "string"
+    },
+    "record_hash": {
+     "title": "Record Hash",
+     "type": "string"
+    },
+    "seq": {
+     "title": "Seq",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "alert_id",
+    "seq",
+    "record_hash"
+   ],
+   "title": "LabelResult",
+   "type": "object"
+  },
+  "RunControl": {
+   "additionalProperties": false,
+   "properties": {
+    "action": {
+     "enum": [
+      "pause",
+      "play",
+      "speed"
+     ],
+     "title": "Action",
+     "type": "string"
+    },
+    "speed": {
+     "anyOf": [
+      {
+       "enum": [
+        1,
+        2,
+        5
+       ],
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Speed"
+    }
+   },
+   "required": [
+    "action"
+   ],
+   "title": "RunControl",
+   "type": "object"
+  },
+  "SiteProfile": {
+   "$defs": {
+    "ScenarioChoice": {
+     "additionalProperties": false,
+     "properties": {
+      "scenario_id": {
+       "title": "Scenario Id",
+       "type": "string"
+      },
+      "title": {
+       "title": "Title",
+       "type": "string"
+      }
+     },
+     "required": [
+      "scenario_id",
+      "title"
+     ],
+     "title": "ScenarioChoice",
+     "type": "object"
+    }
+   },
+   "additionalProperties": false,
+   "description": "A saved site the operator can pick: shared geometry plus one venue's labels.",
+   "properties": {
+    "profile_id": {
+     "title": "Profile Id",
+     "type": "string"
+    },
+    "scenarios": {
+     "items": {
+      "$ref": "#/$defs/ScenarioChoice"
+     },
+     "title": "Scenarios",
+     "type": "array"
+    },
+    "venue": {
+     "title": "Venue",
+     "type": "string"
+    },
+    "zone_labels": {
+     "additionalProperties": {
+      "type": "string"
+     },
+     "title": "Zone Labels",
+     "type": "object"
+    }
+   },
+   "required": [
+    "profile_id",
+    "venue",
+    "zone_labels",
+    "scenarios"
+   ],
+   "title": "SiteProfile",
+   "type": "object"
+  },
+  "StartRun": {
+   "additionalProperties": false,
+   "properties": {
+    "profile_id": {
+     "title": "Profile Id",
+     "type": "string"
+    },
+    "recorded_media": {
+     "default": false,
+     "title": "Recorded Media",
+     "type": "boolean"
+    },
+    "scenario_id": {
+     "title": "Scenario Id",
+     "type": "string"
+    },
+    "seed": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Seed"
+    },
+    "zoom_per_station": {
+     "anyOf": [
+      {
+       "enum": [
+        0,
+        1,
+        2
+       ],
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Zoom Per Station"
+    }
+   },
+   "required": [
+    "profile_id",
+    "scenario_id"
+   ],
+   "title": "StartRun",
+   "type": "object"
+  }
+ },
+ "server_messages": {
+  "$defs": {
+   "AlertCard": {
+    "additionalProperties": false,
+    "description": "One alert, in the order the threat ranking published: level, time to impact, score.\n\nA card stays while its track is live, even if the level falls back to info.",
+    "properties": {
+     "alert_id": {
+      "title": "Alert Id",
+      "type": "string"
+     },
+     "approach": {
+      "enum": [
+       "inside",
+       "heading_to",
+       "none"
+      ],
+      "title": "Approach",
+      "type": "string"
+     },
+     "class_key": {
+      "enum": [
+       "attack",
+       "drone",
+       "unclassified"
+      ],
+      "title": "Class Key",
+      "type": "string"
+     },
+     "coasting": {
+      "title": "Coasting",
+      "type": "boolean"
+     },
+     "confidence": {
+      "title": "Confidence",
+      "type": "number"
+     },
+     "evidence_records": {
+      "title": "Evidence Records",
+      "type": "integer"
+     },
+     "label": {
+      "anyOf": [
+       {
+        "enum": [
+         "confirm",
+         "dismiss"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Label"
+     },
+     "level": {
+      "enum": [
+       "red",
+       "amber",
+       "info"
+      ],
+      "title": "Level",
+      "type": "string"
+     },
+     "looks": {
+      "items": {
+       "$ref": "#/$defs/LookRef"
+      },
+      "title": "Looks",
+      "type": "array"
+     },
+     "n_stations": {
+      "title": "N Stations",
+      "type": "integer"
+     },
+     "reasons": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Reasons",
+      "type": "array"
+     },
+     "score": {
+      "title": "Score",
+      "type": "number"
+     },
+     "sounds": {
+      "default": [],
+      "items": {
+       "$ref": "#/$defs/SoundRef"
+      },
+      "title": "Sounds",
+      "type": "array"
+     },
+     "track_id": {
+      "title": "Track Id",
+      "type": "string"
+     },
+     "tti_s": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tti S"
+     },
+     "zone_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Zone Id"
+     },
+     "zone_label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Zone Label"
+     }
+    },
+    "required": [
+     "alert_id",
+     "track_id",
+     "level",
+     "score",
+     "tti_s",
+     "zone_id",
+     "zone_label",
+     "approach",
+     "class_key",
+     "confidence",
+     "n_stations",
+     "coasting",
+     "reasons",
+     "label",
+     "evidence_records",
+     "looks"
+    ],
+    "title": "AlertCard",
+    "type": "object"
+   },
+   "Bounds": {
+    "additionalProperties": false,
+    "properties": {
+     "max_x": {
+      "title": "Max X",
+      "type": "number"
+     },
+     "max_y": {
+      "title": "Max Y",
+      "type": "number"
+     },
+     "min_x": {
+      "title": "Min X",
+      "type": "number"
+     },
+     "min_y": {
+      "title": "Min Y",
+      "type": "number"
+     }
+    },
+    "required": [
+     "min_x",
+     "min_y",
+     "max_x",
+     "max_y"
+    ],
+    "title": "Bounds",
+    "type": "object"
+   },
+   "CoverageView": {
+    "additionalProperties": false,
+    "properties": {
+     "pct": {
+      "title": "Pct",
+      "type": "number"
+     },
+     "reach_m": {
+      "additionalProperties": {
+       "type": "number"
+      },
+      "title": "Reach M",
+      "type": "object"
+     },
+     "warning": {
+      "title": "Warning",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "pct",
+     "warning",
+     "reach_m"
+    ],
+    "title": "CoverageView",
+    "type": "object"
+   },
+   "EvidenceEvent": {
+    "additionalProperties": false,
+    "properties": {
+     "alert_id": {
+      "title": "Alert Id",
+      "type": "string"
+     },
+     "contract": {
+      "const": 1,
+      "default": 1,
+      "title": "Contract",
+      "type": "integer"
+     },
+     "kind": {
+      "enum": [
+       "alert",
+       "escalation",
+       "label",
+       "export"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "record_hash": {
+      "title": "Record Hash",
+      "type": "string"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     },
+     "seq": {
+      "title": "Seq",
+      "type": "integer"
+     },
+     "t": {
+      "title": "T",
+      "type": "number"
+     },
+     "type": {
+      "const": "evidence",
+      "default": "evidence",
+      "title": "Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "run_id",
+     "seq",
+     "kind",
+     "alert_id",
+     "t",
+     "record_hash"
+    ],
+    "title": "EvidenceEvent",
+    "type": "object"
+   },
+   "EvidenceHead": {
+    "additionalProperties": false,
+    "properties": {
+     "record_hash": {
+      "title": "Record Hash",
+      "type": "string"
+     },
+     "seq": {
+      "title": "Seq",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "seq",
+     "record_hash"
+    ],
+    "title": "EvidenceHead",
+    "type": "object"
+   },
+   "Frame": {
+    "additionalProperties": false,
+    "description": "A snapshot, every 0.4 s of simulated time while a run is going.",
+    "properties": {
+     "alerts": {
+      "items": {
+       "$ref": "#/$defs/AlertCard"
+      },
+      "title": "Alerts",
+      "type": "array"
+     },
+     "contract": {
+      "const": 1,
+      "default": 1,
+      "title": "Contract",
+      "type": "integer"
+     },
+     "coverage": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/CoverageView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "evidence_head": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/EvidenceHead"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "pickets_heard": {
+      "items": {
+       "$ref": "#/$defs/PicketHeard"
+      },
+      "title": "Pickets Heard",
+      "type": "array"
+     },
+     "pre_alerts": {
+      "items": {
+       "$ref": "#/$defs/PreAlert"
+      },
+      "title": "Pre Alerts",
+      "type": "array"
+     },
+     "rays": {
+      "items": {
+       "$ref": "#/$defs/Ray"
+      },
+      "title": "Rays",
+      "type": "array"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     },
+     "sensors": {
+      "items": {
+       "$ref": "#/$defs/SensorView"
+      },
+      "title": "Sensors",
+      "type": "array"
+     },
+     "t": {
+      "title": "T",
+      "type": "number"
+     },
+     "tracks": {
+      "items": {
+       "$ref": "#/$defs/TrackView"
+      },
+      "title": "Tracks",
+      "type": "array"
+     },
+     "type": {
+      "const": "frame",
+      "default": "frame",
+      "title": "Type",
+      "type": "string"
+     },
+     "zoom": {
+      "items": {
+       "$ref": "#/$defs/ZoomView"
+      },
+      "title": "Zoom",
+      "type": "array"
+     }
+    },
+    "required": [
+     "run_id",
+     "t",
+     "tracks",
+     "alerts",
+     "pre_alerts",
+     "pickets_heard",
+     "rays",
+     "zoom",
+     "coverage",
+     "sensors",
+     "evidence_head"
+    ],
+    "title": "Frame",
+    "type": "object"
+   },
+   "Hello": {
+    "additionalProperties": false,
+    "description": "The first message on every connection.",
+    "properties": {
+     "contract": {
+      "const": 1,
+      "default": 1,
+      "title": "Contract",
+      "type": "integer"
+     },
+     "frame": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/Frame"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "profiles": {
+      "items": {
+       "$ref": "#/$defs/SiteProfile"
+      },
+      "title": "Profiles",
+      "type": "array"
+     },
+     "run": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/RunInfo"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "type": {
+      "const": "hello",
+      "default": "hello",
+      "title": "Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "profiles",
+     "run",
+     "frame"
+    ],
+    "title": "Hello",
+    "type": "object"
+   },
+   "LookRef": {
+    "additionalProperties": false,
+    "description": "A recording behind the look evidence, for the clip panel.",
+    "properties": {
+     "at_s": {
+      "title": "At S",
+      "type": "number"
+     },
+     "clip_url": {
+      "title": "Clip Url",
+      "type": "string"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     }
+    },
+    "required": [
+     "source",
+     "clip_url",
+     "at_s"
+    ],
+    "title": "LookRef",
+    "type": "object"
+   },
+   "PicketHeard": {
+    "additionalProperties": false,
+    "properties": {
+     "picket_id": {
+      "title": "Picket Id",
+      "type": "string"
+     },
+     "t": {
+      "title": "T",
+      "type": "number"
+     }
+    },
+    "required": [
+     "picket_id",
+     "t"
+    ],
+    "title": "PicketHeard",
+    "type": "object"
+   },
+   "PicketView": {
+    "additionalProperties": false,
+    "properties": {
+     "picket_id": {
+      "title": "Picket Id",
+      "type": "string"
+     },
+     "x": {
+      "title": "X",
+      "type": "number"
+     },
+     "y": {
+      "title": "Y",
+      "type": "number"
+     }
+    },
+    "required": [
+     "picket_id",
+     "x",
+     "y"
+    ],
+    "title": "PicketView",
+    "type": "object"
+   },
+   "PreAlert": {
+    "additionalProperties": false,
+    "description": "Heard but not placed: a picket's or a station microphone's wedge. Draw it and card it.",
+    "properties": {
+     "bearing_deg": {
+      "title": "Bearing Deg",
+      "type": "number"
+     },
+     "compass": {
+      "enum": [
+       "N",
+       "NE",
+       "E",
+       "SE",
+       "S",
+       "SW",
+       "W",
+       "NW"
+      ],
+      "title": "Compass",
+      "type": "string"
+     },
+     "first_t": {
+      "title": "First T",
+      "type": "number"
+     },
+     "half_width_deg": {
+      "title": "Half Width Deg",
+      "type": "number"
+     },
+     "last_t": {
+      "title": "Last T",
+      "type": "number"
+     },
+     "reports": {
+      "title": "Reports",
+      "type": "integer"
+     },
+     "sector_id": {
+      "title": "Sector Id",
+      "type": "string"
+     },
+     "sensor_id": {
+      "title": "Sensor Id",
+      "type": "string"
+     },
+     "x": {
+      "title": "X",
+      "type": "number"
+     },
+     "y": {
+      "title": "Y",
+      "type": "number"
+     }
+    },
+    "required": [
+     "sector_id",
+     "sensor_id",
+     "x",
+     "y",
+     "bearing_deg",
+     "compass",
+     "half_width_deg",
+     "first_t",
+     "last_t",
+     "reports"
+    ],
+    "title": "PreAlert",
+    "type": "object"
+   },
+   "Ray": {
+    "additionalProperties": false,
+    "description": "A bearing from the latest batch, for the bearing-ray overlay.",
+    "properties": {
+     "azimuth_deg": {
+      "title": "Azimuth Deg",
+      "type": "number"
+     },
+     "elevation_deg": {
+      "title": "Elevation Deg",
+      "type": "number"
+     },
+     "sensor": {
+      "title": "Sensor",
+      "type": "string"
+     },
+     "sigma_deg": {
+      "title": "Sigma Deg",
+      "type": "number"
+     },
+     "station_id": {
+      "title": "Station Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "station_id",
+     "sensor",
+     "azimuth_deg",
+     "elevation_deg",
+     "sigma_deg"
+    ],
+    "title": "Ray",
+    "type": "object"
+   },
+   "RunInfo": {
+    "additionalProperties": false,
+    "description": "Sent when a run starts, pauses, resumes, changes speed or ends.",
+    "properties": {
+     "contract": {
+      "const": 1,
+      "default": 1,
+      "title": "Contract",
+      "type": "integer"
+     },
+     "duration_s": {
+      "title": "Duration S",
+      "type": "number"
+     },
+     "profile_id": {
+      "title": "Profile Id",
+      "type": "string"
+     },
+     "recorded_media": {
+      "title": "Recorded Media",
+      "type": "boolean"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     },
+     "scenario_id": {
+      "title": "Scenario Id",
+      "type": "string"
+     },
+     "seed": {
+      "title": "Seed",
+      "type": "integer"
+     },
+     "site": {
+      "$ref": "#/$defs/SiteMap"
+     },
+     "speed": {
+      "title": "Speed",
+      "type": "number"
+     },
+     "state": {
+      "enum": [
+       "running",
+       "paused",
+       "ended"
+      ],
+      "title": "State",
+      "type": "string"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     },
+     "type": {
+      "const": "run",
+      "default": "run",
+      "title": "Type",
+      "type": "string"
+     },
+     "venue": {
+      "title": "Venue",
+      "type": "string"
+     },
+     "zoom_per_station": {
+      "title": "Zoom Per Station",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "run_id",
+     "profile_id",
+     "scenario_id",
+     "title",
+     "venue",
+     "seed",
+     "duration_s",
+     "recorded_media",
+     "zoom_per_station",
+     "state",
+     "speed",
+     "site"
+    ],
+    "title": "RunInfo",
+    "type": "object"
+   },
+   "ScenarioChoice": {
+    "additionalProperties": false,
+    "properties": {
+     "scenario_id": {
+      "title": "Scenario Id",
+      "type": "string"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "scenario_id",
+     "title"
+    ],
+    "title": "ScenarioChoice",
+    "type": "object"
+   },
+   "SensorView": {
+    "additionalProperties": false,
+    "properties": {
+     "ok": {
+      "title": "Ok",
+      "type": "boolean"
+     },
+     "sensor_id": {
+      "title": "Sensor Id",
+      "type": "string"
+     },
+     "visibility": {
+      "title": "Visibility",
+      "type": "number"
+     }
+    },
+    "required": [
+     "sensor_id",
+     "ok",
+     "visibility"
+    ],
+    "title": "SensorView",
+    "type": "object"
+   },
+   "SiteMap": {
+    "additionalProperties": false,
+    "properties": {
+     "bounds": {
+      "$ref": "#/$defs/Bounds"
+     },
+     "frame": {
+      "default": "local ENU metres: x east, y north, origin at the site centre; north is up",
+      "title": "Frame",
+      "type": "string"
+     },
+     "pickets": {
+      "items": {
+       "$ref": "#/$defs/PicketView"
+      },
+      "title": "Pickets",
+      "type": "array"
+     },
+     "stations": {
+      "items": {
+       "$ref": "#/$defs/StationView"
+      },
+      "title": "Stations",
+      "type": "array"
+     },
+     "zones": {
+      "items": {
+       "$ref": "#/$defs/ZoneView"
+      },
+      "title": "Zones",
+      "type": "array"
+     }
+    },
+    "required": [
+     "bounds",
+     "zones",
+     "stations",
+     "pickets"
+    ],
+    "title": "SiteMap",
+    "type": "object"
+   },
+   "SiteProfile": {
+    "additionalProperties": false,
+    "description": "A saved site the operator can pick: shared geometry plus one venue's labels.",
+    "properties": {
+     "profile_id": {
+      "title": "Profile Id",
+      "type": "string"
+     },
+     "scenarios": {
+      "items": {
+       "$ref": "#/$defs/ScenarioChoice"
+      },
+      "title": "Scenarios",
+      "type": "array"
+     },
+     "venue": {
+      "title": "Venue",
+      "type": "string"
+     },
+     "zone_labels": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "title": "Zone Labels",
+      "type": "object"
+     }
+    },
+    "required": [
+     "profile_id",
+     "venue",
+     "zone_labels",
+     "scenarios"
+    ],
+    "title": "SiteProfile",
+    "type": "object"
+   },
+   "SoundRef": {
+    "additionalProperties": false,
+    "description": "A station microphone's recording behind the sound clue, for the recorded-audio panel.\n\nThe clean source: the classifier heard it mixed with background noise at a simulated\ndistance and wind.",
+    "properties": {
+     "clip_url": {
+      "title": "Clip Url",
+      "type": "string"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     },
+     "station_id": {
+      "title": "Station Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "source",
+     "station_id",
+     "clip_url"
+    ],
+    "title": "SoundRef",
+    "type": "object"
+   },
+   "StationView": {
+    "additionalProperties": false,
+    "properties": {
+     "station_id": {
+      "title": "Station Id",
+      "type": "string"
+     },
+     "x": {
+      "title": "X",
+      "type": "number"
+     },
+     "y": {
+      "title": "Y",
+      "type": "number"
+     },
+     "z": {
+      "title": "Z",
+      "type": "number"
+     }
+    },
+    "required": [
+     "station_id",
+     "x",
+     "y",
+     "z"
+    ],
+    "title": "StationView",
+    "type": "object"
+   },
+   "TrackView": {
+    "additionalProperties": false,
+    "properties": {
+     "alert_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Alert Id"
+     },
+     "coasting": {
+      "title": "Coasting",
+      "type": "boolean"
+     },
+     "level": {
+      "anyOf": [
+       {
+        "enum": [
+         "red",
+         "amber",
+         "info"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Level"
+     },
+     "n_stations": {
+      "title": "N Stations",
+      "type": "integer"
+     },
+     "p_attack_drone": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "P Attack Drone"
+     },
+     "p_bird": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "P Bird"
+     },
+     "p_drone": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "P Drone"
+     },
+     "status": {
+      "enum": [
+       "tentative",
+       "confirmed"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "track_id": {
+      "title": "Track Id",
+      "type": "string"
+     },
+     "trail": {
+      "items": {
+       "maxItems": 3,
+       "minItems": 3,
+       "prefixItems": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "number"
+        },
+        {
+         "type": "number"
+        }
+       ],
+       "type": "array"
+      },
+      "title": "Trail",
+      "type": "array"
+     },
+     "vx": {
+      "title": "Vx",
+      "type": "number"
+     },
+     "vy": {
+      "title": "Vy",
+      "type": "number"
+     },
+     "x": {
+      "title": "X",
+      "type": "number"
+     },
+     "y": {
+      "title": "Y",
+      "type": "number"
+     },
+     "z": {
+      "title": "Z",
+      "type": "number"
+     }
+    },
+    "required": [
+     "track_id",
+     "status",
+     "x",
+     "y",
+     "z",
+     "vx",
+     "vy",
+     "n_stations",
+     "coasting",
+     "trail",
+     "level",
+     "alert_id",
+     "p_drone",
+     "p_attack_drone",
+     "p_bird"
+    ],
+    "title": "TrackView",
+    "type": "object"
+   },
+   "ZoneView": {
+    "additionalProperties": false,
+    "properties": {
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "polygon": {
+      "items": {
+       "maxItems": 2,
+       "minItems": 2,
+       "prefixItems": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "number"
+        }
+       ],
+       "type": "array"
+      },
+      "title": "Polygon",
+      "type": "array"
+     },
+     "weight": {
+      "title": "Weight",
+      "type": "number"
+     },
+     "zone_id": {
+      "title": "Zone Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "zone_id",
+     "label",
+     "weight",
+     "polygon"
+    ],
+    "title": "ZoneView",
+    "type": "object"
+   },
+   "ZoomView": {
+    "additionalProperties": false,
+    "properties": {
+     "azimuth_deg": {
+      "title": "Azimuth Deg",
+      "type": "number"
+     },
+     "camera_id": {
+      "title": "Camera Id",
+      "type": "string"
+     },
+     "elevation_deg": {
+      "title": "Elevation Deg",
+      "type": "number"
+     },
+     "station_id": {
+      "title": "Station Id",
+      "type": "string"
+     },
+     "track_id": {
+      "title": "Track Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "station_id",
+     "camera_id",
+     "track_id",
+     "azimuth_deg",
+     "elevation_deg"
+    ],
+    "title": "ZoomView",
+    "type": "object"
+   }
+  },
+  "discriminator": {
+   "mapping": {
+    "evidence": "#/$defs/EvidenceEvent",
+    "frame": "#/$defs/Frame",
+    "hello": "#/$defs/Hello",
+    "run": "#/$defs/RunInfo"
+   },
+   "propertyName": "type"
+  },
+  "oneOf": [
+   {
+    "$ref": "#/$defs/Hello"
+   },
+   {
+    "$ref": "#/$defs/RunInfo"
+   },
+   {
+    "$ref": "#/$defs/Frame"
+   },
+   {
+    "$ref": "#/$defs/EvidenceEvent"
+   }
+  ]
+ },
+ "title": "C-UAS dashboard contract"
+}

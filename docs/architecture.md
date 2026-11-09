@@ -59,7 +59,8 @@ flowchart TB
 | Audio classification | **Real model** on recorded clips | Same model on live microphones |
 | Acoustic direction (DOA) | Simulator computes bearing + noise | GCC-PHAT on real microphone array |
 | Pickets | Simulator triggers by distance | Real picket units |
-| Zoom camera | Crop from high-resolution clip | Real PTZ camera |
+| Zoom camera | Simulated pointing; with recorded media, a held-out RGB clip as if 4× closer | Real PTZ camera |
+| Site map | The fictional site from `site.yaml`, drawn over an OpenStreetMap basemap of Portsmouth, UK, fetched once and labelled "Simulated scenario"; a local grid without it ([mapping.md](mapping.md)) | Surveyed, client-approved map with MapLibre GL JS and self-hosted PMTiles ([mapping.md](mapping.md)) |
 | Time sync | One simulated clock | PTP hardware |
 | Message bus | In-process async queues | Network bus (MQTT or SAPIENT) |
 | Hand-off | JSON file export | Link to MOI / PSS / MoD operations room |
@@ -71,7 +72,8 @@ flowchart TB
 ```
 cuas-demo/
 ├── CLAUDE.md                 # loaded by Claude Code every session
-├── docs/                     # prd, architecture, design, rules, phases, memory
+├── docs/                     # prd, architecture, design, mapping, rules, phases, memory,
+│                             # dashboard contract and its schema, hand-off schema, samples/
 ├── config/
 │   ├── site.yaml             # stations, pickets, zones, camera specs
 │   ├── media_manifest.yaml   # recorded clips: hashes, labels, train/val/test split (no media)
@@ -99,8 +101,9 @@ cuas-demo/
 │   │   ├── alerts.py         # alert identity, stale and re-acquisition rules
 │   │   ├── coverage.py       # coverage % from reported visibility
 │   │   └── scheduler.py      # zoom camera assignment
-│   ├── evidence/             # store, hashing, tamper-evident log, hand-off export
-│   ├── dashboard/            # FastAPI app, WebSocket, static HTML/JS
+│   ├── evidence/             # hash-chain store, evidence keeper, chain check, mock hand-off package (design.md A11)
+│   ├── dashboard/            # contract, frame builder, FastAPI server and WebSocket, replay, reference page (dashboard_contract.md)
+│   ├── cli.py                # the `cuas` command: `cuas verify RUN_DIR`
 │   └── metrics/              # run report, evaluators (the only readers of ground truth): bearings and tracks; splits, label reader, recorded-media report
 ├── scripts/
 │   ├── run_demo.py           # python scripts/run_demo.py --scenario s1
@@ -109,11 +112,16 @@ cuas-demo/
 │   ├── train_detector.py     # fine-tune a detector; resumes after a kill; CPU by default, opt-in CUDA (docs/colab_gpu.md)
 │   ├── train_audio.py        # train the audio classifier
 │   ├── evaluate_media.py     # held-out reports in runs/eval/
-│   └── compare_zoom.py       # paired S3 run at 0, 1 and 2 zoom cameras, recorded media
+│   ├── compare_zoom.py       # paired S3 run at 0, 1 and 2 zoom cameras, recorded media
+│   ├── mast_bias.py          # tracking with one station's mast off by a fixed bias, reported only
+│   ├── live_runs.py          # live dashboard runs: wires simulator, pipeline, frames and evidence per run
+│   ├── record_stream.py      # contract, hand-off and basemap schemas, sample streams, the MOCK edge-state stream
+│   └── fetch_basemap.py      # one OpenStreetMap request: the display basemap, in site metres, into data/basemap/
 ├── tests/                    # pytest, mirrors src/ layout
 ├── data/                     # datasets (gitignored)
 ├── models/                   # trained weights (gitignored)
-└── runs/                     # outputs per run: evidence, logs, metrics (gitignored)
+└── runs/                     # outputs per run (gitignored); a dashboard or --evidence run gets
+                              # <scenario>_seed<seed>_<NNN>/ with evidence/, handoff/ and station_<id>/ recordings
 ```
 
 ## 4. Messages
@@ -127,11 +135,13 @@ All parts talk only through typed messages on the bus. This mirrors the real sys
 | `PicketAlert` | picket → gateway | picket_id, t, bearing_deg (coarse), loudness, engine_type_probs |
 | `Track` | tracker → classify, threat, dashboard | track_id, t, position_enu_m, velocity_mps, covariance, n_stations, status (tentative, confirmed, lost) |
 | `SectorTrack` | tracker → classify, threat, dashboard | sector_id, t, sensor_id, origin_enu_m, bearing_deg, half_width_deg, status (active, lost) |
-| `TrackClass` | classify → threat | track_id, t, p_drone, p_bird, p_attack_drone, evidence (look, move, sound) |
+| `TrackClass` | classify → threat, dashboard, evidence | track_id, t, p_drone, p_bird, p_attack_drone, evidence (look, move, sound), looks (latest frame per camera, latest sound window per microphone) |
 | `ThreatAssessment` | threat → scheduler, dashboard, evidence | track_id, t, score, level, zone, time_to_impact_s, reasons, alert_id |
 | `CoverageStatus` | visibility → scheduler, dashboard | t, coverage_pct, warning |
 | `ZoomTask` | scheduler → station | station_id, t, camera_id, track_id, azimuth_deg, elevation_deg |
-| `EvidenceRecord` | evidence → dashboard | alert_id, track_id, clip_path, sha256, prev_hash |
+| `OperatorLabel` | dashboard → evidence | alert_id, label (confirm, dismiss), t, request_id |
+| `ExportRequest` | dashboard → evidence | alert_id, t, request_id |
+| `EvidenceRecord` | evidence → dashboard | seq, kind (alert, escalation, label, export), t, alert_id, track_ids, files (path and sha256 each), details, prev_hash, request_id, record_hash |
 | `RejectedMessage` | gateway → log | reason, raw |
 
 Rules:
@@ -146,6 +156,7 @@ Rules:
 - One Python process, `asyncio`.
 - Each component is an async task that subscribes to topics on the bus and publishes results.
 - The demo runs three in-process buses: **sensor** (simulator to gateway), **ingest** (gateway to control layer) and **control** (tracks and sectors onward). Each stage reads one and writes the next, so nothing reaches the tracker without passing the gateway, the observation digests stay unchanged, and the stages shut down in order.
+- A fourth bus, **evidence**, carries the operator's labels and export requests from the dashboard to the evidence keeper, and its records back. The keeper also reads the control bus. It closes the evidence bus once it has exported every alert at the end of a run.
 - The bus interface has `publish(topic, msg)`, `subscribe(topic)` and `close()`. `subscribe("#")` receives every message in publish order. The in-process version uses `asyncio.Queue`. An MQTT version can be added later without touching components.
 - The simulator drives the clock. It can run faster than real time for tests, or at real time for the live demo.
 
@@ -162,8 +173,8 @@ Rules:
 | Audio | `numpy` mel-spectrogram + small PyTorch CNN | Light and trainable on a laptop; current `librosa` needs Python 3.12 |
 | Tracking maths | `numpy`, `scipy` (Hungarian assignment) | The constant-velocity filter is about 25 lines of numpy, so `filterpy` is not needed; `scipy` is already locked |
 | Config | YAML + Pydantic settings | One place for site and scenario values |
-| Dashboard | FastAPI + WebSocket + plain HTML/JS canvas | Real-time, no heavy frontend build |
-| Evidence | SQLite + files + SHA-256 hash chain | Simple, tamper-evident |
+| Dashboard | FastAPI + WebSocket + plain HTML/JS canvas; a local vector site map ([mapping.md](mapping.md)) | Real-time, no heavy frontend build, works offline |
+| Evidence | JSON Lines hash chain + files, SHA-256, checked by `cuas verify` ([design.md](design.md) A11) | Append-only, readable, standard library only; easier to inspect and test byte by byte than SQLite |
 | Tests | `pytest`, `pytest-asyncio` | Standard |
 | Lint/format | `ruff` | One fast tool |
 

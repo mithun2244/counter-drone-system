@@ -39,6 +39,14 @@ This records published terms and is not legal advice. Have counsel review before
 - **Weights licence:** none stated separately. [torchvision warns](https://docs.pytorch.org/vision/stable/models.html) that weights "may have their own licenses" derived from their training data, and that permission is the user's responsibility.
 - **Data behind the weights:** COCO. A [secondary source](https://huggingface.co/datasets/shunk031/MSCOCO) gives annotations as CC BY 4.0 and images as subject to Flickr terms; [COCO's own page](https://cocodataset.org/#termsofuse) did not render when checked. Whether its training recipe used ImageNet weights is unverified.
 
+### OpenStreetMap (display basemap of Portsmouth, UK)
+
+- **URL:** fetched with one request to the Overpass API, https://overpass-api.de/api/interpreter (the endpoint used is recorded in the file's `source`), by `uv run python scripts/fetch_basemap.py`. The query is in the script and saved with the raw response.
+- **Licence:** Open Database License (ODbL) 1.0, https://www.openstreetmap.org/copyright. Any map drawn from it must show "© OpenStreetMap contributors". The dashboard shows that, and the "Simulated scenario" notice, at all times.
+- **Kept:** `data/basemap/portsmouth.osm.json` (raw response) and `portsmouth.json` (projected into site metres, simplified to 2 m). Neither is committed or distributed. If the derived file were ever shared publicly, ODbL's share-alike terms would apply to it.
+- **Fetched:** 2026-11-09, about 7.2 km square around Southsea Common: coastline, water, roads from motorway to tertiary, railways, parks and grass.
+- **Used for:** display only. It is drawn under the fictional site and never reaches tracking, alerts or evidence (`docs/mapping.md`).
+
 ## Checked and ruled out
 
 | Source | Why |

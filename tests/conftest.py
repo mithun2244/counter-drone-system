@@ -5,13 +5,24 @@ import pytest
 
 from cuas.bus import WILDCARD, InProcessBus
 from cuas.clock import SimClock
-from cuas.config import SiteConfig, load_site
+from cuas.config import SiteConfig, ZoneLabels, load_site
+from cuas.evidence.keeper import EvidenceKeeper
+from cuas.evidence.store import EvidenceStore
 from cuas.pipeline import start_pipeline
-from cuas.schemas import Message
+from cuas.schemas import (
+    ClueEvidence,
+    ExportRequest,
+    Message,
+    OperatorLabel,
+    ThreatAssessment,
+    Track,
+    TrackClass,
+)
 from cuas.schemas.topics import ZOOM_TASK
 from cuas.sim.engine import run_scenario
 from cuas.sim.scenario import Scenario, load_scenario
 from cuas.sim.truth import TruthLog
+from cuas.station.recorder import Recorder
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -88,3 +99,60 @@ def record_pipeline(config_dir: Path) -> Callable[..., Awaitable[RecordedPipelin
         return sensed, ingested, controlled, truth
 
     return _record
+
+
+CLIP_ID = "abcdef0123456789"
+STADIUM_LABELS = ZoneLabels(
+    critical="Pitch", important="Grounds", perimeter="Perimeter"
+)
+
+
+@pytest.fixture
+def finished_run(tmp_path: Path) -> Path:
+    """A finished run's folder, made by the real evidence keeper: one recording, an alert raised
+    amber that turns red, an operator label and export, and the exports at run end."""
+    run_dir = tmp_path / "run"
+    Recorder(run_dir).save("st1", CLIP_ID, ".mp4", b"recorded clip")
+    keeper = EvidenceKeeper(EvidenceStore(run_dir), "run-1", STADIUM_LABELS)
+    cov = tuple(tuple(1.0 if i == j else 0.0 for j in range(6)) for i in range(6))
+    for t, level in [(1.0, "amber"), (1.2, "red")]:
+        keeper.ingest(
+            Track(
+                track_id="trk-1",
+                t=t,
+                position_enu_m=(-300.0 + 10 * t, 100.0, 60.0),
+                velocity_mps=(10.0, 0.0, 0.0),
+                covariance=cov,
+                n_stations=3,
+                status="confirmed",
+            )
+        )
+        keeper.ingest(
+            TrackClass(
+                track_id="trk-1",
+                t=t,
+                p_drone=0.9,
+                p_bird=0.1,
+                p_attack_drone=0.0,
+                evidence=ClueEvidence(look=0.9),
+                looks={"st1.rgb": f"{CLIP_ID}:3"},
+            )
+        )
+        keeper.ingest(
+            ThreatAssessment(
+                track_id="trk-1",
+                t=t,
+                score=0.8,
+                level=level,
+                zone="critical",
+                time_to_impact_s=20.0,
+                reasons=("heading to Pitch, 20 s",),
+                alert_id="alert-1",
+            )
+        )
+    keeper.handle(
+        OperatorLabel(alert_id="alert-1", label="confirm", t=2.0, request_id="req-1")
+    )
+    keeper.handle(ExportRequest(alert_id="alert-1", t=3.0, request_id="req-2"))
+    keeper.finish()
+    return run_dir

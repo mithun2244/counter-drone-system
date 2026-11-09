@@ -12,19 +12,24 @@ Detect and report only. Never write mitigation code.
 - Components, folders, messages, stack: `docs/architecture.md`
 - Algorithms and dashboard design: `docs/design.md`
 - Phase tasks and acceptance checks: `docs/phases.md`
+- Dashboard API, WebSocket messages and examples: `docs/dashboard_contract.md`
+- GitHub branch, push and documentation workflow: `GITHUB.md`
 
 ## Commands
 - Install: `uv sync`
-- Tests: `uv run pytest`
+- Regular tests: `uv run pytest --ignore=tests/test_decision.py`. The frozen Phase 4 gate is recorded in `docs/memory.md`.
 - Lint: `uv run ruff check . && uv run ruff format --check .`
 - Run a scenario in real time: `uv run python scripts/run_demo.py --scenario s1`
 - Run a scenario as fast as possible: add `--fast`
+- Start the dashboard: `uv run python scripts/run_demo.py --dashboard`
+- Verify evidence: `uv run cuas verify runs/<run_id>`, substituting the actual run folder name
 
 ## Workflow
 1. Read memory.md and the current phase in phases.md.
 2. Plan, get approval, then code in small commits.
 3. Run tests and lint before saying a task is done.
-4. Update memory.md at the end of the session.
+4. Update `docs/memory.md` at the end of the session.
+5. Before publishing changes to GitHub, apply the documentation check in `docs/rules.md` §8.
 
 ## Workflow rules with Superpowers
 - Use `docs/phases.md` and `docs/rules.md` as the project's workflow.

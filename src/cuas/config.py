@@ -290,6 +290,45 @@ class ZoomSettings(ConfigModel):
     half_fov_deg: Positive
 
 
+class BasemapSettings(ConfigModel):
+    """A real basemap drawn under the fictional site, for display only (docs/mapping.md).
+
+    The anchor is where the site's ENU origin sits; ``heading_deg`` is the true bearing of the
+    site's +y axis. ``scripts/fetch_basemap.py`` turns map data into site metres around it, once.
+    """
+
+    name: str
+    file: str
+    """In ``data/basemap/``."""
+    anchor_name: str
+    anchor_lat: Annotated[float, Field(ge=-90.0, le=90.0)]
+    anchor_lon: Annotated[float, Field(ge=-180.0, le=180.0)]
+    heading_deg: Annotated[float, Field(ge=0.0, lt=360.0)]
+    notice: str
+    """Shown on the map at all times."""
+    attribution: str
+    simplify_m: Positive
+    """Line simplification tolerance; far below what the map can show."""
+
+
+class DashboardSettings(ConfigModel):
+    """What the dashboard stream carries (docs/dashboard_contract.md)."""
+
+    frame_period_s: Positive
+    """A frame every this much simulated time: 2.5 a second at real time for 0.4 s."""
+    trail_s: Positive
+    trail_step_s: Positive
+    picket_flash_s: Positive
+    class_threshold: Probability
+    """A card says attack or drone once that probability reaches this, else unclassified."""
+    map_margin_fraction: NonNegative
+    """Space around the outermost pickets and zones, as a share of the site's extent."""
+    host: Literal["127.0.0.1", "localhost"]
+    """Local only: the demo has no authentication and makes no outside connections."""
+    port: Annotated[int, Field(ge=1024, le=65535)]
+    basemap: BasemapSettings
+
+
 class CoverageSettings(ConfigModel):
     """Coverage % (design.md A10): cells of one zone reachable by enough stations."""
 
@@ -319,6 +358,7 @@ class SiteConfig(ConfigModel):
     alerts: AlertSettings
     zoom: ZoomSettings
     coverage: CoverageSettings
+    dashboard: DashboardSettings
 
     @model_validator(mode="after")
     def _position_sensors_exist(self) -> Self:

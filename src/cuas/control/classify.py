@@ -68,6 +68,7 @@ class _Evidence:
     looks: list[float] = field(default_factory=list)
     zoom_looks: list[tuple[float, float]] = field(default_factory=list)
     wide_frames: set[str] = field(default_factory=set)
+    latest_looks: dict[str, str] = field(default_factory=dict)
     sounds: list[float] = field(default_factory=list)
     piston: list[float] = field(default_factory=list)
 
@@ -166,6 +167,10 @@ class Classifier:
     ) -> None:
         evidence = self._evidence[track_id]
         if sensor in CAMERAS:
+            if bearing.snapshot_ref is not None:
+                evidence.latest_looks[f"{bearing.station_id}.{sensor}"] = (
+                    bearing.snapshot_ref
+                )
             p = look_probability(bearing.class_probs)
             if sensor != "zoom":
                 if bearing.snapshot_ref is not None:
@@ -177,6 +182,10 @@ class Classifier:
                     (t, p)
                 )  # a frame already seen wide adds nothing
             return
+        if bearing.snapshot_ref is not None:
+            evidence.latest_looks[f"{bearing.station_id}.{sensor}"] = (
+                bearing.snapshot_ref
+            )
         p = sound_probability(bearing.class_probs)
         if p is not None:
             evidence.sounds.append(p)
@@ -222,6 +231,7 @@ class Classifier:
             p_bird=1.0 - p_drone,
             p_attack_drone=p_attack,
             evidence=ClueEvidence(**clues),
+            looks=dict(sorted(evidence.latest_looks.items())),
         )
         return Classified(
             track,

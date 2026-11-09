@@ -1,10 +1,12 @@
 """The gateway and control layer on real simulator runs. Ground truth is used only to check."""
 
+import asyncio
 from collections.abc import AsyncIterator
 
 import pytest
 
 from cuas.bus import WILDCARD, InProcessBus
+from cuas.clock import SimClock
 from cuas.config import SiteConfig, ZoneLabels
 from cuas.geometry import bearing_to
 from cuas.metrics.track_evaluator import TrackReport, evaluate_tracks
@@ -20,6 +22,7 @@ from cuas.schemas import (
     TrackClass,
     ZoomTask,
 )
+from cuas.sim.engine import run_scenario
 from cuas.sim.scenario import load_scenario
 
 ALL_SCENARIOS = ["s1", "s2", "s3", "s4"]
@@ -185,6 +188,53 @@ async def test_same_seed_same_tracks_and_pace_does_not_matter(record_pipeline) -
     _, _, paced, _ = await record_pipeline("s2", seed=7, pace=100.0)
     assert first
     assert dumps(first) == dumps(second) == dumps(paced)
+
+
+async def run_controlled(
+    site: SiteConfig, config_dir, pace: float | None, operator
+) -> tuple[list[Message], list[Message]]:
+    """S2 seed 7 with an operator task that may pause or change speed while it runs."""
+    scenario = load_scenario(config_dir, "s2")
+    sensor, ingest, control = InProcessBus(), InProcessBus(), InProcessBus()
+    clock = SimClock(site.simulation.tick_s, pace=pace)
+    taps = [bus.subscribe(WILDCARD) for bus in (sensor, control)]
+    labels = scenario.metadata.zone_labels
+    pipeline = start_pipeline(sensor, ingest, control, site, labels, lambda: clock.now)
+    acting = asyncio.create_task(operator(clock))
+    await run_scenario(scenario, site, sensor, clock, seed=7)
+    await sensor.close()
+    await pipeline
+    await acting
+    sensed, controlled = [[m async for m in tap] for tap in taps]
+    return sensed, controlled
+
+
+async def test_pausing_and_changing_speed_change_no_output(
+    site: SiteConfig, config_dir
+) -> None:
+    async def idle(clock: SimClock) -> None:
+        return None
+
+    held: list[float] = []
+
+    async def operator(clock: SimClock) -> None:
+        while clock.now < 30.0:
+            await asyncio.sleep(0.005)
+        clock.pause()
+        held.append(clock.now)
+        await asyncio.sleep(0.2)
+        clock.resume()
+        clock.set_pace(250.0)
+        while clock.now < 80.0:
+            await asyncio.sleep(0.005)
+        clock.set_pace(100.0)
+
+    fast = await run_controlled(site, config_dir, None, idle)
+    steered = await run_controlled(site, config_dir, 100.0, operator)
+    assert held and held[0] < 40.0  # the pause really happened mid-run
+    assert fast[1]
+    assert dumps(fast[0]) == dumps(steered[0])
+    assert dumps(fast[1]) == dumps(steered[1])
 
 
 MAX_MEDIAN_ERROR_M = 20.0  # phases.md, Phase 3

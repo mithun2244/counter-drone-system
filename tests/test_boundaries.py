@@ -7,7 +7,7 @@ import pytest
 
 SOURCE = Path(__file__).resolve().parents[1] / "src" / "cuas"
 WALL_CLOCK_OR_UNSEEDED = {"time", "datetime", "random"}
-SEPARATE_COMPONENTS = {"station", "gateway", "control"}
+SEPARATE_COMPONENTS = {"station", "gateway", "control", "dashboard", "evidence"}
 TRUTH_MODULE = "cuas.sim.truth"
 LABELS_MODULE = "cuas.media_manifest"
 METRICS = SOURCE / "metrics"
@@ -92,6 +92,10 @@ def test_source_tree_obeys_the_import_rules() -> None:
         ("pipeline.py", "from cuas.metrics.track_evaluator import evaluate_tracks"),
         ("control/x.py", "from cuas.gateway.gateway import Gateway"),
         ("gateway/x.py", "from cuas.control.layer import ControlLayer"),
+        ("dashboard/x.py", "from cuas.evidence.keeper import EvidenceKeeper"),
+        ("evidence/x.py", "from cuas.dashboard.frames import FrameBuilder"),
+        ("dashboard/x.py", "from cuas.control.threat import rank"),
+        ("dashboard/x.py", "from cuas.metrics.alert_evaluator import evaluate_alerts"),
     ],
 )
 def test_forbidden_imports_are_caught(path: str, source: str) -> None:
@@ -114,6 +118,8 @@ def test_forbidden_imports_are_caught(path: str, source: str) -> None:
         ("pipeline.py", "from cuas.gateway.gateway import Gateway"),
         ("pipeline.py", "from cuas.control.layer import ControlLayer"),
         ("metrics/x.py", "from cuas.schemas import Track"),
+        ("dashboard/x.py", "from cuas.dashboard.contract import Frame"),
+        ("dashboard/x.py", "from cuas.config import SiteConfig"),
     ],
 )
 def test_allowed_imports_pass(path: str, source: str) -> None:

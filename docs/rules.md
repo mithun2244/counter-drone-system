@@ -57,6 +57,7 @@
 
 - One small commit per finished task, with a clear message (`tracker: add triangulation with angle check`).
 - Work on a branch per phase (`phase-3-tracker`). Merge when its acceptance checks pass.
+- Before publishing changes to GitHub, review `README.md`, `CLAUDE.md`, `GITHUB.md` and any other docs the change affects. Update the affected docs on the same branch or pull request before pushing. Check setup and run commands, workflow instructions, contracts, and phase status as applicable.
 
 ## 9. End of every session
 
