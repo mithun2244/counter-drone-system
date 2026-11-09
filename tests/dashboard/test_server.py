@@ -347,3 +347,19 @@ def test_the_operator_dashboard_layout_and_selected_track_details() -> None:
     assert "unavailable: track {id} not in this frame" in text
     assert "unavailable: near-stationary" in text
     assert "metres from the site origin" in text and "clockwise from north" in text
+    assert 'course: "Direction of travel"' in text
+
+
+def test_the_operator_dashboard_draws_labelled_acoustic_sectors() -> None:
+    """pre_alerts as wedges behind their own toggle, on by default, labelled with sensor and
+    heard-from direction, listed under System status; grid beyond the basemap is labelled."""
+    app = STATIC / "app"
+    page = (app / "index.html").read_text(encoding="utf-8")
+    text = (app / "text.js").read_text(encoding="utf-8")
+    assert '<input type="checkbox" id="sectors" checked>' in page
+    assert '<input type="checkbox" id="rays">' in page
+    status = page[page.index('id="status-panel"') : page.index('id="map-panel"')]
+    assert 'id="acoustic"' in status
+    assert '"Acoustic sectors"' in text and '"Acoustic detections"' in text
+    assert "{sensor} · Engine heard {direction} · Unconfirmed" in text
+    assert "Outside basemap coverage" in text

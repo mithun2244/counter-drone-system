@@ -8,6 +8,8 @@ const MAP = {
   rayLength: 3000,
   wedgeReach: 2000,
   scaleBar: 1000,
+  sectorLabelAt: 0.5,  // wedge labels sit this share of the reach out along the centre line
+  outsideLabelMin: 24,  // px: an uncovered strip at least this thick gets the outside-coverage label
   arrowSeconds: 5,
   closeUpMargin: 0.25,  // close-up: the outermost zone plus this share of its size on each side
   roadWidth: { motorway: 3, trunk: 2.5, primary: 2, secondary: 1.5, tertiary: 1 },
@@ -21,9 +23,12 @@ function toScreen(bounds, width, height) {
   const scale = Math.min(width / w, height / h);
   const left = (width - w * scale) / 2;  // centred, north up
   const bottom = (height - h * scale) / 2;
+  const minX = bounds.min_x - left / scale;  // the whole pane in site metres: one uniform scale
+  const minY = bounds.min_y - bottom / scale;
   return {
     scale,
     at: (x, y) => [left + (x - bounds.min_x) * scale, height - bottom - (y - bounds.min_y) * scale],
+    visible: { min_x: minX, min_y: minY, max_x: minX + width / scale, max_y: minY + height / scale },
   };
 }
 
@@ -45,7 +50,8 @@ function layer(width, height, ratio) {
   return { canvas, ctx };
 }
 
-// Draws everything, in the contract's order. `scene`: run, frame, basemap, rays, selectedTrack.
+// Draws everything, in the contract's order. `scene`: run, frame, basemap, rays, sectors, closeUp,
+// selectedTrack. The canvas fills the pane; the grid runs edge to edge under the basemap.
 function drawMap(canvas, scene) {
   const ratio = window.devicePixelRatio || 1;
   const width = canvas.clientWidth;
@@ -56,7 +62,7 @@ function drawMap(canvas, scene) {
   }
   const ctx = canvas.getContext("2d");
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-  ctx.fillStyle = "#0b0f14";
+  ctx.fillStyle = "#121820";
   ctx.fillRect(0, 0, width, height);
   const { run, frame, basemap } = scene;
   const bounds = run ? viewBounds(run.site, scene.closeUp) : basemap && basemap.bounds;  // the same box
@@ -78,7 +84,8 @@ function viewBounds(site, closeUp) {
 }
 
 function drawBackground(ctx, view, basemap, bounds, size) {
-  if (!basemap) { drawGrid(ctx, view, bounds); return; }
+  drawGrid(ctx, view, view.visible);  // edge to edge; the basemap's land covers it where there is map
+  if (!basemap) return;
   const key = `${size.width}x${size.height}@${size.ratio}:${JSON.stringify(bounds)}`;
   if (mapCache.key !== key || mapCache.source !== basemap) {  // paint once, then copy
     const { canvas, ctx: paint } = layer(size.width, size.height, size.ratio);
@@ -86,6 +93,30 @@ function drawBackground(ctx, view, basemap, bounds, size) {
     Object.assign(mapCache, { basemap: canvas, key, source: basemap });
   }
   ctx.drawImage(mapCache.basemap, 0, 0, size.width, size.height);
+  labelOutside(ctx, view, basemap.bounds, size);
+}
+
+function labelOutside(ctx, view, b, size) {  // each uncovered strip says what it is
+  const [x0, y0] = view.at(b.min_x, b.max_y);
+  const [x1, y1] = view.at(b.max_x, b.min_y);
+  const text = t("outsideBasemap");
+  ctx.font = "12px system-ui, sans-serif";
+  ctx.fillStyle = "#6b7685";
+  ctx.textAlign = "center";
+  const mid = y0 + 0.75 * (y1 - y0);  // side labels low, clear of the video at upper right
+  const strips = [  // thickness, centre, rotation: left, right, top, bottom of the basemap
+    [x0, x0 / 2, mid, -Math.PI / 2], [size.width - x1, (x1 + size.width) / 2, mid, Math.PI / 2],
+    [y0, size.width / 2, y0 / 2, 0], [size.height - y1, size.width / 2, (y1 + size.height) / 2, 0],
+  ];
+  for (const [thickness, cx, cy, angle] of strips) {
+    if (thickness < MAP.outsideLabelMin) continue;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    ctx.fillText(text, 0, 4);
+    ctx.restore();
+  }
+  ctx.textAlign = "start";
 }
 
 function fillAreas(ctx, view, areas, colour) {
@@ -135,11 +166,34 @@ function drawSite(ctx, view, site, frame, scene, size) {
   drawZones(ctx, view, site.zones);
   if (!frame) { drawSensors(ctx, view, site, null); return; }
   if (frame.coverage && frame.coverage.warning) drawCoverageLoss(ctx, view, site, frame.coverage, size);
-  for (const wedge of frame.pre_alerts) drawWedge(ctx, view, wedge);
+  if (scene.sectors) for (const wedge of frame.pre_alerts) drawWedge(ctx, view, wedge);  // this frame's only
   drawSensors(ctx, view, site, frame);
   if (scene.rays) drawRays(ctx, view, site, frame.rays);
   drawZoom(ctx, view, site, frame);
   for (const track of frame.tracks) drawTrack(ctx, view, track, track.track_id === scene.selectedTrack);
+  const placed = [];  // label boxes already drawn this frame
+  if (scene.sectors) for (const wedge of frame.pre_alerts) labelWedge(ctx, view, wedge, size, placed);
+}
+
+function sectorText(wedge) {  // "st3 · Engine heard east · Unconfirmed"
+  return t("sectorLabel", { sensor: wedge.sensor_id.split(".")[0], direction: t(`compassWord.${wedge.compass}`) });
+}
+
+function labelWedge(ctx, view, wedge, size, placed) {
+  const [mx, my] = view.at(...along(wedge.x, wedge.y, wedge.bearing_deg, MAP.sectorLabelAt * MAP.wedgeReach));
+  const text = sectorText(wedge);
+  ctx.font = "700 12px system-ui, sans-serif";
+  const w = ctx.measureText(text).width;
+  const x = Math.min(Math.max(mx - w / 2, 6), size.width - w - 6);  // kept on the pane
+  let y = Math.min(Math.max(my, 18), size.height - 26);
+  const hits = (yy) => placed.some((r) => x < r.x + r.w + 8 && r.x < x + w + 8 && Math.abs(r.y - yy) < 20);
+  for (let tries = 0; tries < placed.length && hits(y); tries++) y -= 20;  // step clear of earlier labels
+  placed.push({ x, y, w });
+  ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+  ctx.fillRect(x - 4, y - 13, w + 8, 18);
+  ctx.fillStyle = "#ffcf7a";
+  ctx.fillText(text, x, y);
+  ctx.font = "12px system-ui, sans-serif";
 }
 
 function drawZones(ctx, view, zones) {
@@ -272,6 +326,8 @@ function drawTrack(ctx, view, track, selected) {
 
 function drawScaleAndNorth(ctx, view, width, height) {
   const length = MAP.scaleBar * view.scale;
+  ctx.fillStyle = "rgba(0, 0, 0, 0.65)";  // a backing box, like the attribution's
+  ctx.fillRect(8, height - 56, length + 16, 30);
   ctx.strokeStyle = "#e6edf3"; ctx.fillStyle = "#e6edf3"; ctx.lineWidth = 2;
   ctx.font = "12px system-ui, sans-serif";
   ctx.beginPath(); ctx.moveTo(16, height - 34); ctx.lineTo(16 + length, height - 34); ctx.stroke();

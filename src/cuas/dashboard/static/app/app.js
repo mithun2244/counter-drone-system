@@ -163,6 +163,18 @@ function tickTti() {  // counts down between frames by `speed` per wall second
   }
 }
 
+// --- acoustic detections: heard, not placed (pre_alerts) ---
+
+function renderAcoustic() {
+  const pre = state.frame ? state.frame.pre_alerts : [];  // in the order sent
+  $("acoustic").replaceChildren(...(pre.length ? pre.map((p) => {
+    const values = { sensor: p.sensor_id.split(".")[0], direction: t(`compassWord.${p.compass}`), last: clock(p.last_t), n: p.reports };
+    const row = el("li", "", t(p.reports === 1 ? "acousticRowOne" : "acousticRow", values));
+    row.dataset.sector = p.sector_id;
+    return row;
+  }) : [el("li", "note", t("acousticNone"))]));
+}
+
 // --- system status (design.md B1, B4) ---
 
 function renderStatus() {
@@ -400,10 +412,11 @@ function render() {
   renderTopBar();
   renderQueue();
   renderStatus();
+  renderAcoustic();
   renderDetails();
   const card = selectedCard();
   drawMap($("map"), { run: state.run, frame: state.frame, basemap: state.basemap, selectedTrack: card && card.track_id,
-    rays: $("rays").checked, closeUp: $("close-up").checked });
+    rays: $("rays").checked, sectors: $("sectors").checked, closeUp: $("close-up").checked });
 }
 
 async function loadBasemap() {
@@ -417,6 +430,7 @@ document.title = t("title");
 $("profile").addEventListener("change", fillScenarios);
 $("go").addEventListener("click", startRun);
 $("rays").addEventListener("change", render);
+$("sectors").addEventListener("change", render);
 $("close-up").addEventListener("change", render);
 $("alerts").addEventListener("click", (event) => {
   const card = event.target.closest(".card");

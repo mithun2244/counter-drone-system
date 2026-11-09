@@ -23,6 +23,7 @@
       <span id="clock" class="clock"></span>
       <button id="play-pause"></button>
       <span class="speeds"><button data-speed="1">1×</button><button data-speed="2">2×</button><button data-speed="5">5×</button></span>
+      <label><input type="checkbox" id="sectors" checked> <span data-text="sectors"></span></label>
       <label><input type="checkbox" id="rays"> <span data-text="rays"></span></label>
       <label><input type="checkbox" id="close-up"> <span data-text="closeUp"></span></label>
     </div>
@@ -33,6 +34,8 @@
       <div id="banner" role="alert" hidden></div>
       <h2 data-text="status"></h2>
       <div id="status"></div>
+      <h2 data-text="acoustic"></h2>
+      <ul id="acoustic"></ul>
     </section>
     <section id="map-panel">
       <canvas id="map"></canvas>
