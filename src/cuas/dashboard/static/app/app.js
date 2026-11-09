@@ -2,7 +2,10 @@
 // (docs/dashboard_contract.md). Plain JS, no libraries, nothing loaded from outside this server.
 "use strict";
 
-const state = { profiles: [], run: null, frame: null, frameWall: 0, basemap: null, ttis: new Map() };
+const state = {
+  profiles: [], run: null, frame: null, frameWall: 0, basemap: null, ttis: new Map(),
+  selected: null, looks: [], sounds: [],
+};
 const $ = (id) => document.getElementById(id);
 
 function el(tag, className, text) {
@@ -13,9 +16,9 @@ function el(tag, className, text) {
 }
 
 function clock(seconds) {  // simulated time as mm:ss.s
-  const m = Math.floor(seconds / 60);
-  const s = (seconds - 60 * m).toFixed(1).padStart(4, "0");
-  return `${String(m).padStart(2, "0")}:${s}`;
+  const tenths = Math.round(seconds * 10);
+  const m = Math.floor(tenths / 600);
+  return `${String(m).padStart(2, "0")}:${((tenths - 600 * m) / 10).toFixed(1).padStart(4, "0")}`;
 }
 
 function connect() {
@@ -32,10 +35,11 @@ function receive(message) {
     setFrame(message.frame);
     fillProfiles();
   } else if (message.type === "run") {
-    if (!state.run || state.run.run_id !== message.run_id) setFrame(null);
+    if (!state.run || state.run.run_id !== message.run_id) { setFrame(null); select(null); }
     state.run = message;
   } else if (message.type === "frame") {
     setFrame(message);
+    refreshMedia();
   }
   render();
 }
@@ -100,12 +104,20 @@ function makeCard(alertId) {
   card.tabIndex = 0;
   const head = el("div", "head");
   head.append(el("span", "level"), el("span", "class"), el("span", "tti"));
-  card.append(head, el("div", "sub"), el("div", "reasons"), el("div", "meta"));
+  const actions = el("div", "actions");
+  for (const action of ["confirm", "dismiss", "export"]) {
+    const button = el("button", "", t(action));
+    button.dataset.action = action;
+    actions.append(button);
+  }
+  card.append(head, el("div", "sub"), el("div", "reasons"), el("div", "meta"), actions, el("div", "result"));
   return card;
 }
 
 function fillCard(card, a) {
-  card.className = `card ${a.level}`;
+  card.className = `card ${a.level}${a.alert_id === state.selected ? " selected" : ""}`;
+  const ended = !state.run || state.run.state === "ended";  // an ended run's evidence is closed
+  for (const b of card.querySelectorAll("[data-action]")) b.disabled = ended || b.dataset.busy === "1";
   card.querySelector(".level").textContent = t(`level.${a.level}`);
   card.querySelector(".class").textContent = `${t(`classKey.${a.class_key}`)} ${Math.round(100 * a.confidence)}%`;
   const where = a.zone_label ? t(`approach.${a.approach}`, { zone: a.zone_label }) : t("approach.none");
@@ -200,11 +212,118 @@ function sensorTable(sensors) {
 
 // --- drawing ---
 
+// --- operator actions: labels and hand-off export (dashboard_contract.md) ---
+
+async function act(button, alertId) {
+  const action = button.dataset.action;
+  const result = button.closest(".card").querySelector(".result");
+  button.dataset.busy = "1";
+  button.disabled = true;
+  button.textContent = t("saving");
+  const path = `/api/alerts/${encodeURIComponent(alertId)}`;
+  const reply = action === "export" ? await post(`${path}/export`, {}) : await post(`${path}/label`, { label: action });
+  button.dataset.busy = "";
+  button.textContent = t(action);
+  button.disabled = !state.run || state.run.state === "ended";
+  result.className = reply ? "result" : "result error";
+  if (!reply) { result.textContent = $("message").textContent; return; }
+  if (action === "export") {  // the saved file and its hash: the response is rounded, the file is not
+    result.replaceChildren(el("div", "copy", t("exported", { path: reply.path })),
+      el("div", "copy", t("sha256", { hash: reply.sha256 })));
+  } else {
+    result.textContent = t("labelSaved", { label: t(`labelled.${action}`), seq: reply.seq });
+  }
+}
+
+// --- selected alert: map ring, clip and recorded audio ---
+
+function selectedCard() {
+  return state.selected && state.frame ? state.frame.alerts.find((a) => a.alert_id === state.selected) : null;
+}
+
+function select(alertId) {
+  state.selected = alertId;
+  const card = selectedCard();
+  showLooks(card ? card.looks : [], true);
+  showSounds(card ? card.sounds : []);
+  if (!alertId) $("clip-note").textContent = t("pickAlert");
+}
+
+const urls = (items) => items.map((i) => i.clip_url).join();
+
+function refreshMedia() {  // recordings can join an alert after it was selected: never mid-play
+  const card = selectedCard();
+  if (!card) return;
+  if ($("clip").paused && urls(card.looks) !== urls(state.looks)) showLooks(card.looks, false);
+  if ($("audio").paused && urls(card.sounds) !== urls(state.sounds)) showSounds(card.sounds);
+}
+
+function lookName(look) {
+  const [station, kind] = look.source.split(".");
+  const name = t(`lookKind.${kind}`);
+  return `${station} ${name === `lookKind.${kind}` ? kind : name}`;
+}
+
+function showLooks(looks, autoplay) {
+  const current = state.looks[Number($("looks").dataset.index)];
+  state.looks = [...looks].sort((a, b) => b.source.endsWith(".zoom") - a.source.endsWith(".zoom"));  // zoom first
+  $("looks").replaceChildren(...state.looks.map((look, i) => {
+    const button = el("button", "", lookName(look));
+    button.dataset.index = i;
+    return button;
+  }));
+  const keep = current ? state.looks.findIndex((l) => l.source === current.source) : -1;
+  if (state.looks.length) { playLook(Math.max(keep, 0), autoplay); return; }
+  $("looks").dataset.index = "";
+  $("clip").removeAttribute("src");
+  $("clip").load();
+  $("clip-note").textContent = t("noClip");
+}
+
+function playLook(index, autoplay) {  // the RGB / thermal / zoom toggle
+  const look = state.looks[index];
+  $("looks").dataset.index = index;
+  for (const b of $("looks").children) b.classList.toggle("on", Number(b.dataset.index) === index);
+  $("clip").src = `${look.clip_url}#t=${look.at_s}`;  // media fragment: start near the look
+  $("clip-note").textContent = t("clipAt", { source: look.source, at: look.at_s.toFixed(1) });
+  if (autoplay) $("clip").play().catch(() => {});  // a blocked autoplay leaves the controls
+}
+
+function showSounds(sounds) {
+  stopAudio();
+  state.sounds = sounds;
+  $("sounds").replaceChildren(...(sounds.length ? sounds.map((s) => {
+    const row = el("li", "", t("station", { id: s.station_id }));
+    const button = el("button", "", t("playAudio"));
+    button.dataset.src = s.clip_url;
+    row.append(button);
+    return row;
+  }) : [el("li", "note", t("noSound"))]));
+}
+
+function stopAudio() {
+  $("audio").pause();
+  $("audio").removeAttribute("src");
+  for (const b of $("sounds").querySelectorAll("button")) b.textContent = t("playAudio");
+}
+
+function playSound(button) {
+  const playing = button.textContent === t("stopAudio");
+  stopAudio();
+  if (playing) return;
+  $("audio").src = button.dataset.src;
+  button.textContent = t("stopAudio");
+  $("audio").play().catch((error) => { button.textContent = t("playAudio"); $("message").textContent = String(error); });
+}
+
+// --- drawing ---
+
 function render() {
   renderTopBar();
   renderQueue();
   renderStatus();
-  drawMap($("map"), { run: state.run, frame: state.frame, basemap: state.basemap,
+  const card = selectedCard();
+  drawMap($("map"), { run: state.run, frame: state.frame, basemap: state.basemap, selectedTrack: card && card.track_id,
     rays: $("rays").checked, closeUp: $("close-up").checked });
 }
 
@@ -220,6 +339,26 @@ $("profile").addEventListener("change", fillScenarios);
 $("go").addEventListener("click", startRun);
 $("rays").addEventListener("change", render);
 $("close-up").addEventListener("change", render);
+$("alerts").addEventListener("click", (event) => {
+  const card = event.target.closest(".card");
+  if (!card) return;
+  const button = event.target.closest("button[data-action]");
+  if (button) { act(button, card.dataset.alert); return; }
+  if (!event.target.closest(".result")) { select(card.dataset.alert); render(); }  // leave the hash selectable
+});
+$("alerts").addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && event.target.classList.contains("card")) { select(event.target.dataset.alert); render(); }
+});
+$("looks").addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (button) playLook(Number(button.dataset.index), true);
+});
+$("sounds").addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-src]");
+  if (button) playSound(button);
+});
+$("audio").addEventListener("ended", stopAudio);
+select(null);
 $("play-pause").addEventListener("click", () =>
   post("/api/run/control", { action: state.run.state === "running" ? "pause" : "play" }));
 for (const b of document.querySelectorAll("[data-speed]")) {

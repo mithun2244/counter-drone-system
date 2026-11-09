@@ -38,7 +38,18 @@
       <p id="all-clear"></p>
     </section>
     <section id="clip-panel">
-      <h2 data-text="clip"></h2>
+      <div class="video-side">
+        <h2 data-text="clip"></h2>
+        <div id="looks" class="choices"></div>
+        <video id="clip" controls muted playsinline></video>
+        <div id="clip-note" class="note"></div>
+      </div>
+      <div class="audio-side">
+        <h2 data-text="audioTitle"></h2>
+        <div class="note" data-text="audioNote"></div>
+        <ul id="sounds"></ul>
+        <audio id="audio"></audio>
+      </div>
     </section>
     <section id="status-panel">
       <h2 data-text="status"></h2>
