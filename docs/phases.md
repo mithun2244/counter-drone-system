@@ -114,6 +114,10 @@ Done when:
 - [ ] Editing any stored file makes `cuas verify` fail
 - [ ] Export produces a valid JSON package per alert
 
+**Status:**
+- **Tested checkpoint:** `91efcd9` on `phase-5-dashboard`. Backend, evidence, reference page (with the Portsmouth basemap and recorded audio) and docs are done; the regular suite passes (980, gate file excluded).
+- **Still open:** the acceptance checks above stay unticked until they run on the integrated branch with the user's full operator dashboard connected, and are reported before the merge.
+
 ---
 
 ## Phase 6 — Demo polish and report
@@ -130,6 +134,64 @@ Done when:
 - [ ] All 4 scenarios run end to end, each in under 5 minutes
 - [ ] The metrics report meets or honestly reports against every `prd.md` §8 target
 - [ ] A fresh clone, then setup, then demo works on a second machine
+
+### Plan (approved 2026-11-09)
+
+**When:** implementation starts only after Phase 5 is accepted and merged (`rules.md` §1), on `phase-6-demo` cut from `main`. Nothing below is built yet.
+
+**User decisions:**
+- The presenter advances the playlist: each run ends paused, and Next starts the next scenario.
+- The second machine is not known yet: the procedure and checklist are written, and the user runs them when a machine is available.
+
+**A. Independent of the dashboard.** These start first.
+- **A1. Metrics report per run.** New `src/cuas/metrics/report.py` writes `runs/<id>/metrics.md` from the existing evaluator reports.
+  - **Labels:** "Simulator results, not real-world performance", plus "simulated geometry, real model output on held-out clips" with recorded media.
+  - **Inputs recorded:** scenario, seed, zoom cameras, recorded media, git commit, `uv.lock` hash, Python and torch versions, OS, CPU.
+  - **`prd.md` §8 table,** each row met, missed or not applicable:
+    - detection rate (S1–S3)
+    - false alarms: alerts that reached amber or red and belong to no drone (S3)
+    - early warning (S1)
+    - median position error
+    - time to alert, per drone and the worst
+  - **Also:** wall clock against the 5-minute limit, digests, and the evidence head with the `cuas verify` result.
+  - **Where:** written for `run_demo.py --scenario … --evidence` runs and every live dashboard run. Known misses (time to alert, recorded-media S3 bird alerts) are reported as missed. At most one evaluator field is added, with a test.
+- **A2. One command per scenario and the full playlist.**
+  - `config/demo.yaml` holds the `design.md` B6 order (S2, S3, S1, S4) and each scenario's demo settings.
+  - `run_demo.py --demo <scenario>` serves the dashboard with that scenario queued and opens the browser. `--demo full` queues the playlist, and after S4 prints the `cuas verify` command.
+  - Contract additions, with the version kept at 1: `POST /api/playlist/next`, and a `playlist` field on `RunInfo` (position, total, next scenario; `null` outside a playlist). Next is refused during a run (`409`). The reference page gets a Next button.
+- **A3. Setup check.**
+  - `.gitattributes` keeps `config/media_manifest.yaml` CRLF on every OS, so its hash matches the one the weights were recorded against.
+  - `scripts/check_setup.py` checks Python 3.11, `uv.lock`, recordings (`download_data.verify`), each model against its `weights_sha256`, the basemap and the port, and prints fixes.
+- **A4. Root `README.md`:** what the demo is, setup (including copying `models/`, which is never committed), commands, where outputs go, and a troubleshooting table. The dashboard click path waits for B4.
+- **A5. Timing:** each scenario in real time with its demo settings, headless and with the reference page attached, under 5 minutes, recorded in `metrics.md`.
+- **A6. Fresh clone on this machine:** clone, `uv sync`, copy `models/`, `check_setup.py`, the regular suite and all four demo commands. This rehearses C1.
+
+**B. Needs the user's full operator dashboard.**
+- [ ] **B1.** Phase 5 acceptance on the integrated branch, then the merge (prerequisite for all of Phase 6)
+- [ ] **B2.** The dashboard wires the playlist (Next, "Next: S3", the `playlist` field)
+- [ ] **B3.** Full B6 dry run in the dashboard, about 7 minutes:
+  - S2: rays, zoom, alert card
+  - S3: birds grey, only the drone red
+  - S1: pickets first, three red cards ranked by time to impact
+  - S4: coverage banner
+  - Evidence: Export hand-off JSON, then `cuas verify`
+- [ ] **B4.** README click path and screenshots
+
+**C. Needs hardware the user provides.** Both pending.
+- [ ] **C1. Second-machine clean run.** It follows A6 and the README exactly, and records the OS, CPU, scenario durations and the `check_setup` output. Behaviour is compared, and digests are reported as found, matching or not.
+- [ ] **C2. GPU dry run.** It needs a GPU laptop (`prd.md` open question). Without one it is reported as "not run: no GPU machine".
+
+**Verification:**
+- Regular suite (gate file excluded) and lint. No held-out evaluation rerun; `attempts.jsonl` unchanged.
+- Baseline sensor digests unchanged.
+- Sabotages, each of which must fail a test:
+  - mark a missed target as met
+  - drop the simulator label
+  - skip a playlist entry
+  - allow Next during a run
+  - break the weights hash check
+- Each `metrics.md` checked by hand against its run's `[evaluator]` lines.
+- Results reported before any merge.
 
 ---
 
