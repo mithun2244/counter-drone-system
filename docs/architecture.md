@@ -102,7 +102,7 @@ cuas-demo/
 │   │   ├── coverage.py       # coverage % from reported visibility
 │   │   └── scheduler.py      # zoom camera assignment
 │   ├── evidence/             # hash-chain store, evidence keeper, chain check, mock hand-off package (design.md A11)
-│   ├── dashboard/            # contract, frame builder, FastAPI server and WebSocket, replay, reference page (dashboard_contract.md)
+│   ├── dashboard/            # contract, frame builder, FastAPI server and WebSocket, replay; static/app operator dashboard, static/reference page (dashboard_contract.md)
 │   ├── cli.py                # the `cuas` command: `cuas verify RUN_DIR`
 │   └── metrics/              # run report, evaluators (the only readers of ground truth): bearings and tracks; splits, label reader, recorded-media report
 ├── scripts/

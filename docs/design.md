@@ -279,7 +279,7 @@ Reasons: fast straight flight, piston engine
 
 - Dark theme (control-room friendly), high contrast.
 - One font, two weights. Large numbers for TTI.
-- English first. Keep text in a translation file so Arabic (right to left) can be added.
+- English first. Keep text in a translation file so Arabic (right to left) can be added. The operator dashboard keeps every UI string in `src/cuas/dashboard/static/app/text.js` (`TEXT.en`); alert `reasons` are still English sentences from the server (`dashboard_contract.md`, known limits).
 
 ### B6. Demo script (about 7 minutes)
 

@@ -2,7 +2,7 @@
 
 Passive counter-drone detection demo. The simulator generates the site geometry and sensor observations. Recorded-media mode runs the detectors and classifier on public RGB, thermal and audio recordings.
 
-## Run the reference dashboard
+## Run the operator dashboard
 
 From the repository root, with Python 3.11 and `uv` available:
 
@@ -11,9 +11,16 @@ uv sync
 uv run python scripts/run_demo.py --dashboard
 ```
 
-Open [the reference dashboard](http://127.0.0.1:8000/reference/). Select **Fictional Processing Plant**, choose **S1**, and click **Start monitoring**. For recorded-media runs, prepare the local recordings and model weights as described in the [dashboard contract](docs/dashboard_contract.md) and [data source notes](data/README.md).
+Open [the operator dashboard](http://127.0.0.1:8000/). It works offline and loads nothing from the internet.
 
-The Phase 5 reference page is available for testing. See [phase status and acceptance checks](docs/phases.md) for the full operator dashboard and the Phase 6 plan.
+1. In the top bar, select **Fictional Processing Plant**, choose **S1**, and click **Start monitoring**. Use **1× / 2× / 5×** and **Pause** to control the simulated clock.
+2. Watch the map: pickets flash and amber wedges show engines heard but not yet placed. Tracks appear as dots with trails, labelled with their level. Tick **Bearing rays** to see the station bearings, and **Close-up** to fit the map to the site.
+3. The **Alert queue** lists alerts in the server's ranking, with time to impact counting down. Click a card to ring its track on the map and load its recordings.
+4. With **Recorded media** ticked before starting (Fictional Stadium, S2), the **Clip** panel plays the selected alert's camera clips (one button per camera) and **Recorded audio** plays each station's clean source audio.
+5. On a card, **Confirm** or **Dismiss** saves a label in the evidence chain, and **Export hand-off JSON** saves a mock hand-off package and shows its path and SHA-256.
+6. After the run, check its evidence with `uv run cuas verify runs/<run_id>`. The run folder is shown in **System status**.
+
+Without `data/basemap/portsmouth.json` (from `scripts/fetch_basemap.py`) the map draws a local grid. For recorded-media runs, prepare the local recordings and model weights as described in the [dashboard contract](docs/dashboard_contract.md) and [data source notes](data/README.md). The [reference page](http://127.0.0.1:8000/reference/) is a minimal independent check of the same contract. See [phase status and acceptance checks](docs/phases.md) for Phase 5 acceptance and the Phase 6 plan.
 
 ## Project docs
 

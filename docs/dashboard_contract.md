@@ -22,7 +22,7 @@
 
 | Path | What |
 | --- | --- |
-| `/` | The operator dashboard, served from `src/cuas/dashboard/static/app/`. Until `index.html` exists there, `/` redirects to `/reference/` |
+| `/` | The operator dashboard (`design.md` B1–B4), served from `src/cuas/dashboard/static/app/`. If `index.html` is missing there, `/` redirects to `/reference/` |
 | `/reference/` | The reference page, from `src/cuas/dashboard/static/reference/`. It checks the contract end to end and is kept separate from the dashboard |
 | `/ws` | The stream |
 | `/api/...` | The HTTP API |
@@ -172,7 +172,7 @@ The site and every position stay in local ENU metres. The basemap is already in 
 - If `GET /api/basemap` answers `404`, draw a local grid and say so, still with a "Simulated scenario" label.
 - Never convert to latitude and longitude in the dashboard. The `anchor` in the basemap is for reference only.
 
-The reference page does all of this; `static/reference/reference.js` (`drawBackground`, `paintBasemap`, `drawNotice`) is the worked example.
+The reference page does all of this; `static/reference/reference.js` (`drawBackground`, `paintBasemap`, `drawNotice`) is the worked example. The operator dashboard's `static/app/map.js` started from a copy of it, kept separate so the reference page stays an independent check.
 
 **State, pause and repeated frames:**
 - Replace your state from each `frame`, including one that repeats the previous `t` while paused. It is sent again because an evidence record was written, and its cards carry the new `label` and `evidence_records`, and the new `evidence_head`.
@@ -295,7 +295,7 @@ Content-Type: application/json
 | `POST /api/alerts/alert-1/label` with `{}` | `422` | `{"detail": "Field required"}` |
 | `POST /api/alerts/alert-1/label` after the run ended, or during a replay | `409` | `{"detail": "no run that keeps evidence is going"}` |
 
-**Try it on the reference page:** start a live run, then use the Confirm, Dismiss and Export hand-off JSON buttons on any card. The page shows the reply below the controls: for an export, the saved path and its SHA-256.
+**Try it:** start a live run, then use the Confirm, Dismiss and Export hand-off JSON buttons on any card. The operator dashboard shows the reply on the card; the reference page shows it below the controls. For an export, both show the saved path and its SHA-256.
 
 ## Samples
 

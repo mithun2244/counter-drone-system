@@ -105,8 +105,8 @@ Done when:
 
 Tasks:
 - [x] FastAPI app plus WebSocket stream of tracks, alerts and status (contract in `dashboard_contract.md`)
-- [ ] Map canvas, alert queue, clip panel, status panel (`design.md` B1–B4): the user's dashboard, on its own branch. A minimal reference page at `/reference/` stays for testing
-- [x] Confirm / Dismiss buttons saved as labels (backend and reference page; the user's dashboard wires the same endpoints)
+- [x] Map canvas, alert queue, clip panel, status panel (`design.md` B1–B4): the operator dashboard at `/` (`static/app/`), built by Claude Code at the user's request on `phase-5-operator-dashboard`. The minimal reference page at `/reference/` stays for testing
+- [x] Confirm / Dismiss buttons saved as labels (backend, operator dashboard and reference page)
 - [x] Evidence store, hash chain, `cuas verify` command, hand-off JSON export (`design.md` A11)
 
 Done when:
@@ -115,8 +115,9 @@ Done when:
 - [ ] Export produces a valid JSON package per alert
 
 **Status:**
-- **Tested checkpoint:** `91efcd9` on `phase-5-dashboard`. Backend, evidence, reference page (with the Portsmouth basemap and recorded audio) and docs are done; the regular suite passes (980, gate file excluded).
-- **Still open:** the acceptance checks above stay unticked until they run on the integrated branch with the user's full operator dashboard connected, and are reported before the merge.
+- **Backend checkpoint:** `91efcd9`, merged to `main` as `f3610a2` (PR #1) before acceptance. Backend, evidence, reference page (with the Portsmouth basemap and recorded audio) and docs.
+- **Operator dashboard:** on `phase-5-operator-dashboard`, cut from `f3610a2`. Plain HTML, CSS and JS in `src/cuas/dashboard/static/app/`, no build step and no new dependency; WebSocket contract unchanged.
+- **Acceptance:** the checks above were run on that branch with the operator dashboard and reported to the user (`memory.md`, session log). They stay unticked until the user accepts the report. Still pending: the manual offline start with the network disconnected, and listening to the audio in a real browser.
 
 ---
 

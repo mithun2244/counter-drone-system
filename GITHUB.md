@@ -9,7 +9,7 @@ Use the private `mithun2244/counter-drone-system` repository. `main` contains ac
 3. Push the named phase branch. For Phase 5:
 
    ```sh
-   git push -u origin phase-5-dashboard
+   git push -u origin phase-5-operator-dashboard
    ```
 
 4. Check the branch on GitHub and use it for review. Record test results and pending acceptance checks in [project memory](docs/memory.md).
