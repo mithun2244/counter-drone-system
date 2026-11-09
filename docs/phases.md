@@ -116,7 +116,7 @@ Done when:
 
 **Status:**
 - **Backend checkpoint:** `91efcd9`, merged to `main` as `f3610a2` (PR #1) before acceptance. Backend, evidence, reference page (with the Portsmouth basemap and recorded audio) and docs.
-- **Operator dashboard:** on `phase-5-operator-dashboard`, cut from `f3610a2`. Plain HTML, CSS and JS in `src/cuas/dashboard/static/app/`, no build step and no new dependency; WebSocket contract unchanged.
+- **Operator dashboard:** on `phase-5-operator-dashboard`, cut from `f3610a2`. Plain HTML, CSS and JS in `src/cuas/dashboard/static/app/`, no build step and no new dependency; WebSocket contract unchanged. Revised at the user's request to three columns (status, map, queue with the selected alert's details and evidence) with the video over the map (`design.md` B1); the acceptance checks were rerun on the revision.
 - **Acceptance:** the checks above were run on that branch with the operator dashboard and reported to the user (`memory.md`, session log). They stay unticked until the user accepts the report. Still pending: the manual offline start with the network disconnected, and listening to the audio in a real browser.
 
 ---

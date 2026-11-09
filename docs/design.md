@@ -229,19 +229,33 @@ A test edits every stored file of a finished run, one at a time, by flipping one
 ### B1. Layout
 
 ```
-┌───────────────────────────────────────────────────────────────┐
-│ Top bar: scenario name · sim clock · ▶ ❚❚ · speed 1x/2x/5x      │
-├───────────────────────────────────────┬───────────────────────┤
-│                                       │  ALERT QUEUE          │
-│            SITE MAP                   │  (ranked, highest     │
-│  zones · stations · pickets · tracks  │   first)              │
-│  picket sectors · track trails        │  [card] [card] [card] │
-│                                       │                       │
-├───────────────────────────────────────┼───────────────────────┤
-│ Clip panel: zoom clip of selected     │ System status:        │
-│ alert + RGB/thermal toggle            │ coverage % · sensors  │
-└───────────────────────────────────────┴───────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Top bar: run · sim clock · ▶/❚❚ · speed 1x/2x/5x · bearing rays · close-up │
+├──────────────┬──────────────────────────────────────┬────────────────────┤
+│ SYSTEM       │ notice                ┌────────────┐ │ ALERT QUEUE        │
+│ STATUS       │                       │ VIDEO      │ │ (server ranking)   │
+│ coverage     │                       │ tabs · −/+ │ │ [card] [card] ...  │
+│ banner       │        SITE MAP       │ clip       │ │ Confirm · Dismiss  │
+│ stations and │  zones · stations ·   └────────────┘ │ Export hand-off    │
+│ sensors      │  pickets · wedges · tracks · trails  ├────────────────────┤
+│ faults       │                                      │ SELECTED ALERT     │
+│ evidence     │                                      │ track details      │
+│ head         │ scale              attribution       │ evidence · audio   │
+└──────────────┴──────────────────────────────────────┴────────────────────┘
 ```
+
+Chosen by the user on 2026-11-09, replacing a bottom clip and status strip, to give the map more room. Status is on the left; the map is in the centre; the ranked queue is on the right, with the selected alert below it.
+
+- **Video over the map**, at the upper right, below the notice line and clear of the attribution. It has one tab per recording (zoom first, then RGB and thermal per station) and a collapse/expand button. WebSocket updates never reload the clip that is loaded, so the chosen tab and its playback carry on; a tab click loads that source's newest clip.
+- **Selected alert panel.** It shows the alert, joined to its track by `track_id`:
+  - estimated position, in metres east or west and north or south of the site origin
+  - altitude, in metres relative to the site origin
+  - ground speed, from `vx` and `vy`
+  - course, in degrees clockwise from north, from `vx` and `vy`. Below 0.5 m/s it reads "unavailable: near-stationary"
+  - the number of contributing stations
+  - coasting
+
+  A value that cannot be shown says so in words: "unavailable: track … not in this frame". The **Evidence** section holds the latest label, the number of records, the last action's result, and the recorded audio, labelled clean source audio.
 
 ### B2. Map
 
@@ -263,7 +277,7 @@ Reasons: fast straight flight, piston engine
 
 - Countdown updates live.
 - **Confirm / Dismiss** are saved as labels for the learning loop: each is a `label` record in the evidence chain (A11). **Export hand-off** writes the mock package. Request and response examples are in `dashboard_contract.md`.
-- Clicking a card selects the track on the map and plays its clip.
+- Clicking a card selects the track on the map, plays its clip over the map, and opens its details and evidence below the queue (B1).
 
 ### B4. States
 
