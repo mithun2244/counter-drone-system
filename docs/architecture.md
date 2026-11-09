@@ -60,7 +60,7 @@ flowchart TB
 | Acoustic direction (DOA) | Simulator computes bearing + noise | GCC-PHAT on real microphone array |
 | Pickets | Simulator triggers by distance | Real picket units |
 | Zoom camera | Simulated pointing; with recorded media, a held-out RGB clip as if 4× closer | Real PTZ camera |
-| Site map | Local vector drawing of the fictional site from `site.yaml` ([mapping.md](mapping.md)) | Surveyed, client-approved map with MapLibre GL JS and self-hosted PMTiles ([mapping.md](mapping.md)) |
+| Site map | The fictional site from `site.yaml`, drawn over an OpenStreetMap basemap of Portsmouth, UK, fetched once and labelled "Simulated scenario"; a local grid without it ([mapping.md](mapping.md)) | Surveyed, client-approved map with MapLibre GL JS and self-hosted PMTiles ([mapping.md](mapping.md)) |
 | Time sync | One simulated clock | PTP hardware |
 | Message bus | In-process async queues | Network bus (MQTT or SAPIENT) |
 | Hand-off | JSON file export | Link to MOI / PSS / MoD operations room |
@@ -115,7 +115,8 @@ cuas-demo/
 │   ├── compare_zoom.py       # paired S3 run at 0, 1 and 2 zoom cameras, recorded media
 │   ├── mast_bias.py          # tracking with one station's mast off by a fixed bias, reported only
 │   ├── live_runs.py          # live dashboard runs: wires simulator, pipeline, frames and evidence per run
-│   └── record_stream.py      # contract schemas, sample streams, the MOCK edge-state stream
+│   ├── record_stream.py      # contract, hand-off and basemap schemas, sample streams, the MOCK edge-state stream
+│   └── fetch_basemap.py      # one OpenStreetMap request: the display basemap, in site metres, into data/basemap/
 ├── tests/                    # pytest, mirrors src/ layout
 ├── data/                     # datasets (gitignored)
 ├── models/                   # trained weights (gitignored)

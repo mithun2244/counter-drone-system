@@ -1,6 +1,7 @@
 """Write the dashboard contract's schema, a MOCK edge-state stream, or a sample stream.
 
-``--schema`` writes ``docs/dashboard_contract.schema.json`` and ``docs/handoff.schema.json``. ``--edge-states`` writes
+``--schema`` writes ``docs/dashboard_contract.schema.json``, ``docs/handoff.schema.json`` and
+``docs/basemap.schema.json``. ``--edge-states`` writes
 ``docs/samples/edge_states.jsonl``: hand-made states the simulator never produces (a sensor
 fault, all clear, labelled alerts), marked MOCK. ``--scenario`` runs a scenario as fast as
 possible and writes the messages a dashboard would receive, one JSON object per line: ``hello``,
@@ -15,6 +16,7 @@ from pathlib import Path
 from cuas.bus import WILDCARD, InProcessBus
 from cuas.clock import SimClock
 from cuas.config import load_site
+from cuas.dashboard.basemap import basemap_schema_text
 from cuas.dashboard.contract import (
     AlertCard,
     CoverageView,
@@ -47,6 +49,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR, DATA_DIR, MODELS_DIR = ROOT / "config", ROOT / "data", ROOT / "models"
 SCHEMA_PATH = ROOT / "docs" / "dashboard_contract.schema.json"
 HANDOFF_SCHEMA_PATH = ROOT / "docs" / "handoff.schema.json"
+BASEMAP_SCHEMA_PATH = ROOT / "docs" / "basemap.schema.json"
 EDGE_STATES_PATH = ROOT / "docs" / "samples" / "edge_states.jsonl"
 SAMPLES_DIR = ROOT / "runs" / "samples"
 
@@ -264,6 +267,7 @@ def main() -> None:
         for path, text in [
             (SCHEMA_PATH, schema_text()),
             (HANDOFF_SCHEMA_PATH, handoff_schema_text()),
+            (BASEMAP_SCHEMA_PATH, basemap_schema_text()),
         ]:
             path.write_text(text, encoding="utf-8")
             print(f"wrote {path.relative_to(ROOT)}")

@@ -30,6 +30,7 @@ from fastapi.staticfiles import StaticFiles
 
 from cuas.bus import Bus
 from cuas.clock import SimClock
+from cuas.dashboard.basemap import Basemap
 from cuas.dashboard.contract import (
     EvidenceEvent,
     ExportResult,
@@ -282,7 +283,10 @@ class Hub:
             self.publish(self.run.model_copy(update={"state": "ended"}))
 
 
-def create_app(hub: Hub, app_dir: Path = APP_DIR) -> FastAPI:
+def create_app(
+    hub: Hub, app_dir: Path = APP_DIR, basemap: Basemap | None = None
+) -> FastAPI:
+    """``basemap`` is drawn under the site; without one, frontends draw the local grid."""
     app = FastAPI(
         title="C-UAS dashboard", docs_url=None, redoc_url=None, openapi_url=None
     )
@@ -338,6 +342,15 @@ def create_app(hub: Hub, app_dir: Path = APP_DIR) -> FastAPI:
         if path is None:
             raise HTTPException(status_code=404, detail="no such recording in this run")
         return FileResponse(path, media_type="video/mp4")
+
+    @app.get("/api/basemap")
+    def get_basemap() -> Basemap:
+        if basemap is None:
+            raise HTTPException(
+                status_code=404,
+                detail="no basemap on this machine: draw the local grid",
+            )
+        return basemap
 
     @app.get("/api/contract")
     def get_contract() -> dict:

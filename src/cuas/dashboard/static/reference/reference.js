@@ -2,7 +2,10 @@
 // nothing loaded from outside this server. It proves the stream works; it is not the dashboard.
 "use strict";
 
-const state = { profiles: [], run: null, frame: null, selected: null };
+const state = { profiles: [], run: null, frame: null, selected: null, basemap: null, cache: null };
+const GRID_M = 500;
+const ROAD_WIDTH = { motorway: 3, trunk: 2.5, primary: 2, secondary: 1.5, tertiary: 1 };
+const SIMULATED = "Simulated scenario: fictional site";
 const $ = (id) => document.getElementById(id);
 const LEVEL_COLOUR = { red: "#ff5c5c", amber: "#ffb347", info: "#9aa" };
 const esc = (text) => String(text).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -72,28 +75,115 @@ function draw() {
 function toScreen(site, canvas) {
   const b = site.bounds;
   const scale = Math.min(canvas.width / (b.max_x - b.min_x), canvas.height / (b.max_y - b.min_y));
+  const left = (canvas.width - (b.max_x - b.min_x) * scale) / 2;  // centred
+  const bottom = (canvas.height - (b.max_y - b.min_y) * scale) / 2;
   return {
     scale,
-    at: (x, y) => [(x - b.min_x) * scale, canvas.height - (y - b.min_y) * scale],
+    at: (x, y) => [left + (x - b.min_x) * scale, canvas.height - bottom - (y - b.min_y) * scale],
   };
+}
+
+async function loadBasemap() {
+  const response = await fetch("/api/basemap");  // 404: no basemap on this machine
+  state.basemap = response.ok ? await response.json() : null;
+  draw();
+}
+
+// One transform for everything: the basemap is already in site metres (docs/mapping.md).
+function drawBackground(ctx, view, canvas, site) {
+  if (!state.basemap) {
+    drawGrid(ctx, view, site.bounds);
+    return;
+  }
+  const key = `${canvas.width}x${canvas.height}`;
+  if (!state.cache || state.cache.key !== key) {  // draw the map once, then copy it
+    const layer = document.createElement("canvas");
+    layer.width = canvas.width; layer.height = canvas.height;
+    paintBasemap(layer.getContext("2d"), view, state.basemap);
+    state.cache = { key, layer };
+  }
+  ctx.drawImage(state.cache.layer, 0, 0);
+}
+
+function path(ctx, view, line) {
+  line.forEach(([x, y], i) => (i ? ctx.lineTo(...view.at(x, y)) : ctx.moveTo(...view.at(x, y))));
+}
+
+function fillAreas(ctx, view, areas, colour) {
+  ctx.fillStyle = colour;
+  for (const area of areas) {
+    ctx.beginPath();
+    for (const ring of area.rings) { path(ctx, view, ring); ctx.closePath(); }
+    ctx.fill("evenodd");  // later rings are holes: islands in the sea
+  }
+}
+
+function strokeLines(ctx, view, lines, colour, width) {
+  ctx.strokeStyle = colour; ctx.lineWidth = width;
+  for (const line of lines) { ctx.beginPath(); path(ctx, view, line); ctx.stroke(); }
+}
+
+function paintBasemap(ctx, view, map) {
+  const b = map.bounds;
+  const [x0, y0] = view.at(b.min_x, b.max_y);
+  const [x1, y1] = view.at(b.max_x, b.min_y);
+  ctx.fillStyle = "#2b3038"; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);  // land
+  fillAreas(ctx, view, map.sea, "#173149");
+  fillAreas(ctx, view, map.water, "#1d3f5e");
+  fillAreas(ctx, view, map.green, "#2f4535");
+  ctx.setLineDash([4, 3]);
+  strokeLines(ctx, view, map.rail, "#5a5f66", 1);
+  ctx.setLineDash([]);
+  for (const road of map.roads) strokeLines(ctx, view, [road.line], "#626873", ROAD_WIDTH[road.kind] || 1);
+  strokeLines(ctx, view, map.coastline, "#4d7ea8", 1.5);
+  ctx.lineWidth = 1;
+}
+
+function drawGrid(ctx, view, b) {
+  ctx.strokeStyle = "#333a44"; ctx.lineWidth = 1;
+  for (let x = Math.ceil(b.min_x / GRID_M) * GRID_M; x <= b.max_x; x += GRID_M) {
+    ctx.beginPath(); path(ctx, view, [[x, b.min_y], [x, b.max_y]]); ctx.stroke();
+  }
+  for (let y = Math.ceil(b.min_y / GRID_M) * GRID_M; y <= b.max_y; y += GRID_M) {
+    ctx.beginPath(); path(ctx, view, [[b.min_x, y], [b.max_x, y]]); ctx.stroke();
+  }
+}
+
+function drawNotice(ctx, canvas) {  // always on: the map is real, the scenario is not
+  const map = state.basemap;
+  const notice = map ? map.notice : `${SIMULATED} · local grid ${GRID_M} m (no basemap)`;
+  ctx.font = "bold 13px sans-serif";
+  ctx.fillStyle = "rgba(0, 0, 0, 0.6)"; ctx.fillRect(8, 8, ctx.measureText(notice).width + 16, 24);
+  ctx.fillStyle = "#ffd36b"; ctx.fillText(notice, 16, 25);
+  ctx.font = "11px sans-serif";
+  if (map) {
+    const width = ctx.measureText(map.attribution).width;
+    ctx.fillStyle = "rgba(0, 0, 0, 0.6)"; ctx.fillRect(canvas.width - width - 16, canvas.height - 20, width + 12, 16);
+    ctx.fillStyle = "#ddd"; ctx.fillText(map.attribution, canvas.width - width - 10, canvas.height - 8);
+  }
+  ctx.font = "10px sans-serif";
 }
 
 function drawMap(run, frame) {
   const canvas = $("map");
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (!run) return;
-  const view = toScreen(run.site, canvas);
+  const site = run ? run.site : state.basemap;  // the basemap shares the site's bounds
+  if (!site) { drawNotice(ctx, canvas); return; }
+  const view = toScreen(site, canvas);
+  drawBackground(ctx, view, canvas, site);
+  if (!run) { drawNotice(ctx, canvas); return; }
   for (const zone of run.site.zones) {  // outermost first
     ctx.beginPath();
-    zone.polygon.forEach(([x, y], i) => (i ? ctx.lineTo(...view.at(x, y)) : ctx.moveTo(...view.at(x, y))));
+    path(ctx, view, zone.polygon);
     ctx.closePath();
-    ctx.fillStyle = `rgba(80, 110, 160, ${0.12 + 0.25 * zone.weight})`;
+    ctx.fillStyle = `rgba(80, 110, 160, ${0.08 + 0.2 * zone.weight})`;
     ctx.fill();
     const [lx, ly] = view.at(zone.polygon[0][0], zone.polygon[0][1]);
     ctx.fillStyle = "#cfd8e3";
     ctx.fillText(zone.label, lx + 4, ly - 4);
   }
+  if (frame) for (const wedge of frame.pre_alerts) drawWedge(ctx, view, wedge);
   const heard = new Set(frame ? frame.pickets_heard.map((p) => p.picket_id) : []);
   for (const picket of run.site.pickets) {
     const [x, y] = view.at(picket.x, picket.y);
@@ -105,11 +195,9 @@ function drawMap(run, frame) {
     ctx.fillStyle = "#dde"; ctx.fillRect(x - 5, y - 5, 10, 10);
     ctx.fillText(station.station_id, x + 7, y + 4);
   }
-  if (frame) {
-    for (const wedge of frame.pre_alerts) drawWedge(ctx, view, wedge);
-    for (const track of frame.tracks) drawTrack(ctx, view, track);
-  }
+  if (frame) for (const track of frame.tracks) drawTrack(ctx, view, track);
   drawScaleAndNorth(ctx, view, canvas);
+  drawNotice(ctx, canvas);
 }
 
 function drawWedge(ctx, view, wedge) {
@@ -214,4 +302,5 @@ document.querySelectorAll("[data-action]").forEach((b) =>
   b.addEventListener("click", () => post("/api/run/control", { action: b.dataset.action })));
 document.querySelectorAll("[data-speed]").forEach((b) =>
   b.addEventListener("click", () => post("/api/run/control", { action: "speed", speed: Number(b.dataset.speed) })));
+loadBasemap();
 connect();

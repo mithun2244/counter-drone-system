@@ -381,6 +381,7 @@ async def run(args: argparse.Namespace, site: SiteConfig) -> None:
 async def serve_dashboard(args: argparse.Namespace, site: SiteConfig) -> None:
     from live_runs import LiveLauncher
 
+    from cuas.dashboard.basemap import StaleBasemap, load_basemap
     from cuas.dashboard.replay import ReplayLauncher
     from cuas.dashboard.server import Hub, Launcher, create_app, serve
 
@@ -389,9 +390,18 @@ async def serve_dashboard(args: argparse.Namespace, site: SiteConfig) -> None:
         launcher = LiveLauncher(CONFIG_DIR, DATA_DIR, MODELS_DIR, ROOT / "runs")
     else:
         launcher = ReplayLauncher(args.replay, site.simulation.tick_s)
+    try:
+        basemap = load_basemap(DATA_DIR, site.dashboard.basemap)
+    except StaleBasemap as error:
+        raise SystemExit(str(error)) from error
     host, port = site.dashboard.host, args.port or site.dashboard.port
     print(f"dashboard: http://{host}:{port}/  (reference page: /reference/)")
-    await serve(create_app(Hub(launcher)), host, port)
+    print(
+        f"basemap: {basemap.name}, fetched {basemap.fetched}"
+        if basemap
+        else "basemap: none (scripts/fetch_basemap.py); the local grid is drawn"
+    )
+    await serve(create_app(Hub(launcher), basemap=basemap), host, port)
 
 
 def main() -> None:

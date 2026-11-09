@@ -33,7 +33,7 @@
 
 ## Conventions
 
-- **Positions:** local ENU metres. x is east, y is north, and the origin is the site centre. Draw north up. There is no map background (`docs/mapping.md`).
+- **Positions:** local ENU metres. x is east, y is north, and the origin is the site centre. Draw north up. The basemap, if any, comes in the same metres (below, and `docs/mapping.md`).
 - **Angles:** degrees. Azimuth 0 is north and runs clockwise.
 - **Times:** simulated seconds from the start of the run.
 - **Numbers:** rounded to 3 decimal places when sent (1 mm, 0.001°, 1 ms, 0.001 probability).
@@ -153,6 +153,31 @@ Errors return `{"detail": "..."}`, always a string: `404` for an unknown alert, 
 | `POST /api/alerts/{alert_id}/export` | — | `alert_id`, `path`, `sha256`, and the hand-off `package` (`docs/handoff.schema.json`). Every alert is also exported when the run ends |
 | `GET /api/clips/{station}/{clip}` | — | The recording (H.264 MP4), for a `<video>` element. Seek to `at_s` |
 | `GET /api/contract` | — | This contract's JSON Schema |
+| `GET /api/basemap` | — | The display basemap in site metres (`docs/basemap.schema.json`), or `404` when this machine has none: draw the local grid then. Added after version 1 without changing any message |
+
+## The map: basemap, one transform, fallback
+
+The site and every position stay in local ENU metres. The basemap is already in the same metres, projected once by `scripts/fetch_basemap.py` around the anchor in `config/site.yaml` (`docs/mapping.md`). So a dashboard needs exactly one transform, ENU metres to screen, for everything it draws:
+
+- Fit `run.site.bounds` to the canvas, north up. Before a run starts, the basemap's own `bounds` are the same box.
+- Draw in this order:
+  1. basemap: land as the background, then `sea`, `water`, `green`, `rail`, `roads` (`kind` sets the width), `coastline`
+  2. zones, outermost first
+  3. picket and acoustic wedges (`pre_alerts`)
+  4. pickets, then stations
+  5. tracks, with trails and velocity arrows
+- Areas are lists of rings: the first ring is the outline, any others are holes. Fill them even-odd.
+- Keep the basemap's `notice` ("Simulated scenario: …") and `attribution` ("© OpenStreetMap contributors (ODbL)") visible at all times, as plain text. The licence requires the attribution.
+- If `GET /api/basemap` answers `404`, draw a local grid and say so, still with a "Simulated scenario" label.
+- Never convert to latitude and longitude in the dashboard. The `anchor` in the basemap is for reference only.
+
+The reference page does all of this; `static/reference/reference.js` (`drawBackground`, `paintBasemap`, `drawNotice`) is the worked example.
+
+**State, pause and repeated frames:**
+- Replace your state from each `frame`, including one that repeats the previous `t` while paused. It is sent again because an evidence record was written, and its cards carry the new `label` and `evidence_records`, and the new `evidence_head`.
+- Take a track's trail from `track.trail` only. Do not append the track's position yourself on each frame, or a repeated frame adds a duplicate point. If you keep your own history, key it by `(track_id, t)`.
+
+**Export:** label the action "Export hand-off JSON", since it saves a file. Show the saved `path` (relative to the run folder) and the `sha256` from the response.
 
 ## Operator actions: Confirm, Dismiss, Export
 

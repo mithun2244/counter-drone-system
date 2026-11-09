@@ -1,0 +1,254 @@
+{
+ "$defs": {
+  "Anchor": {
+   "additionalProperties": false,
+   "properties": {
+    "heading_deg": {
+     "title": "Heading Deg",
+     "type": "number"
+    },
+    "lat": {
+     "title": "Lat",
+     "type": "number"
+    },
+    "lon": {
+     "title": "Lon",
+     "type": "number"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    }
+   },
+   "required": [
+    "name",
+    "lat",
+    "lon",
+    "heading_deg"
+   ],
+   "title": "Anchor",
+   "type": "object"
+  },
+  "Area": {
+   "additionalProperties": false,
+   "description": "Rings in site metres: the first is the outline, any others are holes (draw even-odd).",
+   "properties": {
+    "rings": {
+     "items": {
+      "items": {
+       "maxItems": 2,
+       "minItems": 2,
+       "prefixItems": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "number"
+        }
+       ],
+       "type": "array"
+      },
+      "type": "array"
+     },
+     "title": "Rings",
+     "type": "array"
+    }
+   },
+   "required": [
+    "rings"
+   ],
+   "title": "Area",
+   "type": "object"
+  },
+  "Bounds": {
+   "additionalProperties": false,
+   "properties": {
+    "max_x": {
+     "title": "Max X",
+     "type": "number"
+    },
+    "max_y": {
+     "title": "Max Y",
+     "type": "number"
+    },
+    "min_x": {
+     "title": "Min X",
+     "type": "number"
+    },
+    "min_y": {
+     "title": "Min Y",
+     "type": "number"
+    }
+   },
+   "required": [
+    "min_x",
+    "min_y",
+    "max_x",
+    "max_y"
+   ],
+   "title": "Bounds",
+   "type": "object"
+  },
+  "Road": {
+   "additionalProperties": false,
+   "properties": {
+    "kind": {
+     "title": "Kind",
+     "type": "string"
+    },
+    "line": {
+     "items": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "number"
+       }
+      ],
+      "type": "array"
+     },
+     "title": "Line",
+     "type": "array"
+    }
+   },
+   "required": [
+    "kind",
+    "line"
+   ],
+   "title": "Road",
+   "type": "object"
+  }
+ },
+ "additionalProperties": false,
+ "properties": {
+  "anchor": {
+   "$ref": "#/$defs/Anchor"
+  },
+  "attribution": {
+   "title": "Attribution",
+   "type": "string"
+  },
+  "bounds": {
+   "$ref": "#/$defs/Bounds"
+  },
+  "coastline": {
+   "items": {
+    "items": {
+     "maxItems": 2,
+     "minItems": 2,
+     "prefixItems": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "number"
+      }
+     ],
+     "type": "array"
+    },
+    "type": "array"
+   },
+   "title": "Coastline",
+   "type": "array"
+  },
+  "fetched": {
+   "title": "Fetched",
+   "type": "string"
+  },
+  "green": {
+   "items": {
+    "$ref": "#/$defs/Area"
+   },
+   "title": "Green",
+   "type": "array"
+  },
+  "licence": {
+   "title": "Licence",
+   "type": "string"
+  },
+  "name": {
+   "title": "Name",
+   "type": "string"
+  },
+  "notice": {
+   "title": "Notice",
+   "type": "string"
+  },
+  "projection": {
+   "title": "Projection",
+   "type": "string"
+  },
+  "rail": {
+   "items": {
+    "items": {
+     "maxItems": 2,
+     "minItems": 2,
+     "prefixItems": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "number"
+      }
+     ],
+     "type": "array"
+    },
+    "type": "array"
+   },
+   "title": "Rail",
+   "type": "array"
+  },
+  "raw_sha256": {
+   "title": "Raw Sha256",
+   "type": "string"
+  },
+  "roads": {
+   "items": {
+    "$ref": "#/$defs/Road"
+   },
+   "title": "Roads",
+   "type": "array"
+  },
+  "sea": {
+   "items": {
+    "$ref": "#/$defs/Area"
+   },
+   "title": "Sea",
+   "type": "array"
+  },
+  "source": {
+   "title": "Source",
+   "type": "string"
+  },
+  "water": {
+   "items": {
+    "$ref": "#/$defs/Area"
+   },
+   "title": "Water",
+   "type": "array"
+  }
+ },
+ "required": [
+  "name",
+  "notice",
+  "attribution",
+  "licence",
+  "source",
+  "fetched",
+  "raw_sha256",
+  "projection",
+  "anchor",
+  "bounds",
+  "sea",
+  "water",
+  "green",
+  "roads",
+  "rail",
+  "coastline"
+ ],
+ "title": "Basemap",
+ "type": "object"
+}
