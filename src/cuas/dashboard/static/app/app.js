@@ -4,8 +4,10 @@
 
 const state = {
   profiles: [], run: null, frame: null, frameWall: 0, basemap: null, ttis: new Map(),
-  selected: null, looks: [], sounds: [],
+  selected: null, lastCard: null, looks: [], source: null, sounds: [], results: new Map(), collapsed: false,
 };
+const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+const STATIONARY_MPS = 0.5;  // below this ground speed a course means nothing
 const $ = (id) => document.getElementById(id);
 
 function el(tag, className, text) {
@@ -210,13 +212,10 @@ function sensorTable(sensors) {
   return table;
 }
 
-// --- drawing ---
-
 // --- operator actions: labels and hand-off export (dashboard_contract.md) ---
 
 async function act(button, alertId) {
   const action = button.dataset.action;
-  const result = button.closest(".card").querySelector(".result");
   button.dataset.busy = "1";
   button.disabled = true;
   button.textContent = t("saving");
@@ -225,17 +224,22 @@ async function act(button, alertId) {
   button.dataset.busy = "";
   button.textContent = t(action);
   button.disabled = !state.run || state.run.state === "ended";
-  result.className = reply ? "result" : "result error";
-  if (!reply) { result.textContent = $("message").textContent; return; }
-  if (action === "export") {  // the saved file and its hash: the response is rounded, the file is not
-    result.replaceChildren(el("div", "copy", t("exported", { path: reply.path })),
-      el("div", "copy", t("sha256", { hash: reply.sha256 })));
-  } else {
-    result.textContent = t("labelSaved", { label: t(`labelled.${action}`), seq: reply.seq });
-  }
+  let lines;
+  if (!reply) lines = [$("message").textContent];
+  else if (action === "export") lines = [t("exported", { path: reply.path }), t("sha256", { hash: reply.sha256 })];
+  else lines = [t("labelSaved", { label: t(`labelled.${action}`), seq: reply.seq })];
+  state.results.set(alertId, { error: !reply, lines });  // the file's hash: the response is rounded, the file is not
+  const card = button.closest(".card");
+  if (card) showResult(card.querySelector(".result"), state.results.get(alertId));
+  renderDetails();
 }
 
-// --- selected alert: map ring, clip and recorded audio ---
+function showResult(node, result) {
+  node.className = result.error ? "result error" : "result";
+  node.replaceChildren(...result.lines.map((line) => el("div", "copy", line)));
+}
+
+// --- selected alert: map ring, video over the map, details and evidence ---
 
 function selectedCard() {
   return state.selected && state.frame ? state.frame.alerts.find((a) => a.alert_id === state.selected) : null;
@@ -243,20 +247,28 @@ function selectedCard() {
 
 function select(alertId) {
   state.selected = alertId;
-  const card = selectedCard();
-  showLooks(card ? card.looks : [], true);
+  state.lastCard = selectedCard();
+  state.source = null;
+  const card = state.lastCard;
+  refreshTabs(card ? card.looks : []);
+  if (state.looks.length) loadSource(state.looks[0].source, true);
+  else { $("clip").removeAttribute("src"); $("clip").load(); }
   showSounds(card ? card.sounds : []);
-  if (alertId) return;
-  $("clip-note").textContent = t("pickAlert");
-  $("sounds").replaceChildren();  // nothing selected: no "no audio for this alert" yet
+  $("details-panel").hidden = !alertId;
+  $("video-overlay").hidden = !alertId;
 }
 
 const urls = (items) => items.map((i) => i.clip_url).join();
 
-function refreshMedia() {  // recordings can join an alert after it was selected: never mid-play
+// Each frame: tabs and audio rows follow the alert, but the loaded clip is never reloaded, so the
+// chosen source and playback survive updates. A tab click loads that source's newest clip.
+function refreshMedia() {
   const card = selectedCard();
   if (!card) return;
-  if ($("clip").paused && urls(card.looks) !== urls(state.looks)) showLooks(card.looks, false);
+  state.lastCard = card;
+  refreshTabs(card.looks);
+  const kept = state.looks.some((l) => l.source === state.source);
+  if (state.looks.length && (!state.source || !kept) && $("clip").paused) loadSource(state.looks[0].source, false);
   if ($("audio").paused && urls(card.sounds) !== urls(state.sounds)) showSounds(card.sounds);
 }
 
@@ -266,29 +278,93 @@ function lookName(look) {
   return `${station} ${name === `lookKind.${kind}` ? kind : name}`;
 }
 
-function showLooks(looks, autoplay) {
-  const current = state.looks[Number($("looks").dataset.index)];
-  state.looks = [...looks].sort((a, b) => b.source.endsWith(".zoom") - a.source.endsWith(".zoom"));  // zoom first
-  $("looks").replaceChildren(...state.looks.map((look, i) => {
-    const button = el("button", "", lookName(look));
-    button.dataset.index = i;
-    return button;
-  }));
-  const keep = current ? state.looks.findIndex((l) => l.source === current.source) : -1;
-  if (state.looks.length) { playLook(Math.max(keep, 0), autoplay); return; }
-  $("looks").dataset.index = "";
-  $("clip").removeAttribute("src");
-  $("clip").load();
-  $("clip-note").textContent = t("noClip");
+function refreshTabs(looks) {  // keyed by source; zoom first
+  state.looks = [...looks].sort((a, b) => b.source.endsWith(".zoom") - a.source.endsWith(".zoom"));
+  const names = state.looks.map((l) => l.source).join();
+  if (names !== [...$("looks").children].map((b) => b.dataset.source).join()) {
+    $("looks").replaceChildren(...state.looks.map((look) => {
+      const button = el("button", "", lookName(look));
+      button.dataset.source = look.source;
+      button.setAttribute("role", "tab");
+      return button;
+    }));
+  }
+  for (const b of $("looks").children) {
+    const on = b.dataset.source === state.source;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-selected", String(on));
+  }
+  $("video-overlay").classList.toggle("empty", !state.source);
+  if (!state.source) $("clip-note").textContent = state.looks.length ? "" : t("noClip");
 }
 
-function playLook(index, autoplay) {  // the RGB / thermal / zoom toggle
-  const look = state.looks[index];
-  $("looks").dataset.index = index;
-  for (const b of $("looks").children) b.classList.toggle("on", Number(b.dataset.index) === index);
+function loadSource(source, autoplay) {  // the RGB / thermal / zoom tabs
+  const look = state.looks.find((l) => l.source === source);
+  if (!look) return;
+  state.source = source;
   $("clip").src = `${look.clip_url}#t=${look.at_s}`;  // media fragment: start near the look
   $("clip-note").textContent = t("clipAt", { source: look.source, at: look.at_s.toFixed(1) });
+  refreshTabs(state.looks);
   if (autoplay) $("clip").play().catch(() => {});  // a blocked autoplay leaves the controls
+}
+
+function setCollapsed(collapsed) {
+  state.collapsed = collapsed;
+  $("video-overlay").classList.toggle("collapsed", collapsed);
+  $("collapse").textContent = collapsed ? t("expand") : t("collapse");
+  $("collapse").title = collapsed ? t("expandLabel") : t("collapseLabel");
+  $("collapse").setAttribute("aria-expanded", String(!collapsed));
+}
+
+function trackFacts(track) {  // each value with its unit
+  const speed = Math.hypot(track.vx, track.vy);
+  const course = Math.round((((Math.atan2(track.vx, track.vy) * 180) / Math.PI) + 360) % 360) % 360;  // clockwise from north
+  return {
+    track: `${track.track_id} · ${track.status}`,
+    position: t("positionValue", {
+      x: Math.abs(track.x).toFixed(0), ew: track.x < 0 ? "W" : "E", y: Math.abs(track.y).toFixed(0), ns: track.y < 0 ? "S" : "N",
+    }),
+    altitude: t("altitudeValue", { z: track.z.toFixed(0) }),
+    speed: t("speedValue", { ms: speed.toFixed(1), kmh: (speed * 3.6).toFixed(0) }),
+    course: speed < STATIONARY_MPS ? t("stationary") : t("courseValue", { deg: course, compass: COMPASS[Math.round(course / 45) % 8] }),
+    stations: String(track.n_stations),
+    coasting: track.coasting ? t("coastingYes") : t("coastingNo"),
+  };
+}
+
+function renderDetails() {
+  if (!state.selected) return;
+  const card = selectedCard() || state.lastCard;
+  if (!card) { $("details").replaceChildren(el("p", "note", t("alertGone"))); $("evidence").replaceChildren(); return; }
+  const track = state.frame ? state.frame.tracks.find((tr) => tr.track_id === card.track_id) : null;  // joined by track_id
+  const facts = track ? trackFacts(track) : null;
+  const where = card.zone_label ? t(`approach.${card.approach}`, { zone: card.zone_label }) : t("approach.none");
+  const tti = card.tti_s === null ? t("noTti") : `${t("tti")} ${card.tti_s.toFixed(0)} s`;
+  const summary = el("p", `summary level ${card.level}`,
+    `${t(`level.${card.level}`)} · ${t(`classKey.${card.class_key}`)} ${Math.round(100 * card.confidence)}% · ${tti} · ${where}`);
+  const table = el("table");
+  const row = (key, value) => {
+    const tr = table.insertRow();
+    tr.append(el("th", "", t(`detail.${key}`)));
+    const td = tr.insertCell();
+    td.dataset.key = key;
+    td.textContent = value;
+    if (value.startsWith(t("unavailable"))) td.className = "unavailable";
+  };
+  row("track", facts ? facts.track : card.track_id);
+  row("updated", state.frame ? clock(state.frame.t) : t("unavailable"));
+  for (const key of ["position", "altitude", "speed", "course", "stations", "coasting"]) {
+    row(key, facts ? facts[key] : t("noTrack", { id: card.track_id }));
+  }
+  $("details").replaceChildren(summary, table, el("p", "note", t("detailsNote")));
+  if (!selectedCard()) $("details").append(el("p", "note", t("alertGone")));
+  const evidence = [
+    el("p", card.label ? "label" : "unavailable", card.label ? t(`labelled.${card.label}`) : t("noLabel")),
+    el("p", "", card.evidence_records === 1 ? t("oneRecord") : t("records", { n: card.evidence_records })),
+  ];
+  const result = state.results.get(card.alert_id);
+  if (result) { const node = el("div"); showResult(node, result); evidence.push(node); }
+  $("evidence").replaceChildren(...evidence);
 }
 
 function showSounds(sounds) {
@@ -324,6 +400,7 @@ function render() {
   renderTopBar();
   renderQueue();
   renderStatus();
+  renderDetails();
   const card = selectedCard();
   drawMap($("map"), { run: state.run, frame: state.frame, basemap: state.basemap, selectedTrack: card && card.track_id,
     rays: $("rays").checked, closeUp: $("close-up").checked });
@@ -352,9 +429,11 @@ $("alerts").addEventListener("keydown", (event) => {
   if (event.key === "Enter" && event.target.classList.contains("card")) { select(event.target.dataset.alert); render(); }
 });
 $("looks").addEventListener("click", (event) => {
-  const button = event.target.closest("button");
-  if (button) playLook(Number(button.dataset.index), true);
+  const button = event.target.closest("button[data-source]");
+  if (button) loadSource(button.dataset.source, true);
 });
+$("collapse").addEventListener("click", () => setCollapsed(!state.collapsed));
+setCollapsed(false);
 $("sounds").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-src]");
   if (button) playSound(button);

@@ -29,31 +29,41 @@
     <span id="message" role="status"></span>
   </header>
   <main>
-    <section id="map-panel"><canvas id="map"></canvas></section>
-    <section id="queue-panel">
+    <section id="status-panel">
       <div id="banner" role="alert" hidden></div>
-      <h2 data-text="alertQueue"></h2>
-      <ol id="alerts"></ol>
-      <ul id="pre-alerts"></ul>
-      <p id="all-clear"></p>
+      <h2 data-text="status"></h2>
+      <div id="status"></div>
     </section>
-    <section id="clip-panel">
-      <div class="video-side">
-        <h2 data-text="clip"></h2>
-        <div id="looks" class="choices"></div>
-        <video id="clip" controls muted playsinline></video>
-        <div id="clip-note" class="note"></div>
+    <section id="map-panel">
+      <canvas id="map"></canvas>
+      <div id="video-overlay" hidden>
+        <div class="overlay-head">
+          <div id="looks" class="tabs" role="tablist"></div>
+          <button id="collapse" aria-expanded="true"></button>
+        </div>
+        <div class="overlay-body">
+          <video id="clip" controls muted playsinline></video>
+          <div id="clip-note" class="note"></div>
+        </div>
       </div>
-      <div class="audio-side">
-        <h2 data-text="audioTitle"></h2>
+    </section>
+    <section id="side">
+      <div id="queue-panel">
+        <h2 data-text="alertQueue"></h2>
+        <ol id="alerts"></ol>
+        <ul id="pre-alerts"></ul>
+        <p id="all-clear"></p>
+      </div>
+      <div id="details-panel" hidden>
+        <h2 data-text="selected"></h2>
+        <div id="details"></div>
+        <h3 data-text="evidence"></h3>
+        <div id="evidence"></div>
+        <h3 data-text="audioTitle"></h3>
         <div class="note" data-text="audioNote"></div>
         <ul id="sounds"></ul>
         <audio id="audio"></audio>
       </div>
-    </section>
-    <section id="status-panel">
-      <h2 data-text="status"></h2>
-      <div id="status"></div>
     </section>
   </main>
   <script src="text.js"></script>

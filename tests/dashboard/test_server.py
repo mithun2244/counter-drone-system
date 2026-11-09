@@ -318,3 +318,32 @@ def test_the_operator_dashboard_shows_the_required_wording() -> None:
     assert "Engine heard, {compass}, unconfirmed" in text
     assert "Simulated scenario: fictional site · local grid {grid} m" in text
     assert "basemap.notice" in script and "basemap.attribution" in script
+
+
+def test_the_operator_dashboard_layout_and_selected_track_details() -> None:
+    """Three columns with the video over the map and audio in the selected alert's evidence
+    panel; track details say so in words when a value is unavailable."""
+    app = STATIC / "app"
+    page = (app / "index.html").read_text(encoding="utf-8")
+    text = (app / "text.js").read_text(encoding="utf-8")
+    assert (
+        page.index('id="status-panel"')
+        < page.index('id="map-panel"')
+        < page.index('id="side"')
+    )
+    overlay = page[page.index('id="map-panel"') : page.index('id="side"')]
+    assert (
+        'id="video-overlay"' in overlay
+        and 'id="clip"' in overlay
+        and 'id="collapse"' in overlay
+    )
+    details = page[page.index('id="details-panel"') :]
+    assert (
+        'id="sounds"' in details
+        and 'id="audio"' in details
+        and 'id="evidence"' in details
+    )
+    assert 'id="clip-panel"' not in page
+    assert "unavailable: track {id} not in this frame" in text
+    assert "unavailable: near-stationary" in text
+    assert "metres from the site origin" in text and "clockwise from north" in text

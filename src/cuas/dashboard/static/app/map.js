@@ -276,9 +276,9 @@ function drawScaleAndNorth(ctx, view, width, height) {
   ctx.font = "12px system-ui, sans-serif";
   ctx.beginPath(); ctx.moveTo(16, height - 34); ctx.lineTo(16 + length, height - 34); ctx.stroke();
   ctx.fillText(`${MAP.scaleBar} m`, 16, height - 40);
-  ctx.beginPath(); ctx.moveTo(width - 24, 74); ctx.lineTo(width - 24, 44); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(width - 30, 52); ctx.lineTo(width - 24, 44); ctx.lineTo(width - 18, 52); ctx.stroke();
-  ctx.fillText("N", width - 28, 38);
+  ctx.beginPath(); ctx.moveTo(24, 86); ctx.lineTo(24, 56); ctx.stroke();  // top left, under the notice:
+  ctx.beginPath(); ctx.moveTo(18, 64); ctx.lineTo(24, 56); ctx.lineTo(30, 64); ctx.stroke();  // the video sits top right
+  ctx.fillText("N", 20, 52);
   ctx.lineWidth = 1;
 }
 
