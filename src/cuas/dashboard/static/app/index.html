@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>C-UAS operator dashboard</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header id="top">
+    <div id="start">
+      <label><span data-text="profile"></span> <select id="profile"></select></label>
+      <label><span data-text="scenario"></span> <select id="scenario"></select></label>
+      <label><input type="checkbox" id="media"> <span data-text="recordedMedia"></span></label>
+      <label><span data-text="zoomCameras"></span>
+        <select id="zoom"><option value="" data-text="zoomDefault"></option><option>0</option><option>1</option><option>2</option></select>
+      </label>
+      <button id="go" class="primary" data-text="start"></button>
+    </div>
+    <div id="running">
+      <strong id="run-title"></strong>
+      <span id="clock" class="clock"></span>
+      <button id="play-pause"></button>
+      <span class="speeds"><button data-speed="1">1×</button><button data-speed="2">2×</button><button data-speed="5">5×</button></span>
+      <label><input type="checkbox" id="rays"> <span data-text="rays"></span></label>
+      <label><input type="checkbox" id="close-up"> <span data-text="closeUp"></span></label>
+    </div>
+    <span id="message" role="status"></span>
+  </header>
+  <main>
+    <section id="map-panel"><canvas id="map"></canvas></section>
+    <section id="queue-panel">
+      <div id="banner" role="alert" hidden></div>
+      <h2 data-text="alertQueue"></h2>
+      <ol id="alerts"></ol>
+      <ul id="pre-alerts"></ul>
+      <p id="all-clear"></p>
+    </section>
+    <section id="clip-panel">
+      <h2 data-text="clip"></h2>
+    </section>
+    <section id="status-panel">
+      <h2 data-text="status"></h2>
+      <div id="status"></div>
+    </section>
+  </main>
+  <script src="text.js"></script>
+  <script src="map.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
