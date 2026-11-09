@@ -230,7 +230,7 @@ A test edits every stored file of a finished run, one at a time, by flipping one
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ Top bar: run · sim clock · ▶/❚❚ · speed 1x/2x/5x · bearing rays · close-up │
+│ Top bar: run · clock · ▶/❚❚ · 1x/2x/5x · sectors · rays · close-up       │
 ├──────────────┬──────────────────────────────────────┬────────────────────┤
 │ SYSTEM       │ notice                ┌────────────┐ │ ALERT QUEUE        │
 │ STATUS       │                       │ VIDEO      │ │ (server ranking)   │
@@ -238,20 +238,21 @@ A test edits every stored file of a finished run, one at a time, by flipping one
 │ banner       │        SITE MAP       │ clip       │ │ Confirm · Dismiss  │
 │ stations and │  zones · stations ·   └────────────┘ │ Export hand-off    │
 │ sensors      │  pickets · wedges · tracks · trails  ├────────────────────┤
-│ faults       │                                      │ SELECTED ALERT     │
-│ evidence     │                                      │ track details      │
-│ head         │ scale              attribution       │ evidence · audio   │
+│ faults       │  grid continues edge to edge         │ SELECTED ALERT     │
+│ evidence head│  ("Outside basemap coverage")        │ track details      │
+│ ACOUSTIC     │                                      │ evidence · audio   │
+│ DETECTIONS   │ scale              attribution       │                    │
 └──────────────┴──────────────────────────────────────┴────────────────────┘
 ```
 
-Chosen by the user on 2026-11-09, replacing a bottom clip and status strip, to give the map more room. Status is on the left; the map is in the centre; the ranked queue is on the right, with the selected alert below it.
+Chosen by the user on 2026-11-09, replacing a bottom clip and status strip, to give the map more room. Status, with the acoustic detections list under it, is on the left; the map is in the centre; the ranked queue is on the right, with the selected alert below it.
 
 - **Video over the map**, at the upper right, below the notice line and clear of the attribution. It has one tab per recording (zoom first, then RGB and thermal per station) and a collapse/expand button. WebSocket updates never reload the clip that is loaded, so the chosen tab and its playback carry on; a tab click loads that source's newest clip.
 - **Selected alert panel.** It shows the alert, joined to its track by `track_id`:
   - estimated position, in metres east or west and north or south of the site origin
   - altitude, in metres relative to the site origin
   - ground speed, from `vx` and `vy`
-  - course, in degrees clockwise from north, from `vx` and `vy`. Below 0.5 m/s it reads "unavailable: near-stationary"
+  - direction of travel, in degrees clockwise from north, from `vx` and `vy`. Below 0.5 m/s it reads "unavailable: near-stationary". It is labelled "Direction of travel" so it is not confused with the direction a microphone heard the drone from
   - the number of contributing stations
   - coasting
 
@@ -259,12 +260,12 @@ Chosen by the user on 2026-11-09, replacing a bottom clip and status strip, to g
 
 ### B2. Map
 
-- Top-down canvas, north up, scale bar.
+- Top-down canvas, north up, one uniform scale, filling its pane edge to edge. The site bounds are fitted and centred; the 500 m coordinate grid continues across the whole pane, and strips beyond the basemap are labelled "Outside basemap coverage". The scale bar and attribution sit on dark backing boxes.
 - **Zones:** filled polygons (critical darker).
 - **Stations:** squares. **Pickets:** small dots on the outer ring; a dot flashes when triggered.
 - **Tracks:** a dot with a trail (last 20 s) and a velocity arrow. Colour by level: red, amber, grey (info). Every colour also has a text label, so colour is never the only signal.
-- **Picket sectors:** a translucent wedge showing the coarse direction of an acoustic-only detection.
-- **Toggle:** show bearing rays from stations, useful for explaining triangulation in the demo.
+- **Acoustic sectors:** each active `pre_alert` (picket or station microphone) is a translucent amber wedge from its reported `x`, `y`, `bearing_deg` and `half_width_deg`, out to 2000 m, the same geometry as the reference page. It is labelled with the sensor and the direction heard from, for example "st3 · Engine heard east · Unconfirmed". Wedges are redrawn from each frame, so one that leaves the feed disappears. An **Acoustic sectors** toggle, on by default, shows or hides them. **Acoustic detections** under System status lists the same sectors: sensor, direction heard from, last heard and the number of reports.
+- **Toggles:** Acoustic sectors (on by default) and Bearing rays (off by default) are independent. Bearing rays show the stations' bearings, useful for explaining triangulation in the demo.
 
 ### B3. Alert card
 
