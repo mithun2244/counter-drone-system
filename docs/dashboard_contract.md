@@ -27,7 +27,9 @@
 | `/ws` | The stream |
 | `/api/...` | The HTTP API |
 
-**Run it:** `uv run python scripts/run_demo.py --dashboard --replay docs/samples/s1_seed1001.jsonl` serves a sample through the real server, then open `http://127.0.0.1:8000/`. Start the run the sample holds (S1 at the processing plant). Pause and speed work; the run ends when the sample does. Live runs arrive in step 5.
+**Run it:**
+- **Live:** `uv run python scripts/run_demo.py --dashboard`, then open `http://127.0.0.1:8000/`. Pick a site profile and scenario and start monitoring: the simulator plays the scenario as the live sensor feed, in real time. Each run gets a fresh folder, `runs/<scenario>_seed<seed>_<NNN>/`, and the run ID is its name. When a run ends, the server console prints its control digest, the same one `run_demo.py --scenario ... --fast` prints for that scenario, seed and zoom setting.
+- **Replay:** `uv run python scripts/run_demo.py --dashboard --replay docs/samples/s1_seed1001.jsonl` serves a sample through the same server. Start the run the sample holds (S1 at the processing plant). Pause and speed work; the run ends when the sample does.
 
 ## Conventions
 
@@ -82,7 +84,7 @@ Draw the scale bar and north arrow yourself.
 
 ### `frame`
 
-A full snapshot every 0.4 s of simulated time: 2.5 a second at 1× speed, which meets `prd.md` FR-11's minimum of 2. Each frame replaces the last, so nothing needs to be merged. In a live run, a frame can show the control layer's state up to one 0.2 s batch behind.
+A full snapshot every 0.4 s of simulated time: 2.5 a second at 1× speed, which meets `prd.md` FR-11's minimum of 2. Each frame replaces the last, so nothing needs to be merged. In a live run, a frame goes out one 0.2 s tick after its mark, and can show the control layer's state up to one 0.2 s batch behind.
 
 | Field | Meaning |
 | --- | --- |
@@ -140,7 +142,7 @@ The B4 card is "Engine heard, `compass`, unconfirmed".
 
 ## HTTP API
 
-Served now, except label and export, which arrive with the evidence store (step 6). Errors return `{"detail": "..."}`, always a string: `404` for an unknown alert, clip, profile or scenario; `409` if a run is already active, or for control with no run; `422` for a bad body.
+Served now, except label and export, which arrive with the evidence store (step 6). Errors return `{"detail": "..."}`, always a string: `404` for an unknown alert, clip, profile or scenario, or recorded media this machine does not have; `409` if a run is already active, or for control with no run; `422` for a bad body.
 
 | Request | Body | Returns |
 | --- | --- | --- |

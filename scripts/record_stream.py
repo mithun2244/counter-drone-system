@@ -30,7 +30,13 @@ from cuas.dashboard.contract import (
     TrackView,
     schema_text,
 )
-from cuas.dashboard.frames import FrameBuilder, profiles, replay, site_map
+from cuas.dashboard.frames import (
+    FrameBuilder,
+    profiles,
+    replay,
+    run_info,
+    site_map,
+)
 from cuas.pipeline import start_pipeline
 from cuas.schemas.topics import GATEWAY_ACCEPTED, ZOOM_TASK
 from cuas.sim.engine import run_scenario
@@ -95,19 +101,8 @@ async def record(args: argparse.Namespace, seed: int) -> list[str]:
     accepted = [m async for m in accepted_tap]
     controlled = [m async for m in control_tap]
     known = profiles(all_metadata())
-    run = RunInfo(
-        run_id=run_id,
-        profile_id=next(p.profile_id for p in known if p.venue == meta.venue),
-        scenario_id=meta.id,
-        title=meta.title,
-        venue=meta.venue,
-        seed=seed,
-        duration_s=scenario.duration_s,
-        recorded_media=media is not None,
-        zoom_per_station=site.zoom_per_station,
-        state="running",
-        speed=1.0,
-        site=site_map(site, labels, site.dashboard.map_margin_fraction),
+    run = run_info(
+        run_id, meta, known, site, seed, scenario.duration_s, media is not None
     )
     frames = replay(FrameBuilder(run_id, site, labels), accepted, controlled)
     messages = [

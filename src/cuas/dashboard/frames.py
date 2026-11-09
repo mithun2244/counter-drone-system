@@ -20,6 +20,7 @@ from cuas.dashboard.contract import (
     PicketView,
     PreAlert,
     Ray,
+    RunInfo,
     ScenarioChoice,
     SensorView,
     SiteMap,
@@ -112,6 +113,32 @@ def profiles(scenarios: Sequence[ScenarioMetadata]) -> list[SiteProfile]:
     return out
 
 
+def run_info(
+    run_id: str,
+    meta: ScenarioMetadata,
+    known: Sequence[SiteProfile],
+    site: SiteConfig,
+    seed: int,
+    duration_s: float,
+    recorded_media: bool,
+) -> RunInfo:
+    """A run as it starts: running at 1x, with the map of its site."""
+    return RunInfo(
+        run_id=run_id,
+        profile_id=next(p.profile_id for p in known if p.venue == meta.venue),
+        scenario_id=meta.id,
+        title=meta.title,
+        venue=meta.venue,
+        seed=seed,
+        duration_s=duration_s,
+        recorded_media=recorded_media,
+        zoom_per_station=site.zoom_per_station,
+        state="running",
+        speed=1.0,
+        site=site_map(site, meta.zone_labels, site.dashboard.map_margin_fraction),
+    )
+
+
 class FrameBuilder:
     def __init__(self, run_id: str, site: SiteConfig, labels: ZoneLabels) -> None:
         self._run_id = run_id
@@ -139,11 +166,17 @@ class FrameBuilder:
     def ingest(self, message: Message) -> list[Frame]:
         """Take one message. Returns the frames for every mark it shows has passed."""
         t = getattr(message, "t", None)
+        frames = [] if t is None else self.advance(t)
+        self._apply(message)
+        return frames
+
+    def advance(self, t: float) -> list[Frame]:
+        """The frames for every mark before ``t``. A live run calls it on the clock, because
+        simulated time also passes while nothing is heard."""
         frames = []
-        while t is not None and t > self._mark() + EARLY:
+        while t > self._mark() + EARLY:
             frames.append(self._frame(self._mark()))
             self._next_k += 1
-        self._apply(message)
         return frames
 
     def flush(self) -> Frame:

@@ -4,6 +4,9 @@ With ``--scenario``, run that scenario and print what the sensors report, then w
 and the shared tracker made of it. The output depends only on the scenario, seed and config, so
 two runs with the same inputs are byte-identical, in fast mode or real time. Ground truth reaches
 only the evaluator; its ``[evaluator]`` lines are the only output that names targets.
+
+With ``--dashboard``, serve the dashboard locally. The operator picks a site profile and starts
+live runs from it (``live_runs.py``), or with ``--replay`` plays a recorded contract stream.
 """
 
 import argparse
@@ -344,14 +347,16 @@ async def run(args: argparse.Namespace, site: SiteConfig) -> None:
 
 
 async def serve_dashboard(args: argparse.Namespace, site: SiteConfig) -> None:
-    from cuas.dashboard.replay import ReplayLauncher
-    from cuas.dashboard.server import Hub, create_app, serve
+    from live_runs import LiveLauncher
 
+    from cuas.dashboard.replay import ReplayLauncher
+    from cuas.dashboard.server import Hub, Launcher, create_app, serve
+
+    launcher: Launcher
     if args.replay is None:
-        raise SystemExit(
-            "live dashboard runs arrive in Phase 5 step 5; use --replay FILE"
-        )
-    launcher = ReplayLauncher(args.replay, site.simulation.tick_s)
+        launcher = LiveLauncher(CONFIG_DIR, DATA_DIR, MODELS_DIR, ROOT / "runs")
+    else:
+        launcher = ReplayLauncher(args.replay, site.simulation.tick_s)
     host, port = site.dashboard.host, args.port or site.dashboard.port
     print(f"dashboard: http://{host}:{port}/  (reference page: /reference/)")
     await serve(create_app(Hub(launcher)), host, port)

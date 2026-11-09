@@ -83,6 +83,16 @@ def test_a_frame_for_each_mark_simulated_time_passes(
     assert builder.flush().t == pytest.approx(3 * period)
 
 
+def test_time_passing_with_nothing_heard_still_gives_frames_once_each(
+    builder: FrameBuilder, site: SiteConfig
+) -> None:
+    period = site.dashboard.frame_period_s
+    quiet = builder.advance(1.0)
+    assert [f.t for f in quiet] == pytest.approx([0.0, period, 2 * period])
+    assert builder.advance(1.0) == []
+    assert [f.t for f in feed(builder, track("trk-1", 1.4))] == [3 * period]
+
+
 def test_cards_keep_the_published_ranking_and_a_new_batch_replaces_it(
     builder: FrameBuilder,
 ) -> None:
