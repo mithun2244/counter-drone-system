@@ -246,7 +246,9 @@ function select(alertId) {
   const card = selectedCard();
   showLooks(card ? card.looks : [], true);
   showSounds(card ? card.sounds : []);
-  if (!alertId) $("clip-note").textContent = t("pickAlert");
+  if (alertId) return;
+  $("clip-note").textContent = t("pickAlert");
+  $("sounds").replaceChildren();  // nothing selected: no "no audio for this alert" yet
 }
 
 const urls = (items) => items.map((i) => i.clip_url).join();

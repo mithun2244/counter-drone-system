@@ -41,7 +41,7 @@ const TEXT = {
     engineHeard: "Engine heard, {compass}, unconfirmed",
     level: { red: "RED", amber: "AMBER", info: "INFO" },
     classKey: { attack: "Attack drone", drone: "Drone", unclassified: "Unclassified" },
-    approach: { inside: "Inside {zone}", heading_to: "Heading to {zone}", none: "No zone" },
+    approach: { inside: "Inside {zone}", heading_to: "Heading to {zone}", none: "Not heading to a zone" },
     stations: "{n} stations",
     oneStation: "1 station",
     coasting: "coasting",
