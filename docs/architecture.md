@@ -132,7 +132,9 @@ All parts talk only through typed messages on the bus. This mirrors the real sys
 | `ThreatAssessment` | threat → scheduler, dashboard, evidence | track_id, t, score, level, zone, time_to_impact_s, reasons, alert_id |
 | `CoverageStatus` | visibility → scheduler, dashboard | t, coverage_pct, warning |
 | `ZoomTask` | scheduler → station | station_id, t, camera_id, track_id, azimuth_deg, elevation_deg |
-| `EvidenceRecord` | evidence → dashboard | alert_id, track_id, clip_path, sha256, prev_hash |
+| `OperatorLabel` | dashboard → evidence | alert_id, label (confirm, dismiss), t, request_id |
+| `ExportRequest` | dashboard → evidence | alert_id, t, request_id |
+| `EvidenceRecord` | evidence → dashboard | seq, kind (alert, escalation, label, export), t, alert_id, track_ids, files (path and sha256 each), details, prev_hash, request_id, record_hash |
 | `RejectedMessage` | gateway → log | reason, raw |
 
 Rules:
@@ -147,6 +149,7 @@ Rules:
 - One Python process, `asyncio`.
 - Each component is an async task that subscribes to topics on the bus and publishes results.
 - The demo runs three in-process buses: **sensor** (simulator to gateway), **ingest** (gateway to control layer) and **control** (tracks and sectors onward). Each stage reads one and writes the next, so nothing reaches the tracker without passing the gateway, the observation digests stay unchanged, and the stages shut down in order.
+- A fourth bus, **evidence**, carries the operator's labels and export requests from the dashboard to the evidence keeper, and its records back. The keeper also reads the control bus. It closes the evidence bus once it has exported every alert at the end of a run.
 - The bus interface has `publish(topic, msg)`, `subscribe(topic)` and `close()`. `subscribe("#")` receives every message in publish order. The in-process version uses `asyncio.Queue`. An MQTT version can be added later without touching components.
 - The simulator drives the clock. It can run faster than real time for tests, or at real time for the live demo.
 

@@ -14,6 +14,7 @@ from cuas.dashboard.contract import (
     AlertCard,
     Bounds,
     CoverageView,
+    EvidenceHead,
     Frame,
     LookRef,
     PicketHeard,
@@ -33,6 +34,7 @@ from cuas.dashboard.contract import (
 from cuas.schemas import (
     BearingDetection,
     CoverageStatus,
+    EvidenceRecord,
     Message,
     PicketAlert,
     SectorTrack,
@@ -162,6 +164,9 @@ class FrameBuilder:
         self._zoom: dict[tuple[str, str], ZoomTask] = {}
         self._coverage: CoverageStatus | None = None
         self._sensors: dict[str, SensorStatus] = {}
+        self._head: EvidenceHead | None = None
+        self._records: dict[str, int] = {}
+        self._operator_labels: dict[str, str] = {}
 
     def ingest(self, message: Message) -> list[Frame]:
         """Take one message. Returns the frames for every mark it shows has passed."""
@@ -211,10 +216,19 @@ class FrameBuilder:
             self._sensors[message.sensor_id] = message
         elif isinstance(message, PicketAlert):
             self._picket_alerts.append(message)
+        elif isinstance(message, EvidenceRecord):
+            self._evidence(message)
         elif isinstance(message, BearingDetection):
             if self._rays and self._rays[0].t != message.t:
                 self._rays = []
             self._rays.append(message)
+
+    def _evidence(self, record: EvidenceRecord) -> None:
+        self._head = EvidenceHead(seq=record.seq, record_hash=record.record_hash)
+        self._records[record.alert_id] = self._records.get(record.alert_id, 0) + 1
+        label = record.details.get("label")
+        if record.kind == "label" and isinstance(label, str):
+            self._operator_labels[record.alert_id] = label
 
     def _track(self, track: Track) -> None:
         if track.status == "lost":
@@ -284,7 +298,7 @@ class FrameBuilder:
                 )
                 for _, s in sorted(self._sensors.items())
             ],
-            evidence_head=None,
+            evidence_head=self._head,
         )
 
     def _track_view(self, track: Track, threat: ThreatAssessment | None) -> TrackView:
@@ -338,8 +352,8 @@ class FrameBuilder:
             n_stations=track.n_stations,
             coasting=track.n_stations == 0,
             reasons=list(threat.reasons),
-            label=None,
-            evidence_records=0,
+            label=self._operator_labels.get(alert_id),
+            evidence_records=self._records.get(alert_id, 0),
             looks=[] if cls is None else self._looks(cls),
         )
 

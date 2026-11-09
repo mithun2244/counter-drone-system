@@ -5,6 +5,9 @@ and the shared tracker made of it. The output depends only on the scenario, seed
 two runs with the same inputs are byte-identical, in fast mode or real time. Ground truth reaches
 only the evaluator; its ``[evaluator]`` lines are the only output that names targets.
 
+With ``--evidence``, the evidence keeper also writes the run's chain, snapshots and hand-off
+packages into a fresh ``runs/<scenario>_seed<seed>_<NNN>/`` folder, for ``cuas verify``.
+
 With ``--dashboard``, serve the dashboard locally. The operator picks a site profile and starts
 live runs from it (``live_runs.py``), or with ``--replay`` plays a recorded contract stream.
 """
@@ -19,6 +22,8 @@ from pathlib import Path
 from cuas.bus import WILDCARD, InProcessBus
 from cuas.clock import SimClock
 from cuas.config import SiteConfig, load_site
+from cuas.evidence.keeper import EvidenceKeeper, start_keeper
+from cuas.evidence.store import EvidenceStore, fresh_run_dir
 from cuas.metrics.alert_evaluator import AlertReport, evaluate_alerts
 from cuas.metrics.evaluator import TargetSummary, summarize
 from cuas.metrics.track_evaluator import TrackReport, evaluate_tracks
@@ -74,6 +79,11 @@ def parse_args() -> argparse.Namespace:
         "--recorded-media",
         action="store_true",
         help="run real models on held-out recordings for look evidence",
+    )
+    parser.add_argument(
+        "--evidence",
+        action="store_true",
+        help="with --scenario: keep evidence in a fresh folder under runs/",
     )
     parser.add_argument(
         "--dashboard",
@@ -289,7 +299,11 @@ def print_alert_evaluation(report: AlertReport) -> None:
 
 
 def build_media(
-    args: argparse.Namespace, site: SiteConfig, wind_mps: float, seed: int
+    args: argparse.Namespace,
+    site: SiteConfig,
+    wind_mps: float,
+    seed: int,
+    run_dir: Path | None,
 ) -> LookSource | None:
     """Imported only when asked for, so simulator-only runs never load torch."""
     if not args.recorded_media:
@@ -300,12 +314,22 @@ def build_media(
         CONFIG_DIR,
         DATA_DIR,
         MODELS_DIR,
-        ROOT / "runs" / f"{args.scenario}_seed{seed}",
+        run_dir or ROOT / "runs" / f"{args.scenario}_seed{seed}",
         site.station_ai,
         site.simulation.tick_s,
         wind_mps,
         seed,
     )
+
+
+def keep_evidence(
+    scenario: Scenario, seed: int, control_bus: InProcessBus
+) -> tuple[EvidenceStore, asyncio.Task[None]]:
+    """Subscribe the evidence keeper to the control bus, writing into a fresh run folder."""
+    run_dir = fresh_run_dir(ROOT / "runs", f"{scenario.metadata.id}_seed{seed}")
+    store = EvidenceStore(run_dir)
+    keeper = EvidenceKeeper(store, run_dir.name, scenario.metadata.zone_labels)
+    return store, start_keeper(keeper, control_bus, InProcessBus())
 
 
 async def run(args: argparse.Namespace, site: SiteConfig) -> None:
@@ -314,6 +338,8 @@ async def run(args: argparse.Namespace, site: SiteConfig) -> None:
     print_header(scenario, site, seed)
     sensor_bus, ingest_bus, control_bus = InProcessBus(), InProcessBus(), InProcessBus()
     clock = SimClock(site.simulation.tick_s, pace=None if args.fast else REAL_TIME_PACE)
+    evidence = keep_evidence(scenario, seed, control_bus) if args.evidence else None
+    run_dir = None if evidence is None else evidence[0].run_dir
     printer = asyncio.create_task(print_observations(sensor_bus.subscribe(WILDCARD)))
     outputs = asyncio.create_task(collect(control_bus.subscribe(WILDCARD)))
     rejected = asyncio.create_task(collect(ingest_bus.subscribe(GATEWAY_REJECTED)))
@@ -325,7 +351,7 @@ async def run(args: argparse.Namespace, site: SiteConfig) -> None:
         scenario.metadata.zone_labels,
         lambda: clock.now,
     )
-    media = build_media(args, site, scenario.environment.wind_mps, seed)
+    media = build_media(args, site, scenario.environment.wind_mps, seed, run_dir)
     truth = await run_scenario(
         scenario,
         site,
@@ -340,6 +366,12 @@ async def run(args: argparse.Namespace, site: SiteConfig) -> None:
     await pipeline
     controlled = await outputs
     print_control(controlled, await rejected)
+    if evidence is not None:
+        store, keeper = evidence
+        await keeper
+        records = 0 if store.head is None else store.head.seq
+        print(f"evidence: {records} records in {run_dir}")
+        print(f"check it with: uv run cuas verify {run_dir}")
     print_evaluation(summarize(truth))
     tracks = [m for m in controlled if isinstance(m, Track)]
     print_track_evaluation(evaluate_tracks(truth, tracks))
@@ -366,6 +398,9 @@ def main() -> None:
     args = parse_args()
     if args.replay and not args.dashboard:
         print("--replay needs --dashboard", file=sys.stderr)
+        sys.exit(USAGE_ERROR)
+    if args.evidence and not args.scenario:
+        print("--evidence needs --scenario", file=sys.stderr)
         sys.exit(USAGE_ERROR)
     site = load_site(CONFIG_DIR, zoom_per_station=args.zoom_per_station)
     if args.dashboard:

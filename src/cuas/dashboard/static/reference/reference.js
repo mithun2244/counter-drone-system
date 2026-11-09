@@ -153,6 +153,9 @@ function drawQueue(frame) {
       <strong>${esc(a.level.toUpperCase())}</strong> ${esc(a.class_key)} ${(100 * a.confidence).toFixed(0)}%
       · TTI ${a.tti_s === null ? "none" : a.tti_s.toFixed(0) + " s"} · ${esc(a.zone_label || "")}
       <br>${esc(a.reasons.join(", "))}${a.label ? ` · labelled ${esc(a.label)}` : ""}
+      · ${a.evidence_records} evidence records
+      <br><button data-label="confirm">Confirm</button> <button data-label="dismiss">Dismiss</button>
+      <button data-export>Export</button>
     </li>`).join("") : "<li>All clear</li>";
   if (frame) {
     for (const pre of frame.pre_alerts) {
@@ -171,9 +174,20 @@ function drawStatus(frame) {
   $("banner").textContent = frame.coverage ? `Coverage ${frame.coverage.pct.toFixed(0)}%: reduced` : "";
 }
 
+async function act(button, alertId) {
+  const path = `/api/alerts/${encodeURIComponent(alertId)}`;
+  if (button.dataset.label) {
+    const result = await post(`${path}/label`, { label: button.dataset.label });
+    if (result) $("message").textContent = `${alertId} ${button.dataset.label}ed: record ${result.seq}`;
+  } else {
+    const result = await post(`${path}/export`, {});
+    if (result) $("message").textContent = `${alertId} exported to ${result.path}`;
+  }
+}
+
 function selectAlert(event) {
   const item = event.target.closest("li[data-alert]");
-  if (!item || !state.frame) return;
+  if (!item || !state.frame || event.target.closest("button")) return;
   state.selected = item.dataset.alert;
   const card = state.frame.alerts.find((a) => a.alert_id === state.selected);
   const look = card && card.looks[0];
@@ -191,6 +205,11 @@ function selectAlert(event) {
 $("profile").addEventListener("change", fillScenarios);
 $("go").addEventListener("click", startRun);
 $("alerts").addEventListener("click", selectAlert);
+$("alerts").addEventListener("pointerdown", (event) => {  // the queue is redrawn every frame
+  const button = event.target.closest("button");
+  const item = event.target.closest("li[data-alert]");
+  if (button && item) act(button, item.dataset.alert);
+});
 document.querySelectorAll("[data-action]").forEach((b) =>
   b.addEventListener("click", () => post("/api/run/control", { action: b.dataset.action })));
 document.querySelectorAll("[data-speed]").forEach((b) =>

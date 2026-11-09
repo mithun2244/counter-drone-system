@@ -1,6 +1,6 @@
 """Write the dashboard contract's schema, a MOCK edge-state stream, or a sample stream.
 
-``--schema`` writes ``docs/dashboard_contract.schema.json``. ``--edge-states`` writes
+``--schema`` writes ``docs/dashboard_contract.schema.json`` and ``docs/handoff.schema.json``. ``--edge-states`` writes
 ``docs/samples/edge_states.jsonl``: hand-made states the simulator never produces (a sensor
 fault, all clear, labelled alerts), marked MOCK. ``--scenario`` runs a scenario as fast as
 possible and writes the messages a dashboard would receive, one JSON object per line: ``hello``,
@@ -37,6 +37,7 @@ from cuas.dashboard.frames import (
     run_info,
     site_map,
 )
+from cuas.evidence.handoff import handoff_schema_text
 from cuas.pipeline import start_pipeline
 from cuas.schemas.topics import GATEWAY_ACCEPTED, ZOOM_TASK
 from cuas.sim.engine import run_scenario
@@ -45,6 +46,7 @@ from cuas.sim.scenario import available_scenarios, load_scenario
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR, DATA_DIR, MODELS_DIR = ROOT / "config", ROOT / "data", ROOT / "models"
 SCHEMA_PATH = ROOT / "docs" / "dashboard_contract.schema.json"
+HANDOFF_SCHEMA_PATH = ROOT / "docs" / "handoff.schema.json"
 EDGE_STATES_PATH = ROOT / "docs" / "samples" / "edge_states.jsonl"
 SAMPLES_DIR = ROOT / "runs" / "samples"
 
@@ -259,8 +261,12 @@ def write(path: Path, lines: list[str]) -> None:
 def main() -> None:
     args = parse_args()
     if args.schema:
-        SCHEMA_PATH.write_text(schema_text(), encoding="utf-8")
-        print(f"wrote {SCHEMA_PATH.relative_to(ROOT)}")
+        for path, text in [
+            (SCHEMA_PATH, schema_text()),
+            (HANDOFF_SCHEMA_PATH, handoff_schema_text()),
+        ]:
+            path.write_text(text, encoding="utf-8")
+            print(f"wrote {path.relative_to(ROOT)}")
     elif args.edge_states:
         write(EDGE_STATES_PATH, edge_states())
     elif args.scenario:

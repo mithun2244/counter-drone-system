@@ -51,3 +51,14 @@ def test_a_deleted_recording_fails_verification(tmp_path: Path) -> None:
     Recorder(tmp_path).save("st1", "abcd", ".mp4", b"abc")
     (tmp_path / "station_st1" / "abcd.mp4").unlink()
     assert "missing" in verify_recordings(tmp_path)[0]
+
+
+def test_an_edited_hash_list_fails_verification_even_if_it_still_parses(
+    tmp_path: Path,
+) -> None:
+    Recorder(tmp_path).save("st1", "abcd", ".mp4", b"abc")
+    hashes = tmp_path / "station_st1" / "hashes.json"
+    original = hashes.read_bytes()
+    for edited in (original + b"\n", original[:-1], b'{"abcd.mp4": 1}'):
+        hashes.write_bytes(edited)
+        assert "hash list changed" in verify_recordings(tmp_path)[0], edited

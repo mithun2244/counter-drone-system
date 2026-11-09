@@ -10,9 +10,12 @@ from fastapi.testclient import TestClient
 
 from cuas.clock import SimClock
 from cuas.config import SiteConfig, ZoneLabels
-from cuas.dashboard.contract import Frame, StartRun
+from cuas.dashboard.contract import EvidenceHead, Frame, StartRun
 from cuas.dashboard.frames import FrameBuilder
 from cuas.dashboard.server import Hub, create_app
+from cuas.evidence.verify import verify_chain
+from cuas.schemas import OperatorLabel
+from cuas.schemas.topics import EVIDENCE_RECORD, OPERATOR_LABEL
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "live_runs.py"
@@ -41,7 +44,16 @@ async def test_a_live_run_streams_every_frame_and_changes_no_control_output(
     (tmp_path / "s2_seed7_001").mkdir()  # an earlier run's folder is never reused
     published: list = []
     started = await launcher(live, tmp_path).start(S2_SEED_7, published.append)
+    assert started.evidence is not None
+    records = started.evidence.subscribe(EVIDENCE_RECORD)
+    raised = await anext(records)
+    label = OperatorLabel(
+        alert_id=raised.alert_id, label="confirm", t=raised.t, request_id="req-1"
+    )
+    await started.evidence.publish(OPERATOR_LABEL, label)
+    answers = [r async for r in records if r.request_id == "req-1"]
     await started.done
+    assert (raised.kind, [a.kind for a in answers]) == ("alert", ["label"])
     assert started.run.run_id == "s2_seed7_002"
     assert (tmp_path / "s2_seed7_002").is_dir() and started.clips_dir is None
     frames = [m for m in published if isinstance(m, Frame)]
@@ -52,6 +64,14 @@ async def test_a_live_run_streams_every_frame_and_changes_no_control_output(
     _, _, controlled, _ = await record_pipeline("s2", seed=7)
     printed = capsys.readouterr().out
     assert f"control digest sha256:{live.digest(controlled)}" in printed
+    report = verify_chain(tmp_path / "s2_seed7_002")
+    assert report.problems == [] and report.records[-1].kind == "export"
+    head = report.records[-1]
+    assert frames[-1].evidence_head == EvidenceHead(
+        seq=head.seq, record_hash=head.record_hash
+    )
+    cards = [a for f in frames for a in f.alerts]
+    assert max(a.evidence_records for a in cards) >= 1
 
 
 async def test_frames_keep_coming_on_the_clock_while_nothing_is_heard(

@@ -2,7 +2,9 @@
 
 A ``Hub`` holds the one current run, the latest frame and the connected clients. Runs come from
 a ``Launcher`` the composition root supplies (``scripts/run_demo.py``), because the dashboard may
-not start the simulator itself. Everything is served locally; the API documentation pages are
+not start the simulator itself. Labels and exports go to the evidence keeper as messages on the
+run's evidence bus, and the answer is the record carrying the same request ID: the dashboard
+never writes evidence itself. Everything is served locally; the API documentation pages are
 turned off because they load their assets from a CDN.
 
 Mount paths: the API under ``/api``, the stream at ``/ws``, the reference page at ``/reference/``,
@@ -11,10 +13,12 @@ the reference page.
 """
 
 import asyncio
+import json
 import logging
 import re
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
+from itertools import count
 from pathlib import Path
 from typing import Protocol
 
@@ -24,17 +28,24 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from cuas.bus import Bus
 from cuas.clock import SimClock
 from cuas.dashboard.contract import (
     EvidenceEvent,
+    ExportResult,
     Frame,
     Hello,
+    Label,
+    LabelRequest,
+    LabelResult,
     RunControl,
     RunInfo,
     SiteProfile,
     StartRun,
     contract_schema,
 )
+from cuas.schemas import EvidenceRecord, ExportRequest, Message, OperatorLabel
+from cuas.schemas.topics import EVIDENCE_RECORD, EXPORT_REQUEST, OPERATOR_LABEL
 
 log = logging.getLogger(__name__)
 
@@ -58,6 +69,9 @@ class Started:
     """The clock's pace at speed 1."""
     clips_dir: Path | None
     done: asyncio.Task[None]
+    run_dir: Path | None = None
+    evidence: Bus | None = None
+    """The evidence bus, for labels and exports. ``None`` when the run keeps no evidence."""
 
 
 class Launcher(Protocol):
@@ -70,6 +84,10 @@ class Launcher(Protocol):
 
 class Busy(Exception):
     """A run is already going."""
+
+
+class UnknownAlert(Exception):
+    """No alert with that ID has been raised in this run."""
 
 
 class _Client:
@@ -101,6 +119,10 @@ class Hub:
         self._started: Started | None = None
         self._clients: set[_Client] = set()
         self._watcher: asyncio.Task[None] | None = None
+        self._listener: asyncio.Task[None] | None = None
+        self._alert_ids: set[str] = set()
+        self._pending: dict[str, asyncio.Future[EvidenceRecord]] = {}
+        self._request_numbers = count(1)
 
     @property
     def active(self) -> bool:
@@ -114,6 +136,10 @@ class Hub:
             raise Busy("a run is already going")
         started = await self._launcher.start(request, self.publish)
         self._started, self.frame = started, None
+        self._alert_ids, self._pending = set(), {}
+        if started.evidence is not None:  # subscribed before the run can write a record
+            records = started.evidence.subscribe(EVIDENCE_RECORD)
+            self._listener = asyncio.create_task(self._listen(records))
         self.publish(started.run)
         self._watcher = asyncio.create_task(self._end_when_done(started.done))
         return started.run
@@ -134,6 +160,87 @@ class Hub:
             run = self.run.model_copy(update={"speed": speed})
         self.publish(run)
         return run
+
+    async def label(self, alert_id: str, label: Label) -> LabelResult:
+        started = self._evidence_run(alert_id)
+        request = OperatorLabel(
+            alert_id=alert_id,
+            label=label,
+            t=started.clock.now,
+            request_id=self._request_id(),
+        )
+        record = await self._ask(started, OPERATOR_LABEL, request)
+        return LabelResult(
+            alert_id=alert_id, seq=record.seq, record_hash=record.record_hash
+        )
+
+    async def export(self, alert_id: str) -> ExportResult:
+        started = self._evidence_run(alert_id)
+        request = ExportRequest(
+            alert_id=alert_id, t=started.clock.now, request_id=self._request_id()
+        )
+        record = await self._ask(started, EXPORT_REQUEST, request)
+        package = record.files[0]
+        assert started.run_dir is not None
+        text = (started.run_dir / package.path).read_text(encoding="utf-8")
+        return ExportResult(
+            alert_id=alert_id,
+            path=package.path,
+            sha256=package.sha256,
+            package=json.loads(text),
+        )
+
+    def _evidence_run(self, alert_id: str) -> Started:
+        started = self._started
+        if not self.active or started is None or started.evidence is None:
+            raise LookupError("no run that keeps evidence is going")
+        if alert_id not in self._alert_ids:
+            raise UnknownAlert(f"no alert {alert_id!r} in this run")
+        return started
+
+    def _request_id(self) -> str:
+        return f"req-{next(self._request_numbers)}"
+
+    async def _ask(
+        self, started: Started, topic: str, request: OperatorLabel | ExportRequest
+    ) -> EvidenceRecord:
+        """Publish a request and wait for the record that answers it."""
+        assert started.evidence is not None
+        waiting = asyncio.get_running_loop().create_future()
+        self._pending[request.request_id] = waiting
+        try:
+            await started.evidence.publish(topic, request)
+        except RuntimeError as error:  # the evidence bus closed: the run is ending
+            self._pending.pop(request.request_id, None)
+            raise LookupError("the run has ended") from error
+        return await waiting
+
+    async def _listen(self, records: AsyncIterator[Message]) -> None:
+        async for record in records:
+            if not isinstance(record, EvidenceRecord):
+                continue
+            if record.kind == "alert":
+                self._alert_ids.add(record.alert_id)
+            waiting = self._pending.pop(record.request_id or "", None)
+            if waiting is not None and not waiting.done():
+                waiting.set_result(record)
+            if self.run is not None:
+                self.publish(
+                    EvidenceEvent(
+                        run_id=self.run.run_id,
+                        seq=record.seq,
+                        kind=record.kind,
+                        alert_id=record.alert_id,
+                        t=record.t,
+                        record_hash=record.record_hash,
+                    )
+                )
+        for (
+            waiting
+        ) in self._pending.values():  # requests the run ended before answering
+            if not waiting.done():
+                waiting.set_exception(LookupError("the run has ended"))
+        self._pending.clear()
 
     def publish(self, message: Outgoing) -> None:
         if isinstance(message, RunInfo):
@@ -204,6 +311,24 @@ def create_app(hub: Hub, app_dir: Path = APP_DIR) -> FastAPI:
     ) -> RunInfo:  # in the loop: it moves the clock
         try:
             return hub.control(request)
+        except LookupError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+
+    @app.post("/api/alerts/{alert_id}/label")
+    async def label_alert(alert_id: str, request: LabelRequest) -> LabelResult:
+        try:
+            return await hub.label(alert_id, request.label)
+        except UnknownAlert as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except LookupError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+
+    @app.post("/api/alerts/{alert_id}/export")
+    async def export_alert(alert_id: str) -> ExportResult:
+        try:
+            return await hub.export(alert_id)
+        except UnknownAlert as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
         except LookupError as error:
             raise HTTPException(status_code=409, detail=str(error)) from error
 

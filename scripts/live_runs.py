@@ -5,25 +5,28 @@ Each run gets its own buses, pipeline, clock and frame builder, and a fresh fold
 Frames are built from what the gateway accepted and what the control layer published, in the
 order they arrive, so a frame can show the control layer one batch behind
 (docs/dashboard_contract.md). The simulator's ground truth is dropped here and never reaches the
-dashboard. When a run ends, the console gets its control digest: the one
-``run_demo.py --scenario ... --fast`` prints for the same scenario, seed and zoom cameras.
+dashboard. The evidence keeper writes the run's chain, snapshots and hand-off packages into the
+run folder, and answers the operator's labels and exports over the evidence bus. When a run
+ends, the console gets its control digest: the one ``run_demo.py --scenario ... --fast`` prints
+for the same scenario, seed and zoom cameras.
 """
 
 import asyncio
 import hashlib
 from collections.abc import AsyncIterator
-from itertools import count
 from pathlib import Path
 
 from cuas.bus import WILDCARD, InProcessBus
 from cuas.clock import SimClock
 from cuas.config import SiteConfig, load_site
-from cuas.dashboard.contract import SiteProfile, StartRun
+from cuas.dashboard.contract import RunInfo, SiteProfile, StartRun
 from cuas.dashboard.frames import FrameBuilder, profiles, run_info
 from cuas.dashboard.server import Publish, Started
+from cuas.evidence.keeper import EvidenceKeeper, start_keeper
+from cuas.evidence.store import EvidenceStore, fresh_run_dir
 from cuas.pipeline import start_pipeline
 from cuas.schemas import Message
-from cuas.schemas.topics import GATEWAY_ACCEPTED, ZOOM_TASK
+from cuas.schemas.topics import EVIDENCE_RECORD, GATEWAY_ACCEPTED, ZOOM_TASK
 from cuas.sim.engine import run_scenario
 from cuas.sim.scenario import Scenario, available_scenarios, load_scenario
 from cuas.sim.station import LookSource
@@ -39,15 +42,6 @@ def digest(messages: list[Message]) -> str:
             f"{type(message).__name__} {message.model_dump_json()}\n".encode()
         )
     return hashed.hexdigest()
-
-
-def fresh_folder(runs_dir: Path, stem: str) -> Path:
-    """The first ``<stem>_<NNN>`` not taken, so no run overwrites or mixes with another."""
-    for n in count(1):
-        path = runs_dir / f"{stem}_{n:03d}"
-        if not path.exists():
-            return path
-    raise AssertionError("unreachable")
 
 
 async def feed(
@@ -96,7 +90,7 @@ class LiveLauncher:
         scenario = self._scenario(request)
         site = load_site(self._config_dir, zoom_per_station=request.zoom_per_station)
         seed = scenario.seed if request.seed is None else request.seed
-        run_dir = fresh_folder(self._runs_dir, f"{scenario.metadata.id}_seed{seed}")
+        run_dir = fresh_run_dir(self._runs_dir, f"{scenario.metadata.id}_seed{seed}")
         media = self._media(request, site, scenario, seed, run_dir)
         run_dir.mkdir(parents=True, exist_ok=True)
         run = run_info(
@@ -110,11 +104,12 @@ class LiveLauncher:
         )
         clock = SimClock(site.simulation.tick_s, pace=self._pace)
         print(f"run {run.run_id} started, folder {run_dir}")
+        evidence = InProcessBus()
         done = asyncio.create_task(
-            self._run(run.run_id, scenario, site, seed, media, clock, publish)
+            self._run(run, scenario, site, media, clock, publish, evidence, run_dir)
         )
         clips = run_dir if media is not None else None
-        return Started(run, clock, self._pace, clips, done)
+        return Started(run, clock, self._pace, clips, done, run_dir, evidence)
 
     def _scenario(self, request: StartRun) -> Scenario:
         profile = next(
@@ -159,18 +154,27 @@ class LiveLauncher:
 
     async def _run(
         self,
-        run_id: str,
+        run: RunInfo,
         scenario: Scenario,
         site: SiteConfig,
-        seed: int,
         media: LookSource | None,
         clock: SimClock,
         publish: Publish,
+        evidence: InProcessBus,
+        run_dir: Path,
     ) -> None:
         sensor, ingest, control = InProcessBus(), InProcessBus(), InProcessBus()
         labels = scenario.metadata.zone_labels
-        builder = FrameBuilder(run_id, site, labels)
-        taps = (ingest.subscribe(GATEWAY_ACCEPTED), control.subscribe(WILDCARD))
+        builder = FrameBuilder(run.run_id, site, labels)
+        store = EvidenceStore(run_dir)
+        keeper = start_keeper(
+            EvidenceKeeper(store, run.run_id, labels), control, evidence
+        )
+        taps = (
+            ingest.subscribe(GATEWAY_ACCEPTED),
+            control.subscribe(WILDCARD),
+            evidence.subscribe(EVIDENCE_RECORD),
+        )
         feeds = [asyncio.create_task(feed(builder, tap, publish)) for tap in taps]
         ticker = asyncio.create_task(on_time(builder, clock, publish))
         zoom_tasks = control.subscribe(ZOOM_TASK)
@@ -183,7 +187,7 @@ class LiveLauncher:
                 site,
                 sensor,
                 clock,
-                seed=seed,
+                seed=run.seed,
                 media=media,
                 zoom_tasks=zoom_tasks,
             )
@@ -191,6 +195,8 @@ class LiveLauncher:
             ticker.cancel()
             await sensor.close()  # so the pipeline and feeds end even if the run fails
         await pipeline
-        _, controlled = await asyncio.gather(*feeds)
+        await keeper  # it exports every alert, then closes the evidence bus
+        _, controlled, records = await asyncio.gather(*feeds)
         publish(builder.flush())
-        print(f"run {run_id} ended: control digest sha256:{digest(controlled)}")
+        print(f"run {run.run_id} ended: control digest sha256:{digest(controlled)}")
+        print(f"  {len(records)} evidence records; check: uv run cuas verify {run_dir}")

@@ -10,7 +10,10 @@ from cuas.schemas import (
     ClueEvidence,
     CoverageStatus,
     EvidenceRecord,
+    ExportRequest,
+    FileRef,
     Message,
+    OperatorLabel,
     PicketAlert,
     RejectedMessage,
     SectorTrack,
@@ -77,8 +80,18 @@ SAMPLES: list[Message] = [
         elevation_deg=2.0,
     ),
     EvidenceRecord(
-        alert_id="a1", track_id="trk1", clip_path="c.mp4", sha256=HASH, prev_hash=None
+        seq=1,
+        kind="alert",
+        t=3.0,
+        alert_id="alert-1",
+        track_ids=("trk1",),
+        files=(FileRef(path="evidence/0001-alert-alert-1.json", sha256=HASH),),
+        details={"level": "amber", "score": 0.6, "zone": None},
+        prev_hash=None,
+        record_hash=HASH,
     ),
+    OperatorLabel(alert_id="alert-1", label="confirm", t=4.0, request_id="req-1"),
+    ExportRequest(alert_id="alert-1", t=5.0, request_id="req-2"),
     RejectedMessage(reason="unknown sensor", raw="{}"),
     SectorTrack(
         sector_id="sec-1",
@@ -110,7 +123,7 @@ def architecture_messages() -> dict[str, list[str]]:
 
 def test_every_architecture_message_and_key_field_has_a_schema() -> None:
     messages = architecture_messages()
-    assert len(messages) == 11
+    assert len(messages) == 13
     for name, fields in messages.items():
         model = getattr(schemas, name)
         assert issubclass(model, Message)
@@ -150,8 +163,8 @@ def models_in_schemas() -> list[type[BaseModel]]:
 
 def test_no_schema_has_a_ground_truth_field() -> None:
     assert (
-        len(models_in_schemas()) == 13
-    )  # 11 messages, ClueEvidence and the Message base
+        len(models_in_schemas()) == 16
+    )  # 13 messages, ClueEvidence, FileRef and the Message base
     for model in models_in_schemas():
         for field in model.model_fields:
             assert not re.search("target|true|truth", field), (
@@ -188,8 +201,9 @@ def test_a_sector_track_cannot_carry_a_3d_point() -> None:
     assert not {f for f in fields if re.search("position|range|elevation|velocity", f)}
 
 
-def test_evidence_record_rejects_a_malformed_hash() -> None:
+@pytest.mark.parametrize("field", ["prev_hash", "record_hash", "files"])
+def test_evidence_records_reject_a_malformed_hash(field: str) -> None:
+    record = next(s for s in SAMPLES if isinstance(s, EvidenceRecord))
+    bad = [{"path": "evidence/x.json", "sha256": "xyz"}] if field == "files" else "xyz"
     with pytest.raises(ValidationError):
-        EvidenceRecord(
-            alert_id="a", track_id="t", clip_path="c", sha256="xyz", prev_hash=None
-        )
+        EvidenceRecord.model_validate({**record.model_dump(), field: bad})

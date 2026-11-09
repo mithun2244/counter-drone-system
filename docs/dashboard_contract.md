@@ -28,7 +28,7 @@
 | `/api/...` | The HTTP API |
 
 **Run it:**
-- **Live:** `uv run python scripts/run_demo.py --dashboard`, then open `http://127.0.0.1:8000/`. Pick a site profile and scenario and start monitoring: the simulator plays the scenario as the live sensor feed, in real time. Each run gets a fresh folder, `runs/<scenario>_seed<seed>_<NNN>/`, and the run ID is its name. When a run ends, the server console prints its control digest, the same one `run_demo.py --scenario ... --fast` prints for that scenario, seed and zoom setting.
+- **Live:** `uv run python scripts/run_demo.py --dashboard`, then open `http://127.0.0.1:8000/`. Pick a site profile and scenario and start monitoring: the simulator plays the scenario as the live sensor feed, in real time. Each run gets a fresh folder, `runs/<scenario>_seed<seed>_<NNN>/`, and the run ID is its name. It holds the run's evidence: `evidence/chain.jsonl`, the alert snapshots beside it, the hand-off packages in `handoff/` and, with recorded media, the recordings. Check it with `uv run cuas verify runs/<run_id>`. When a run ends, the server console prints its control digest, the same one `run_demo.py --scenario ... --fast` prints for that scenario, seed and zoom setting.
 - **Replay:** `uv run python scripts/run_demo.py --dashboard --replay docs/samples/s1_seed1001.jsonl` serves a sample through the same server. Start the run the sample holds (S1 at the processing plant). Pause and speed work; the run ends when the sample does.
 
 ## Conventions
@@ -138,11 +138,11 @@ The B4 card is "Engine heard, `compass`, unconfirmed".
 
 **Fields:** `run_id`, `seq`, `kind`, `alert_id`, `t`, `record_hash`.
 - `kind` is `alert`, `escalation`, `label` or `export`.
-- Sent when a record joins the evidence chain.
+- Sent when a record joins the evidence chain: when an alert is raised and when it first turns red, for each label and export, and an export of every alert as the run ends. Live runs only; a replay sends what its file holds.
 
 ## HTTP API
 
-Served now, except label and export, which arrive with the evidence store (step 6). Errors return `{"detail": "..."}`, always a string: `404` for an unknown alert, clip, profile or scenario, or recorded media this machine does not have; `409` if a run is already active, or for control with no run; `422` for a bad body.
+Errors return `{"detail": "..."}`, always a string: `404` for an unknown alert, clip, profile or scenario, or recorded media this machine does not have; `409` if a run is already active, for control with no run, or for a label or export when no live run is going (a replay keeps no evidence, and an ended run's evidence is closed); `422` for a bad body.
 
 | Request | Body | Returns |
 | --- | --- | --- |
@@ -150,7 +150,7 @@ Served now, except label and export, which arrive with the evidence store (step 
 | `POST /api/runs` | `profile_id`, `scenario_id`, optional `seed`, `recorded_media` (default false), `zoom_per_station` (0, 1 or 2) | The `run` message |
 | `POST /api/run/control` | `action`: `pause` or `play`; or `speed` with `speed`: 1, 2 or 5 | The `run` message |
 | `POST /api/alerts/{alert_id}/label` | `label`: `confirm` or `dismiss` | `alert_id`, `seq`, `record_hash` |
-| `POST /api/alerts/{alert_id}/export` | — | `alert_id`, `path`, `sha256`, and the hand-off `package` (`docs/handoff.schema.json`, step 6) |
+| `POST /api/alerts/{alert_id}/export` | — | `alert_id`, `path`, `sha256`, and the hand-off `package` (`docs/handoff.schema.json`). Every alert is also exported when the run ends |
 | `GET /api/clips/{station}/{clip}` | — | The recording (H.264 MP4), for a `<video>` element. Seek to `at_s` |
 | `GET /api/contract` | — | This contract's JSON Schema |
 

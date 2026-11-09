@@ -1,0 +1,345 @@
+{
+ "$defs": {
+  "AlertSnapshot": {
+   "additionalProperties": false,
+   "description": "Positions in local ENU metres from the site centre; times in simulated seconds.",
+   "properties": {
+    "alert_id": {
+     "title": "Alert Id",
+     "type": "string"
+    },
+    "clips": {
+     "items": {
+      "$ref": "#/$defs/Clip"
+     },
+     "title": "Clips",
+     "type": "array"
+    },
+    "highest_level": {
+     "enum": [
+      "red",
+      "amber"
+     ],
+     "title": "Highest Level",
+     "type": "string"
+    },
+    "last_position": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/HistoryPoint"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "level": {
+     "enum": [
+      "red",
+      "amber",
+      "info"
+     ],
+     "title": "Level",
+     "type": "string"
+    },
+    "p_attack_drone": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "P Attack Drone"
+    },
+    "p_bird": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "P Bird"
+    },
+    "p_drone": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "P Drone"
+    },
+    "reasons": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Reasons",
+     "type": "array"
+    },
+    "score": {
+     "title": "Score",
+     "type": "number"
+    },
+    "t": {
+     "title": "T",
+     "type": "number"
+    },
+    "time_to_impact_s": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Time To Impact S"
+    },
+    "track_history": {
+     "items": {
+      "$ref": "#/$defs/HistoryPoint"
+     },
+     "title": "Track History",
+     "type": "array"
+    },
+    "track_ids": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Track Ids",
+     "type": "array"
+    },
+    "zone_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Zone Id"
+    },
+    "zone_label": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Zone Label"
+    }
+   },
+   "required": [
+    "alert_id",
+    "t",
+    "track_ids",
+    "level",
+    "highest_level",
+    "score",
+    "time_to_impact_s",
+    "zone_id",
+    "zone_label",
+    "reasons",
+    "p_drone",
+    "p_bird",
+    "p_attack_drone",
+    "last_position",
+    "track_history",
+    "clips"
+   ],
+   "title": "AlertSnapshot",
+   "type": "object"
+  },
+  "ChainRef": {
+   "additionalProperties": false,
+   "properties": {
+    "record_hash": {
+     "title": "Record Hash",
+     "type": "string"
+    },
+    "seq": {
+     "title": "Seq",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "seq",
+    "record_hash"
+   ],
+   "title": "ChainRef",
+   "type": "object"
+  },
+  "Clip": {
+   "additionalProperties": false,
+   "description": "A recording behind the alert's look evidence: ``source`` is ``station.sensor``.",
+   "properties": {
+    "file": {
+     "$ref": "#/$defs/FileRef"
+    },
+    "source": {
+     "title": "Source",
+     "type": "string"
+    }
+   },
+   "required": [
+    "source",
+    "file"
+   ],
+   "title": "Clip",
+   "type": "object"
+  },
+  "FileRef": {
+   "additionalProperties": false,
+   "description": "A stored file, by its path relative to the run folder, and its SHA-256.",
+   "properties": {
+    "path": {
+     "title": "Path",
+     "type": "string"
+    },
+    "sha256": {
+     "pattern": "^[0-9a-f]{64}$",
+     "title": "Sha256",
+     "type": "string"
+    }
+   },
+   "required": [
+    "path",
+    "sha256"
+   ],
+   "title": "FileRef",
+   "type": "object"
+  },
+  "HistoryPoint": {
+   "additionalProperties": false,
+   "description": "One published track position. ``n_stations`` 0 means a prediction while coasting.",
+   "properties": {
+    "n_stations": {
+     "title": "N Stations",
+     "type": "integer"
+    },
+    "t": {
+     "title": "T",
+     "type": "number"
+    },
+    "track_id": {
+     "title": "Track Id",
+     "type": "string"
+    },
+    "x": {
+     "title": "X",
+     "type": "number"
+    },
+    "y": {
+     "title": "Y",
+     "type": "number"
+    },
+    "z": {
+     "title": "Z",
+     "type": "number"
+    }
+   },
+   "required": [
+    "track_id",
+    "t",
+    "x",
+    "y",
+    "z",
+    "n_stations"
+   ],
+   "title": "HistoryPoint",
+   "type": "object"
+  },
+  "LabelEntry": {
+   "additionalProperties": false,
+   "properties": {
+    "label": {
+     "enum": [
+      "confirm",
+      "dismiss"
+     ],
+     "title": "Label",
+     "type": "string"
+    },
+    "seq": {
+     "title": "Seq",
+     "type": "integer"
+    },
+    "t": {
+     "title": "T",
+     "type": "number"
+    }
+   },
+   "required": [
+    "label",
+    "t",
+    "seq"
+   ],
+   "title": "LabelEntry",
+   "type": "object"
+  }
+ },
+ "additionalProperties": false,
+ "properties": {
+  "alert": {
+   "$ref": "#/$defs/AlertSnapshot"
+  },
+  "alert_record_hash": {
+   "title": "Alert Record Hash",
+   "type": "string"
+  },
+  "chain_head": {
+   "$ref": "#/$defs/ChainRef"
+  },
+  "exported_t": {
+   "title": "Exported T",
+   "type": "number"
+  },
+  "labels": {
+   "items": {
+    "$ref": "#/$defs/LabelEntry"
+   },
+   "title": "Labels",
+   "type": "array"
+  },
+  "mock": {
+   "const": true,
+   "default": true,
+   "title": "Mock",
+   "type": "boolean"
+  },
+  "note": {
+   "default": "Mock hand-off: a JSON file only, never sent. Detect and report only.",
+   "title": "Note",
+   "type": "string"
+  },
+  "package_version": {
+   "const": 1,
+   "default": 1,
+   "title": "Package Version",
+   "type": "integer"
+  },
+  "run_id": {
+   "title": "Run Id",
+   "type": "string"
+  }
+ },
+ "required": [
+  "run_id",
+  "exported_t",
+  "alert",
+  "labels",
+  "alert_record_hash",
+  "chain_head"
+ ],
+ "title": "HandoffPackage",
+ "type": "object"
+}

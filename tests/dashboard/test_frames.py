@@ -5,10 +5,12 @@ from itertools import pairwise
 import pytest
 
 from cuas.config import ScenarioMetadata, SiteConfig, ZoneLabels
+from cuas.dashboard.contract import EvidenceHead
 from cuas.dashboard.frames import FrameBuilder, compass, profiles, replay, site_map
 from cuas.schemas import (
     ClueEvidence,
     CoverageStatus,
+    EvidenceRecord,
     PicketAlert,
     RejectedMessage,
     SectorTrack,
@@ -282,3 +284,35 @@ async def test_a_recorded_run_replays_into_a_frame_per_mark(
     assert any(f.coverage is not None for f in frames)
     again = replay(FrameBuilder("run-s2", site, LABELS), accepted, controlled)
     assert [f.model_dump_json() for f in frames] == [f.model_dump_json() for f in again]
+
+
+def record(seq: int, kind: str, label: str | None = None) -> EvidenceRecord:
+    return EvidenceRecord(
+        seq=seq,
+        kind=kind,
+        t=0.2,
+        alert_id="alert-1",
+        track_ids=("trk-1",),
+        files=(),
+        details={} if label is None else {"label": label},
+        prev_hash=None if seq == 1 else f"{seq - 1}" * 64,
+        record_hash=f"{seq}" * 64,
+    )
+
+
+def test_cards_show_the_latest_label_and_how_many_records_their_alert_has(
+    builder: FrameBuilder,
+) -> None:
+    frames = feed(
+        builder,
+        track("trk-1", 0.0),
+        threat("trk-1", 0.0, "red", "alert-1"),
+        record(1, "alert"),
+        record(2, "label", "confirm"),
+        record(3, "label", "dismiss"),
+        track("trk-1", 0.8),
+    )
+    assert frames[0].evidence_head is None
+    card = frames[-1].alerts[0]
+    assert (card.label, card.evidence_records) == ("dismiss", 3)
+    assert frames[-1].evidence_head == EvidenceHead(seq=3, record_hash="3" * 64)

@@ -31,17 +31,27 @@ class Recorder:
             else {}
         )
         hashes[name] = digest
-        hashes_path.write_text(
-            json.dumps(hashes, indent=1, sort_keys=True), encoding="utf-8"
-        )
+        hashes_path.write_text(_hashes_text(hashes), encoding="utf-8")
         return digest
 
 
+def _hashes_text(hashes: dict[str, str]) -> str:
+    return json.dumps(hashes, indent=1, sort_keys=True)
+
+
 def verify_recordings(run_dir: Path) -> list[str]:
-    """Every recording that is missing or has changed. Empty means all hashes match."""
+    """Every recording that is missing or has changed, and every hash list changed since the
+    recorder wrote it. Empty means all is as recorded."""
     problems: list[str] = []
     for hashes_path in sorted(run_dir.glob(f"{STATION_PREFIX}*/{HASHES_NAME}")):
-        hashes = json.loads(hashes_path.read_text(encoding="utf-8"))
+        try:
+            text = hashes_path.read_text(encoding="utf-8")
+            hashes = json.loads(text)
+            if not isinstance(hashes, dict) or text != _hashes_text(hashes):
+                raise ValueError("not as the recorder wrote it")
+        except ValueError:
+            problems.append(f"hash list changed: {hashes_path}")
+            continue
         for name, digest in sorted(hashes.items()):
             path = hashes_path.parent / name
             if not path.exists():

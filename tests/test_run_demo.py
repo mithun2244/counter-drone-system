@@ -101,3 +101,8 @@ def test_zoom_override_is_shown_and_leaves_the_observations_alone(zoom: str) -> 
 )
 def test_bad_arguments_exit_with_usage_error(args: tuple[str, ...]) -> None:
     assert run(*args).returncode == 2
+
+
+def test_evidence_needs_a_scenario() -> None:
+    result = run("--evidence")
+    assert result.returncode == 2 and "--evidence needs --scenario" in result.stderr
