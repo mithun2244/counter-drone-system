@@ -184,6 +184,13 @@ class FrameBuilder:
             self._next_k += 1
         return frames
 
+    def again(self) -> Frame | None:
+        """The latest frame once more, with what changed since: for a live run, evidence the
+        operator wrote while the clock was paused. ``None`` before the first frame."""
+        if self._next_k == 0:
+            return None
+        return self._frame((self._next_k - 1) * self._settings.frame_period_s)
+
     def flush(self) -> Frame:
         """The last frame, once no more messages will come."""
         frame = self._frame(self._mark())

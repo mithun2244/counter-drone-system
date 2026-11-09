@@ -104,10 +104,10 @@ Done when:
 **Goal:** the operator view and tamper-evident records.
 
 Tasks:
-- [ ] FastAPI app plus WebSocket stream of tracks, alerts and status
-- [ ] Map canvas, alert queue, clip panel, status panel (`design.md` B1–B4)
-- [ ] Confirm / Dismiss buttons saved as labels
-- [ ] Evidence store, hash chain, `cuas verify` command, hand-off JSON export (`design.md` A11)
+- [x] FastAPI app plus WebSocket stream of tracks, alerts and status (contract in `dashboard_contract.md`)
+- [ ] Map canvas, alert queue, clip panel, status panel (`design.md` B1–B4): the user's dashboard, on its own branch. A minimal reference page at `/reference/` stays for testing
+- [x] Confirm / Dismiss buttons saved as labels (backend and reference page; the user's dashboard wires the same endpoints)
+- [x] Evidence store, hash chain, `cuas verify` command, hand-off JSON export (`design.md` A11)
 
 Done when:
 - [ ] The dashboard updates at least 2 times per second during S1

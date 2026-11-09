@@ -6,9 +6,9 @@
 ## Current status
 
 - **Current phase:** Phase 5 — Dashboard and evidence, in progress on `phase-5-dashboard`
-- **Last session:** 2026-11-08
-- **Blocked on:** nothing
-- **Next step:** build the approved Phase 5 plan. The dashboard contract and sample streams come first, so the user can build the full dashboard on their own branch. The acceptance checks run once the user's dashboard is connected to the real backend. Do not rerun the held-out evaluations
+- **Last session:** 2026-11-09
+- **Blocked on:** the user's dashboard (B1–B4), on their own branch, being connected to the backend
+- **Next step:** Phase 5 steps 1–7 are done on `phase-5-dashboard` (backend, evidence, docs; not pushed). Step 8: once the user's dashboard is connected, run the Phase 5 acceptance checks on the integrated branch and report them to the user before any merge. The checks are listed in the Phase 5 plan: at least 2 frames a second during S1 in the user's dashboard, `cuas verify` failing on any edit, a valid package per alert, cold start offline, baseline digests and track identity, real time with the dashboard attached, regular suite and fresh clone. Do not rerun the held-out evaluations or the frozen gate
 - **Phase 4:** merged into `main` at `8986f71` and pushed, `main` only, to the private repo `mithun2244/counter-drone-system`. Post-merge check 14 passed. The frozen gate (`tests/test_decision.py`) ran once, on `ce4ea52` (139 of 139), and is not rerun. Regular suite runs pass `--ignore=tests/test_decision.py`. Gate seed declarations, freezes and both gate runs are under Measured results and in the git history
 - **Seeds already seen, so not usable as unseen gate seeds:** development 1–19; 7 (withdrawn from the Phase 4 gates); Phase 3 101–120; Phase 4 gates S1 201–221 and 301–322, S3 201–211 and 301–312, S4 301–312; scenario own seeds 1001, 2002 (S2 and S4) and 3003
 - **Start sessions from `cuas-demo/`**, or `CLAUDE.md` will not auto-load
@@ -44,6 +44,11 @@
 | 2026-11-07 | Movement clue (`design.md` A7): drone-like if hover fraction ≥ 0.2, with hover from 2 s of position change, or if fast, straight and steady flight lasts 5 s of fresh fixes. A7's sharp turns and straightness alone are dropped. Coasting never counts, and never raises an alert | Measured on Phase 3 tracks, seeds 1–19 except 7: A7 as written turned 208 of 313 S3 bird tracks red, because birds turn constantly and fly straight for 10 s at a time. Approved by the user with these conditions |
 | 2026-11-08 | Phase 5 map: a local vector map of the fictional site from `site.yaml`, in local metres, with no tiles or upload. The operator picks a saved site profile and starts monitoring. Production direction: MapLibre GL JS with self-hosted PMTiles and a surveyed, client-approved map (`docs/mapping.md`) | User decision. The site is fictional, the demo must work offline from a cold start, and tracking, alerts and evidence must not depend on the map background |
 | 2026-11-08 | Phase 5 dependencies: `fastapi` (MIT), `uvicorn` (BSD-3-Clause) and `websockets` (BSD-3-Clause, Uvicorn's WebSocket support); `httpx` (BSD-3-Clause) for tests only. They bring `starlette`, `anyio`, `annotated-doc`, `h11`, `click`, `idna` and `opentelemetry-api` (Apache-2.0, an API only: nothing is recorded or sent without an SDK); `httpcore` and `certifi` (MPL-2.0) for tests only. Evidence: a JSONL hash chain and a dedicated evidence bus | Approved by the user. FastAPI with a WebSocket is the architecture's dashboard choice. Starlette 1.10 warns that `httpx` is deprecated for its test client in favour of `httpx2`; kept, as the user chose |
+| 2026-11-09 | Phase 5 evidence: one JSON Lines chain per run folder (`evidence/chain.jsonl`), records `alert`, `escalation` (first time red only), `label` and `export` (on request and for every alert at run end). The dashboard sends `OperatorLabel` and `ExportRequest` on a fourth, evidence bus and waits for the record with its request ID. `cuas verify` lives in `src/cuas/cli.py` | Approved plan (JSONL chain and evidence bus approved by the user). `cli.py` sits outside the components because `evidence` may not import the station's `verify_recordings` |
+| 2026-11-09 | Hand-off package gains `highest_level` beside `level` | Exports at run end showed S1's attack drones as `info` once their flight ended; the package must show the alert reached red |
+| 2026-11-09 | `verify_recordings` also fails on a `hashes.json` not byte for byte as the recorder wrote it, or unreadable | Appending a newline to it went undetected, and a broken one crashed the check |
+| 2026-11-09 | Live runs: frames also come on the clock, one tick behind it, and the latest frame is sent again when an evidence record is written | Without the first, S1 at 1× gave 1 frame a second, below FR-11's 2. Without the second, a label given while paused did not reach the card until play. Neither changes the contract schema |
+| 2026-11-09 | `run_demo.py --dashboard` starts live runs, each in a fresh `runs/<scenario>_seed<seed>_<NNN>/`; `--evidence` keeps evidence for a plain `--scenario` run | Approved plan, step 5. No run overwrites or mixes with another |
 | 2026-11-08 | Phase 5 split: the user builds the full B1–B4 dashboard on their own branch. Claude Code builds the backend, the evidence tools and a minimal reference page, with the WebSocket contract and a sample stream first. Acceptance runs once the user's dashboard is connected | User decision |
 | 2026-11-08 | Zoom (`design.md` A9) gives class evidence only, and only with recorded media. A task takes effect one 0.6 s period after it is issued, so the scheduler aims 1.5 periods ahead. A target within 1° gets a real RGB look on a held-out clip chosen as if 4× closer, avoiding the clips wide cameras use for it. A zoom look on a frame the track already used as a wide look is not counted. Zoom bearings never open or close a batch. The demo default stays one zoom camera per station | Approved by the user. Paired S3 comparison (5 seeds): zoom reduced false alerts overall (37, then 24 with one camera, 21 with two), did not speed up the quadcopter's red alert, and did not change tracks |
 | 2026-11-08 | Mast bias is reported by `scripts/mast_bias.py` through a `MastBias` wrapper on the sensor bus, not under a pytest marker as the plan said | It is a report with no pass or fail, like the zoom comparison. The wrapper leaves the simulator and pipeline unchanged |
@@ -68,7 +73,8 @@
 - Station geometry, bearings and acoustic direction: simulated
 - Pickets: simulated
 - Zoom camera: simulated pointing and field of view; with `--recorded-media`, a real RGB look on a held-out clip chosen as if the target were 4× closer, not a crop of the wide camera's frame. Without recorded media it sees nothing
-- Hand-off: JSON export only
+- Hand-off: JSON export only, marked `"mock": true`; nothing is sent
+- `docs/samples/edge_states.jsonl`: hand-made dashboard states the simulator never produces, marked MOCK
 - Bearing `class_probs` and `snapshot_ref`: real with `--recorded-media`; empty without it, and on S1 camera bearings because no fixed-wing footage exists
 - Picket engine guess: real classifier with `--recorded-media`, otherwise a noisy simulated value
 - Picket loudness: always simulated (`sim/picket.py`)
@@ -110,6 +116,11 @@
 - **Recorded-media S3 alerts on birds.** With real models, birds and false tracks raise 4 to 10 alerts per run with no zoom (5 seeds), because the detectors give some bird clips drone looks (Phase 2's false drone tracks). Zoom lowers this but never removes it. Baseline S3, which has no class data, raises none
 - **Real time for recorded-media S3, fixed on 2026-11-08:** it was 100, 101 and 102 s at 0, 1 and 2 zoom cameras, against 97.2 s allowed. Profiling showed tick 0 costs about 2.6 s (model inference 2.2 s on the first frame of every stream, clip decoding 0.4 s). Pacing started only after tick 0, so that time was never caught up. `SimClock.start()` now starts pacing when the run starts. That is a pacing fix, not a speedup. Now 94.6, 94.5 and 94.5 s, with every output byte-identical to before. The run is up to 4.6 s behind real time in its first seconds and on time from 30 s. Startup before the run is 3.6 s. Baseline S1 (121 s) and S3 (91 s) keep real time
 - **Mast bias** (`runs/robustness/mast_bias.md`; reported only): with st1 off by 0.2°, S1 has exactly 3 tracks on 17 of 18 development seeds and the worst target median is 9.0 m; at 0.5°, 9 of 18, 6 false tracks, worst target median 25.7 m and red order wrong on 6 seeds. S3 birds never reached amber or red at either bias. A real site needs mast calibration first
+- **Evidence: the newest records.** Removing the newest record together with the file it lists leaves a valid, shorter chain, and `cuas verify` passes (pinned by a test, `design.md` A11). Exports carry the chain head and the dashboard shows it; a real system needs an outside anchor
+- Evidence: a recording no alert's looks use is protected only by the recorder's hash list, which no record anchors. Labels and exports need a live run (`409` otherwise)
+- The export response rounds the package's numbers to 3 decimals like every number sent; `sha256` is of the stored file, which keeps full precision
+- Starting a recorded-media dashboard run loads the models in the server's event loop, so the server stalls for a few seconds (marked `ponytail:` in `scripts/live_runs.py`)
+- The committed sample streams carry no evidence (`evidence_head` null)
 - Phase 4: `design.md` A10 does not say which range or grid coverage uses, and S4's result depends on it. Paper calculation at S4's visibility 0.5: `important` zone with quadcopter RGB range gives 100% clear and 55% in dust (works); perimeter with attack drone RGB stays at 100% (warning never fires); perimeter with quadcopter RGB is 45% even in clear air (warning always on)
 
 ## Exceptions to the Phase 2 plan
@@ -170,6 +181,12 @@ Approved by the user on 2026-11-07, for the Phase 2 demo. The plan's CPU time re
 - [ ] GPU laptop available for the live demo?
 
 ## Session log (newest first)
+
+### 2026-11-08 to 11-09 — Phase 5, steps 1–7
+- Done: mapping decisions (`docs/mapping.md`); dashboard contract v1 with schema, samples and frame builder; clock pause, resume and speed; FastAPI server with WebSocket, replay and reference page; live runs from the composition root; evidence store, keeper, labels, exports, hand-off package and `cuas verify`; docs. Regular suite 955 passed before step 7 (gate file excluded). Step 5: 7 of 7 sabotages caught after one invalid one was replaced. Step 6: 15 of 15, after one added test. Dashboard runs, with pause, labels and exports, give control digests identical to plain fast runs. Baseline sensor digests unchanged.
+- Decisions: see the log above.
+- Issues / mocks: see the lists above.
+- Next step: see Current status.
 
 ### 2026-11-07 to 11-08 — Phase 4
 - Done: movement clue, fusion, threat ranking, alert identity, coverage, zoom scheduler, zoom looks from recorded media, alert evaluator, gate tests, paired zoom comparison, mast-bias report, `design.md` A7 to A10. The rule was frozen before each gate run. The first gate run failed on S1 seed 216 and was kept on record; the second passed 139 of 139. 10 of 10 zoom sabotages and 4 of 4 time-to-impact sabotages were caught.

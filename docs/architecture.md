@@ -72,7 +72,8 @@ flowchart TB
 ```
 cuas-demo/
 ├── CLAUDE.md                 # loaded by Claude Code every session
-├── docs/                     # prd, architecture, design, mapping, rules, phases, memory
+├── docs/                     # prd, architecture, design, mapping, rules, phases, memory,
+│                             # dashboard contract and its schema, hand-off schema, samples/
 ├── config/
 │   ├── site.yaml             # stations, pickets, zones, camera specs
 │   ├── media_manifest.yaml   # recorded clips: hashes, labels, train/val/test split (no media)
@@ -100,8 +101,9 @@ cuas-demo/
 │   │   ├── alerts.py         # alert identity, stale and re-acquisition rules
 │   │   ├── coverage.py       # coverage % from reported visibility
 │   │   └── scheduler.py      # zoom camera assignment
-│   ├── evidence/             # store, hashing, tamper-evident log, hand-off export
-│   ├── dashboard/            # FastAPI app, WebSocket, static HTML/JS
+│   ├── evidence/             # hash-chain store, evidence keeper, chain check, mock hand-off package (design.md A11)
+│   ├── dashboard/            # contract, frame builder, FastAPI server and WebSocket, replay, reference page (dashboard_contract.md)
+│   ├── cli.py                # the `cuas` command: `cuas verify RUN_DIR`
 │   └── metrics/              # run report, evaluators (the only readers of ground truth): bearings and tracks; splits, label reader, recorded-media report
 ├── scripts/
 │   ├── run_demo.py           # python scripts/run_demo.py --scenario s1
@@ -110,11 +112,15 @@ cuas-demo/
 │   ├── train_detector.py     # fine-tune a detector; resumes after a kill; CPU by default, opt-in CUDA (docs/colab_gpu.md)
 │   ├── train_audio.py        # train the audio classifier
 │   ├── evaluate_media.py     # held-out reports in runs/eval/
-│   └── compare_zoom.py       # paired S3 run at 0, 1 and 2 zoom cameras, recorded media
+│   ├── compare_zoom.py       # paired S3 run at 0, 1 and 2 zoom cameras, recorded media
+│   ├── mast_bias.py          # tracking with one station's mast off by a fixed bias, reported only
+│   ├── live_runs.py          # live dashboard runs: wires simulator, pipeline, frames and evidence per run
+│   └── record_stream.py      # contract schemas, sample streams, the MOCK edge-state stream
 ├── tests/                    # pytest, mirrors src/ layout
 ├── data/                     # datasets (gitignored)
 ├── models/                   # trained weights (gitignored)
-└── runs/                     # outputs per run: evidence, logs, metrics (gitignored)
+└── runs/                     # outputs per run (gitignored); a dashboard or --evidence run gets
+                              # <scenario>_seed<seed>_<NNN>/ with evidence/, handoff/ and station_<id>/ recordings
 ```
 
 ## 4. Messages
@@ -167,7 +173,7 @@ Rules:
 | Tracking maths | `numpy`, `scipy` (Hungarian assignment) | The constant-velocity filter is about 25 lines of numpy, so `filterpy` is not needed; `scipy` is already locked |
 | Config | YAML + Pydantic settings | One place for site and scenario values |
 | Dashboard | FastAPI + WebSocket + plain HTML/JS canvas; a local vector site map ([mapping.md](mapping.md)) | Real-time, no heavy frontend build, works offline |
-| Evidence | SQLite + files + SHA-256 hash chain | Simple, tamper-evident |
+| Evidence | JSON Lines hash chain + files, SHA-256, checked by `cuas verify` ([design.md](design.md) A11) | Append-only, readable, standard library only; easier to inspect and test byte by byte than SQLite |
 | Tests | `pytest`, `pytest-asyncio` | Standard |
 | Lint/format | `ruff` | One fast tool |
 

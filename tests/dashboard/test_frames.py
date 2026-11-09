@@ -316,3 +316,21 @@ def test_cards_show_the_latest_label_and_how_many_records_their_alert_has(
     card = frames[-1].alerts[0]
     assert (card.label, card.evidence_records) == ("dismiss", 3)
     assert frames[-1].evidence_head == EvidenceHead(seq=3, record_hash="3" * 64)
+
+
+def test_the_latest_frame_again_shows_what_changed_since(
+    builder: FrameBuilder,
+) -> None:
+    assert builder.again() is None
+    (first,) = feed(
+        builder,
+        track("trk-1", 0.0),
+        threat("trk-1", 0.0, "red", "alert-1"),
+        track("trk-1", 0.2),
+    )
+    builder.ingest(record(1, "alert"))
+    builder.ingest(record(2, "label", "confirm"))
+    again = builder.again()
+    assert again is not None and again.t == first.t == 0.0
+    assert (first.alerts[0].label, again.alerts[0].label) == (None, "confirm")
+    assert again.evidence_head == EvidenceHead(seq=2, record_hash="2" * 64)

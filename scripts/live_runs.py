@@ -25,7 +25,7 @@ from cuas.dashboard.server import Publish, Started
 from cuas.evidence.keeper import EvidenceKeeper, start_keeper
 from cuas.evidence.store import EvidenceStore, fresh_run_dir
 from cuas.pipeline import start_pipeline
-from cuas.schemas import Message
+from cuas.schemas import EvidenceRecord, Message
 from cuas.schemas.topics import EVIDENCE_RECORD, GATEWAY_ACCEPTED, ZOOM_TASK
 from cuas.sim.engine import run_scenario
 from cuas.sim.scenario import Scenario, available_scenarios, load_scenario
@@ -47,11 +47,14 @@ def digest(messages: list[Message]) -> str:
 async def feed(
     builder: FrameBuilder, tap: AsyncIterator[Message], publish: Publish
 ) -> list[Message]:
-    """Pass every message to the frame builder and publish its frames. Returns the messages."""
+    """Pass every message to the frame builder and publish its frames. Returns the messages.
+    An evidence record also sends the latest frame again, so a label shows while paused."""
     seen = []
     async for message in tap:
         seen.append(message)
         for frame in builder.ingest(message):
+            publish(frame)
+        if isinstance(message, EvidenceRecord) and (frame := builder.again()):
             publish(frame)
     return seen
 

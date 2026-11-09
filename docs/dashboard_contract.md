@@ -84,7 +84,7 @@ Draw the scale bar and north arrow yourself.
 
 ### `frame`
 
-A full snapshot every 0.4 s of simulated time: 2.5 a second at 1× speed, which meets `prd.md` FR-11's minimum of 2. Each frame replaces the last, so nothing needs to be merged. In a live run, a frame goes out one 0.2 s tick after its mark, and can show the control layer's state up to one 0.2 s batch behind.
+A full snapshot every 0.4 s of simulated time: 2.5 a second at 1× speed, which meets `prd.md` FR-11's minimum of 2. Each frame replaces the last, so nothing needs to be merged. `t` never goes back. In a live run, a frame can repeat the last `t`: it is sent again whenever an evidence record is written, so a label shows even while paused. In a live run, a frame goes out one 0.2 s tick after its mark, and can show the control layer's state up to one 0.2 s batch behind.
 
 | Field | Meaning |
 | --- | --- |
@@ -154,6 +154,123 @@ Errors return `{"detail": "..."}`, always a string: `404` for an unknown alert, 
 | `GET /api/clips/{station}/{clip}` | — | The recording (H.264 MP4), for a `<video>` element. Seek to `at_s` |
 | `GET /api/contract` | — | This contract's JSON Schema |
 
+## Operator actions: Confirm, Dismiss, Export
+
+Captured from a real server: a live S2 run, seed 7, simulator only, paused just after its alert was raised. Hashes and times differ from run to run; the shapes do not.
+
+**When they work:** during a live run, running or paused, for an `alert_id` the run has raised. The server knows an alert once its `alert` evidence record is written, which is within one control batch of the card first appearing. A replay, or a run that has ended, answers `409`.
+
+**Confirm**
+
+```http
+POST /api/alerts/alert-1/label
+Content-Type: application/json
+
+{"label": "confirm"}
+```
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{"alert_id": "alert-1", "seq": 2, "record_hash": "0dedb4c65e449575ab3f67311b89a4f51a6ff45d0e4f04440230952cce933641"}
+```
+
+`seq` and `record_hash` are the new record in the evidence chain. On `/ws` the same record arrives as an event, and a frame follows at once, even while paused, with the card's `label` set to `"confirm"` and `evidence_records` counted up:
+
+```json
+{"contract": 1, "type": "evidence", "run_id": "s2_seed7_008", "seq": 2, "kind": "label", "alert_id": "alert-1", "t": 54.6, "record_hash": "0dedb4c65e449575ab3f67311b89a4f51a6ff45d0e4f04440230952cce933641"}
+```
+
+**Dismiss** is the same request with `{"label": "dismiss"}`:
+
+```http
+POST /api/alerts/alert-1/label
+Content-Type: application/json
+
+{"label": "dismiss"}
+```
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{"alert_id": "alert-1", "seq": 3, "record_hash": "5b2586303ac04755dd082424ca41a3007e5b1546aa320c3261f3c1588f5e0184"}
+```
+
+Labels are never overwritten or removed: each one adds a record, and the card shows the latest (`"dismiss"` here, with `evidence_records` 3). Dismissing does not remove the card or change the alert's level; the control layer decides those.
+
+**Export** takes no body:
+
+```http
+POST /api/alerts/alert-1/export
+```
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+```
+
+```json
+{
+  "alert_id": "alert-1",
+  "path": "handoff/alert-1-0004.json",
+  "sha256": "d69aa8c09538645d9483b62671409ab2deb04473028e826e0dac7dcbb7d40308",
+  "package": {
+    "mock": true,
+    "note": "Mock hand-off: a JSON file only, never sent. Detect and report only.",
+    "package_version": 1,
+    "run_id": "s2_seed7_008",
+    "exported_t": 54.6,
+    "alert": {
+      "alert_id": "alert-1",
+      "t": 54.6,
+      "track_ids": ["trk-3"],
+      "level": "red",
+      "highest_level": "red",
+      "score": 0.784,
+      "time_to_impact_s": 37.28,
+      "zone_id": "critical",
+      "zone_label": "Pitch and Stands",
+      "reasons": ["seen hovering", "heading to Pitch and Stands, 37 s"],
+      "p_drone": 0.8,
+      "p_bird": 0.2,
+      "p_attack_drone": 0.0,
+      "last_position": {"track_id": "trk-3", "t": 54.2, "x": 149.372, "y": 150.347, "z": 59.778, "n_stations": 3},
+      "track_history": [
+        {"track_id": "trk-3", "t": 14.2, "x": 493.652, "y": 417.856, "z": 59.836, "n_stations": 2},
+        "... 196 more points, one per published track position, shortened here ...",
+        {"track_id": "trk-3", "t": 54.2, "x": 149.372, "y": 150.347, "z": 59.778, "n_stations": 3}
+      ],
+      "clips": []
+    },
+    "labels": [
+      {"label": "confirm", "t": 54.6, "seq": 2},
+      {"label": "dismiss", "t": 54.6, "seq": 3}
+    ],
+    "alert_record_hash": "5d669b56ef104e90b45434b58a80d2829b0e2b8715b1e444101a162e1b04c82b",
+    "chain_head": {"seq": 3, "record_hash": "5b2586303ac04755dd082424ca41a3007e5b1546aa320c3261f3c1588f5e0184"}
+  }
+}
+```
+
+- **`path`** is relative to the run folder: the file is `runs/s2_seed7_008/handoff/alert-1-0004.json`. **`sha256`** is of that stored file. The `package` in the response is the same content, but its numbers are rounded to 3 decimals like everything the server sends, so hash the file, not the response.
+- **`clips`** is empty in a simulator-only run. With recorded media each entry is `{"source": "st1.rgb", "file": {"path": "station_st1/<16 hex digits>.mp4", "sha256": "..."}}`.
+- **`level`** is the alert's level at export; **`highest_level`** the highest it reached. An alert whose track is lost falls back to `info`.
+- **`chain_head`** is the newest record before this export's own; **`alert_record_hash`** the record written when the alert was raised.
+- The event `{"type": "evidence", "kind": "export", "seq": 4, ...}` follows on `/ws`. When the run ends, every alert is exported once more (`seq` 5 here, `t` 118.0).
+
+**Errors**, captured from the same run:
+
+| Request | Status | Body |
+| --- | --- | --- |
+| `POST /api/alerts/alert-99/label` with `{"label": "confirm"}` | `404` | `{"detail": "no alert 'alert-99' in this run"}` |
+| `POST /api/alerts/alert-1/label` with `{"label": "maybe"}` | `422` | `{"detail": "Input should be 'confirm' or 'dismiss'"}` |
+| `POST /api/alerts/alert-1/label` with `{}` | `422` | `{"detail": "Field required"}` |
+| `POST /api/alerts/alert-1/label` after the run ended, or during a replay | `409` | `{"detail": "no run that keeps evidence is going"}` |
+
+**Try it on the reference page:** start a live run, then use the Confirm, Dismiss and Export buttons on any card. The page shows the reply below the controls.
+
 ## Samples
 
 | File | Shows |
@@ -171,3 +288,6 @@ Errors return `{"detail": "..."}`, always a string: `404` for an unknown alert, 
 - **`reasons` are English sentences.** Arabic (`design.md` B5) will need codes.
 - **Sensor faults never happen in the simulator.** Use `edge_states.jsonl` for that state.
 - **`at_s` is approximate:** the frame index times the look period.
+- **Labels and exports need a live run.** Once a run ends its evidence is closed, and a replay keeps none: both answer `409`.
+- **The committed samples carry no evidence:** `evidence_head` is null and `evidence_records` 0. `edge_states.jsonl` (MOCK) shows a labelled alert and an evidence event.
+- **Evidence can lose its newest records unnoticed.** Removing the newest record together with the file it lists leaves a valid, shorter chain, and `cuas verify` passes. See `design.md` A11.

@@ -58,7 +58,10 @@ async def test_a_live_run_streams_every_frame_and_changes_no_control_output(
     assert (tmp_path / "s2_seed7_002").is_dir() and started.clips_dir is None
     frames = [m for m in published if isinstance(m, Frame)]
     period = site.dashboard.frame_period_s
-    assert [f.t for f in frames] == [k * period for k in range(len(frames))]
+    times = [f.t for f in frames]
+    marks = sorted(set(times))
+    assert times == sorted(times) and marks == [k * period for k in range(len(marks))]
+    assert len(times) > len(marks)  # evidence records sent the latest frame again
     assert frames[-1].t >= started.run.duration_s
     assert any(f.alerts for f in frames)
     _, _, controlled, _ = await record_pipeline("s2", seed=7)
