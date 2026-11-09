@@ -10,8 +10,8 @@
 - **Blocked on:** the user's dashboard (`design.md` B1–B4), on their own branch, being connected to the backend
 - **Tested checkpoint:** `91efcd9` on `phase-5-dashboard` (backend, evidence, reference page with basemap and recorded audio; regular suite 980 passed, gate file excluded). The full operator dashboard acceptance stays open
 - **Phase 6:** planned and approved (`phases.md`, Phase 6 Plan); not started. Implementation starts only after Phase 5 is accepted and merged, on `phase-6-demo` from `main`. Second-machine (C1) and GPU (C2) checks are pending: no machine named yet
-- **Next step:** Phase 5 steps 1–7 are done on `phase-5-dashboard` (backend, evidence, docs; not pushed). Step 8: once the user's dashboard is connected, run the Phase 5 acceptance checks on the integrated branch and report them to the user before any merge. The checks are listed in the Phase 5 plan: at least 2 frames a second during S1 in the user's dashboard, `cuas verify` failing on any edit, a valid package per alert, cold start offline, baseline digests and track identity, real time with the dashboard attached, regular suite and fresh clone. Do not rerun the held-out evaluations or the frozen gate
-- **Phase 4:** merged into `main` at `8986f71` and pushed, `main` only, to the private repo `mithun2244/counter-drone-system`. Post-merge check 14 passed. The frozen gate (`tests/test_decision.py`) ran once, on `ce4ea52` (139 of 139), and is not rerun. Regular suite runs pass `--ignore=tests/test_decision.py`. Gate seed declarations, freezes and both gate runs are under Measured results and in the git history
+- **Next step:** Phase 5 steps 1–7 are done on `phase-5-dashboard` (backend, evidence and docs; branch published to the private GitHub repo). Step 8: once the user's dashboard is connected, run the Phase 5 acceptance checks on the integrated branch and report them to the user before any merge. The checks are listed in the Phase 5 plan: at least 2 frames a second during S1 in the user's dashboard, `cuas verify` failing on any edit, a valid package per alert, cold start offline, baseline digests and track identity, real time with the dashboard attached, regular suite and fresh clone. Do not rerun the held-out evaluations or the frozen gate
+- **Phase 4:** merged into `main` at `8986f71` and published as `main` to the private repo `mithun2244/counter-drone-system`. Post-merge check 14 passed. The frozen gate (`tests/test_decision.py`) ran once, on `ce4ea52` (139 of 139), and is not rerun. Regular suite runs pass `--ignore=tests/test_decision.py`. Gate seed declarations, freezes and both gate runs are under Measured results and in the git history
 - **Seeds already seen, so not usable as unseen gate seeds:** development 1–19; 7 (withdrawn from the Phase 4 gates); Phase 3 101–120; Phase 4 gates S1 201–221 and 301–322, S3 201–211 and 301–312, S4 301–312; scenario own seeds 1001, 2002 (S2 and S4) and 3003
 - **Start sessions from `cuas-demo/`**, or `CLAUDE.md` will not auto-load
 
@@ -187,6 +187,11 @@ Approved by the user on 2026-11-07, for the Phase 2 demo. The plan's CPU time re
 - [ ] GPU laptop available for the live demo?
 
 ## Session log (newest first)
+
+### 2026-11-09 — GitHub handoff (docs only)
+- Done: confirmed `663f010` was on GitHub. Added a repository entry point in `README.md`, added `GITHUB.md`, and refreshed the commands and workflow in `CLAUDE.md`.
+- Decision: review and update affected documentation before publishing changes to GitHub (`rules.md` §8).
+- Next step: Phase 5 acceptance with the full operator dashboard. See Current status.
 
 ### 2026-11-09 — Phase 6 plan (docs only)
 - Done: Phase 6 plan written into `phases.md` and approved; `91efcd9` recorded as the tested Phase 5 checkpoint. No Phase 6 code.
