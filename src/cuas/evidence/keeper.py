@@ -44,7 +44,9 @@ from cuas.schemas.topics import EVIDENCE_RECORD
 
 log = logging.getLogger(__name__)
 
-RECORDING_DIR = "station_{station}/{clip}.mp4"  # where the recorder keeps camera clips
+# Where the recorder keeps recordings: WAV for a microphone, MP4 for every camera.
+RECORDING_DIR = "station_{station}/{clip}{suffix}"
+MICROPHONE = "acoustic"
 
 
 @dataclass
@@ -209,7 +211,9 @@ class EvidenceKeeper:
         seen = sorted({c for tid in track_ids for c in self._clips.get(tid, set())})
         clips = []
         for source, clip in seen:
-            path = RECORDING_DIR.format(station=source.split(".")[0], clip=clip)
+            station, _, sensor = source.partition(".")
+            suffix = ".wav" if sensor == MICROPHONE else ".mp4"
+            path = RECORDING_DIR.format(station=station, clip=clip, suffix=suffix)
             ref = self._store.ref(path)
             if ref is not None:
                 clips.append(Clip(source=source, file=ref))

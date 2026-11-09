@@ -180,7 +180,7 @@
   },
   "Clip": {
    "additionalProperties": false,
-   "description": "A recording behind the alert's look evidence: ``source`` is ``station.sensor``.",
+   "description": "A recording behind the alert's look or sound evidence: ``source`` is ``station.sensor``.",
    "properties": {
     "file": {
      "$ref": "#/$defs/FileRef"

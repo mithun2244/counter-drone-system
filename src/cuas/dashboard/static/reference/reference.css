@@ -11,3 +11,6 @@ li.selected { outline: 1px solid #888; }
 #banner { color: #111; background: #e6c200; padding: 0.3em 0.6em; display: none; }
 #message { color: #ff8a8a; }
 button, select { background: #2a2a2a; color: #ddd; border: 1px solid #444; padding: 0.2em 0.6em; }
+#sounds { list-style: none; padding: 0; margin: 0.3em 0 0; }
+#sounds li { cursor: default; display: flex; gap: 0.8em; align-items: center; }
+#audio-note { color: #999; font-size: 0.9em; }

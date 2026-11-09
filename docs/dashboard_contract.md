@@ -123,6 +123,7 @@ Colour tracks by level, and always add a text label too, so colour is never the 
 | `label` | `confirm`, `dismiss` or null: the operator's latest label |
 | `evidence_records` | How many evidence records this alert has |
 | `looks` | Recordings behind the look evidence: `source` (`st1.rgb`, `st1.thermal`, `st2.zoom`, ...), `clip_url`, and `at_s`, the approximate offset into the clip. Empty in a simulator-only run |
+| `sounds` | Station microphone recordings behind the sound clue: `source` (`st1.acoustic`, ...), `station_id` and `clip_url` (a WAV). They are the **clean source**: the classifier heard each one mixed with background noise at a simulated distance and wind, so label them "Clean source audio". No `at_s`: the source loops. Empty in a simulator-only run. Added after version 1 shipped; defaults to `[]`, so the version stays 1 |
 
 **`pre_alerts[]` fields:**
 - `sector_id`, `sensor_id` (a picket such as `pk4`, or `st1.acoustic`)
@@ -151,7 +152,7 @@ Errors return `{"detail": "..."}`, always a string: `404` for an unknown alert, 
 | `POST /api/run/control` | `action`: `pause` or `play`; or `speed` with `speed`: 1, 2 or 5 | The `run` message |
 | `POST /api/alerts/{alert_id}/label` | `label`: `confirm` or `dismiss` | `alert_id`, `seq`, `record_hash` |
 | `POST /api/alerts/{alert_id}/export` | — | `alert_id`, `path`, `sha256`, and the hand-off `package` (`docs/handoff.schema.json`). Every alert is also exported when the run ends |
-| `GET /api/clips/{station}/{clip}` | — | The recording (H.264 MP4), for a `<video>` element. Seek to `at_s` |
+| `GET /api/clips/{station}/{clip}` | — | The recording: H.264 MP4 (`video/mp4`) for a `looks` entry, for a `<video>` element, seeking to `at_s`; WAV (`audio/wav`) for a `sounds` entry, for an `<audio>` element |
 | `GET /api/contract` | — | This contract's JSON Schema |
 | `GET /api/basemap` | — | The display basemap in site metres (`docs/basemap.schema.json`), or `404` when this machine has none: draw the local grid then. Added after version 1 without changing any message |
 

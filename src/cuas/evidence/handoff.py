@@ -32,7 +32,7 @@ class HistoryPoint(Model):
 
 
 class Clip(Model):
-    """A recording behind the alert's look evidence: ``source`` is ``station.sensor``."""
+    """A recording behind the alert's look or sound evidence: ``source`` is ``station.sensor``."""
 
     source: str
     file: FileRef

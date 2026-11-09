@@ -220,7 +220,7 @@ A test edits every stored file of a finished run, one at a time, by flipping one
 **Other limits.**
 - Labels and exports need a live run: a replay keeps no evidence, and an ended run's evidence is closed.
 - A request still queued when the run ends gets no record, and its sender is told the run has ended.
-- A recording that no alert's looks use is protected only by the recorder's hash list, which no record anchors.
+- A recording that no alert's looks or sounds use is protected only by the recorder's hash list, which no record anchors. Alert snapshots and hand-off packages list the camera clips and microphone WAVs matched to the alert so far: a snapshot taken before any microphone heard the target lists no WAV.
 
 ---
 

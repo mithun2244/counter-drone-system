@@ -145,6 +145,31 @@ def test_the_recordings_behind_its_looks_are_listed_with_their_hashes(
     assert (snapshot.p_drone, snapshot.p_bird) == (0.9, 0.1)
 
 
+def test_the_microphone_recording_behind_the_sound_clue_is_listed_as_a_wav(
+    keeper: EvidenceKeeper, tmp_path: Path
+) -> None:
+    Recorder(tmp_path).save("st1", "1111222233334444", ".wav", b"sound")
+    classed = TrackClass(
+        track_id="trk-1",
+        t=1.0,
+        p_drone=0.9,
+        p_bird=0.1,
+        p_attack_drone=0.0,
+        evidence=ClueEvidence(sound=0.9),
+        looks={"st1.acoustic": "1111222233334444:12"},
+    )
+    records = feed(
+        keeper, track("trk-1", 1.0), classed, threat("trk-1", 1.0, "red", "a")
+    )
+    sound = FileRef(
+        path="station_st1/1111222233334444.wav",
+        sha256=hashlib.sha256(b"sound").hexdigest(),
+    )
+    assert records[0].files[1:] == (sound,)
+    snapshot = read(AlertSnapshot, tmp_path, records[0].files[0])
+    assert [(c.source, c.file) for c in snapshot.clips] == [("st1.acoustic", sound)]
+
+
 def test_labels_and_exports_answer_their_requests(
     keeper: EvidenceKeeper, tmp_path: Path
 ) -> None:

@@ -189,6 +189,28 @@ def test_looks_become_clip_links_at_the_frame_the_model_saw(
     )
 
 
+def test_sound_windows_become_audio_links_apart_from_the_video(
+    builder: FrameBuilder,
+) -> None:
+    looks = {
+        "st1.acoustic": "1111222233334444:12",
+        "st1.rgb": "abcdef0123456789:7",
+        "st3.acoustic": "5555666677778888:0",
+    }
+    feed(
+        builder,
+        track("trk-1", 0.0),
+        classed("trk-1", 0.0, 0.9, looks=looks),
+        threat("trk-1", 0.0, "red", "alert-1"),
+    )
+    card = builder.flush().alerts[0]
+    assert [r.source for r in card.looks] == ["st1.rgb"]
+    assert [(s.source, s.station_id, s.clip_url) for s in card.sounds] == [
+        ("st1.acoustic", "st1", "/api/clips/st1/1111222233334444"),
+        ("st3.acoustic", "st3", "/api/clips/st3/5555666677778888"),
+    ]
+
+
 @pytest.mark.parametrize(
     ("bearing", "key"), [(0.0, "N"), (135.0, "SE"), (200.0, "S"), (350.0, "N")]
 )

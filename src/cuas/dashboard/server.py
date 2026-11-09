@@ -54,7 +54,8 @@ STATIC = Path(__file__).parent / "static"
 REFERENCE_DIR = STATIC / "reference"
 APP_DIR = STATIC / "app"
 CLIP_ID = re.compile(r"^[0-9a-f]{16}$")
-CLIP_SUFFIX = ".mp4"
+# Camera clips and microphone recordings, as the recorder keeps them.
+CLIP_TYPES = {".mp4": "video/mp4", ".wav": "audio/wav"}
 
 Outgoing = Hello | RunInfo | Frame | EvidenceEvent
 Publish = Callable[[Outgoing], None]
@@ -259,12 +260,9 @@ class Hub:
         stations = {s.station_id for s in self.run.site.stations}
         if station_id not in stations or not CLIP_ID.match(clip_id):
             return None
-        path = (
-            self._started.clips_dir
-            / f"station_{station_id}"
-            / f"{clip_id}{CLIP_SUFFIX}"
-        )
-        return path if path.is_file() else None
+        folder = self._started.clips_dir / f"station_{station_id}"
+        paths = (folder / f"{clip_id}{suffix}" for suffix in CLIP_TYPES)
+        return next((path for path in paths if path.is_file()), None)
 
     def join(self) -> _Client:
         client = _Client()
@@ -341,7 +339,7 @@ def create_app(
         path = hub.clip(station_id, clip_id)
         if path is None:
             raise HTTPException(status_code=404, detail="no such recording in this run")
-        return FileResponse(path, media_type="video/mp4")
+        return FileResponse(path, media_type=CLIP_TYPES[path.suffix])
 
     @app.get("/api/basemap")
     def get_basemap() -> Basemap:

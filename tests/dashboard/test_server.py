@@ -145,6 +145,12 @@ def test_clips_are_served_only_by_real_ids_from_this_run(
         client.post("/api/runs", json=STADIUM)
         good = client.get("/api/clips/st1/abcdef0123456789")
         assert good.status_code == 200 and good.content == b"not really a video"
+        assert good.headers["content-type"] == "video/mp4"
+        (station / "1111222233334444.wav").write_bytes(b"not really a sound")
+        sound = client.get("/api/clips/st1/1111222233334444")
+        assert sound.status_code == 200 and sound.content == b"not really a sound"
+        assert sound.headers["content-type"] == "audio/wav"
+        assert client.get("/api/clips/st2/1111222233334444").status_code == 404
         for bad in [
             "st9/abcdef0123456789",
             "st1/abc",
@@ -276,3 +282,11 @@ def test_a_replay_keeps_no_evidence_so_labels_are_refused(client: TestClient) ->
         reply = client.post("/api/alerts/alert-1/label", json={"label": "confirm"})
         assert reply.status_code == 409
         until_ended(ws)
+
+
+def test_the_reference_page_labels_recorded_audio_as_the_clean_source() -> None:
+    """The classifier heard a noise-mixed version: the page must not suggest otherwise."""
+    page = (STATIC / "reference" / "index.html").read_text(encoding="utf-8")
+    script = (STATIC / "reference" / "reference.js").read_text(encoding="utf-8")
+    assert "Recorded audio" in page and "Clean source audio" in page
+    assert "card.sounds" in script

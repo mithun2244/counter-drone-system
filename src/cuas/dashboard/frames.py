@@ -26,6 +26,7 @@ from cuas.dashboard.contract import (
     SensorView,
     SiteMap,
     SiteProfile,
+    SoundRef,
     StationView,
     TrackView,
     ZoneView,
@@ -49,6 +50,7 @@ COMPASS = ("N", "NE", "E", "SE", "S", "SW", "W", "NW")
 EARLY = 1e-9
 FULL_VISIBILITY = 1.0
 CLIP_URL = "/api/clips/{station}/{clip}"
+ACOUSTIC = "acoustic"
 
 
 def compass(bearing_deg: float) -> str:
@@ -362,13 +364,16 @@ class FrameBuilder:
             label=self._operator_labels.get(alert_id),
             evidence_records=self._records.get(alert_id, 0),
             looks=[] if cls is None else self._looks(cls),
+            sounds=[] if cls is None else self._sounds(cls),
         )
 
     def _looks(self, cls: TrackClass) -> list[LookRef]:
         """A snapshot ref is ``<clip id>:<look index>``; looks are ``look period`` apart."""
         out = []
         for source, ref in cls.looks.items():
-            station = source.split(".")[0]
+            station, _, sensor = source.partition(".")
+            if sensor == ACOUSTIC:
+                continue
             clip, _, index = ref.rpartition(":")
             out.append(
                 LookRef(
@@ -377,6 +382,18 @@ class FrameBuilder:
                     at_s=int(index) * self._look_period_s,
                 )
             )
+        return out
+
+    @staticmethod
+    def _sounds(track_class: TrackClass) -> list[SoundRef]:
+        """No time into the clip: the source loops, so a window index can pass its end."""
+        out = []
+        for source, ref in track_class.looks.items():
+            station, _, sensor = source.partition(".")
+            if sensor == ACOUSTIC:
+                clip = ref.rpartition(":")[0]
+                url = CLIP_URL.format(station=station, clip=clip)
+                out.append(SoundRef(source=source, station_id=station, clip_url=url))
         return out
 
     def _pre_alert(self, sector: SectorTrack, first_t: float) -> PreAlert:

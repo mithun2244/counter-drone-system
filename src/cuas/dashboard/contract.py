@@ -165,6 +165,19 @@ class LookRef(ContractModel):
     """Seconds into the clip of the frame the model looked at (approximate)."""
 
 
+class SoundRef(ContractModel):
+    """A station microphone's recording behind the sound clue, for the recorded-audio panel.
+
+    The clean source: the classifier heard it mixed with background noise at a simulated
+    distance and wind.
+    """
+
+    source: str
+    """``station.acoustic``, for example ``st1.acoustic``."""
+    station_id: str
+    clip_url: str
+
+
 class AlertCard(ContractModel):
     """One alert, in the order the threat ranking published: level, time to impact, score.
 
@@ -189,7 +202,9 @@ class AlertCard(ContractModel):
     label: Label | None
     evidence_records: int
     looks: list[LookRef]
-    """Empty in a simulator-only run: there are no recordings."""
+    """Camera recordings. Empty in a simulator-only run: there are no recordings."""
+    sounds: list[SoundRef] = []
+    """Microphone recordings (WAV), clean sources. Empty in a simulator-only run."""
 
 
 class PreAlert(ContractModel):

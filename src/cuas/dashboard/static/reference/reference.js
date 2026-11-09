@@ -2,7 +2,7 @@
 // nothing loaded from outside this server. It proves the stream works; it is not the dashboard.
 "use strict";
 
-const state = { profiles: [], run: null, frame: null, selected: null, basemap: null, cache: null };
+const state = { profiles: [], run: null, frame: null, selected: null, sounds: [], basemap: null, cache: null };
 const GRID_M = 500;
 const ROAD_WIDTH = { motorway: 3, trunk: 2.5, primary: 2, secondary: 1.5, tertiary: 1 };
 const SIMULATED = "Simulated scenario: fictional site";
@@ -27,6 +27,7 @@ function receive(message) {
     state.run = message;
   } else if (message.type === "frame") {
     state.frame = message;
+    refreshSounds();
   }
   draw();
 }
@@ -287,12 +288,46 @@ function selectAlert(event) {
     $("clip").removeAttribute("src");
     $("clip-note").textContent = "No recording for this alert.";
   }
+  showSounds(card ? card.sounds : []);
   draw();
+}
+
+function refreshSounds() {  // a microphone may hear the alert after it was selected
+  const card = state.selected && state.frame.alerts.find((a) => a.alert_id === state.selected);
+  const urls = (sounds) => sounds.map((s) => s.clip_url).join();
+  if (card && $("audio").paused && urls(card.sounds) !== urls(state.sounds)) showSounds(card.sounds);
+}
+
+function showSounds(sounds) {  // rebuilt on selection, or on a change while stopped: never mid-click
+  stopAudio();
+  state.sounds = sounds;
+  $("sounds").innerHTML = sounds.length
+    ? sounds.map((s) => `<li>Station ${esc(s.station_id)} <button data-src="${esc(s.clip_url)}">Play</button></li>`).join("")
+    : "<li>No recorded audio for this alert.</li>";
+}
+
+function stopAudio() {
+  $("audio").pause();
+  $("audio").removeAttribute("src");
+  for (const b of $("sounds").querySelectorAll("button")) b.textContent = "Play";
+}
+
+function playSound(event) {
+  const button = event.target.closest("button[data-src]");
+  if (!button) return;
+  const playing = button.textContent === "Stop";
+  stopAudio();
+  if (playing) return;
+  $("audio").src = button.dataset.src;
+  button.textContent = "Stop";
+  $("audio").play().catch((error) => { button.textContent = "Play"; $("message").textContent = `Audio: ${error}`; });
 }
 
 $("profile").addEventListener("change", fillScenarios);
 $("go").addEventListener("click", startRun);
 $("alerts").addEventListener("click", selectAlert);
+$("sounds").addEventListener("click", playSound);
+$("audio").addEventListener("ended", stopAudio);
 $("alerts").addEventListener("pointerdown", (event) => {  // the queue is redrawn every frame
   const button = event.target.closest("button");
   const item = event.target.closest("li[data-alert]");

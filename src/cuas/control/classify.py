@@ -182,6 +182,10 @@ class Classifier:
                     (t, p)
                 )  # a frame already seen wide adds nothing
             return
+        if bearing.snapshot_ref is not None:
+            evidence.latest_looks[f"{bearing.station_id}.{sensor}"] = (
+                bearing.snapshot_ref
+            )
         p = sound_probability(bearing.class_probs)
         if p is not None:
             evidence.sounds.append(p)

@@ -328,3 +328,14 @@ def test_a_track_class_names_the_latest_frame_from_each_camera(
     ]
     (out,) = classifier.update(0.2, [track("trk-1", TARGET, 0.2)], later)
     assert out.track_class.looks == {"st1.rgb": "f:8", "st2.zoom": "g:3"}
+
+
+def test_a_track_class_names_the_latest_sound_window_from_each_microphone(
+    classifier: Classifier, site: SiteConfig
+) -> None:
+    """The recorded-audio panel and the evidence need the WAV the classifier heard."""
+    sound = {"electric_drone": 0.7, "engine": 0.1, "background": 0.2}
+    heard = looking_at(site, TARGET, 0.0, "acoustic", sound, frame="a:3")
+    unrecorded = looking_at(site, TARGET, 0.0, "acoustic", sound, station_index=1)
+    (out,) = classifier.update(0.0, [track("trk-1", TARGET, 0.0)], [heard, unrecorded])
+    assert out.track_class.looks == {"st1.acoustic": "a:3"}

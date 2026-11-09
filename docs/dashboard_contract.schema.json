@@ -320,6 +320,14 @@
       "title": "Score",
       "type": "number"
      },
+     "sounds": {
+      "default": [],
+      "items": {
+       "$ref": "#/$defs/SoundRef"
+      },
+      "title": "Sounds",
+      "type": "array"
+     },
      "track_id": {
       "title": "Track Id",
       "type": "string"
@@ -1051,6 +1059,31 @@
      "scenarios"
     ],
     "title": "SiteProfile",
+    "type": "object"
+   },
+   "SoundRef": {
+    "additionalProperties": false,
+    "description": "A station microphone's recording behind the sound clue, for the recorded-audio panel.\n\nThe clean source: the classifier heard it mixed with background noise at a simulated\ndistance and wind.",
+    "properties": {
+     "clip_url": {
+      "title": "Clip Url",
+      "type": "string"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     },
+     "station_id": {
+      "title": "Station Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "source",
+     "station_id",
+     "clip_url"
+    ],
+    "title": "SoundRef",
     "type": "object"
    },
    "StationView": {
