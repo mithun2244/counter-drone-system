@@ -290,3 +290,31 @@ def test_the_reference_page_labels_recorded_audio_as_the_clean_source() -> None:
     script = (STATIC / "reference" / "reference.js").read_text(encoding="utf-8")
     assert "Recorded audio" in page and "Clean source audio" in page
     assert "card.sounds" in script
+
+
+def test_root_serves_the_operator_dashboard_and_its_files(site: SiteConfig) -> None:
+    launcher = ReplayLauncher(EDGE, site.simulation.tick_s, pace=FAST)
+    with TestClient(create_app(Hub(launcher))) as client:  # the real static/app
+        root = client.get("/", follow_redirects=False)
+        assert root.status_code == 200
+        for name in ("app.css", "text.js", "map.js", "app.js"):
+            assert name in root.text
+            assert client.get(f"/{name}").status_code == 200, name
+        assert client.get("/reference/").status_code == 200
+
+
+def test_the_operator_dashboard_shows_the_required_wording() -> None:
+    """Contract and design wording: clean-source audio, the export label, B4 states, and the
+    simulated-scenario notice with the basemap's own notice and attribution."""
+    app = STATIC / "app"
+    page = (app / "index.html").read_text(encoding="utf-8")
+    text = (app / "text.js").read_text(encoding="utf-8")
+    script = (app / "map.js").read_text(encoding="utf-8")
+    # classic scripts, not modules: some Windows setups serve .js as text/plain
+    assert '<script src="text.js"></script>' in page
+    assert "Clean source audio" in text and "Recorded audio" in text
+    assert '"Export hand-off JSON"' in text
+    assert "All clear · last check" in text
+    assert "Engine heard, {compass}, unconfirmed" in text
+    assert "Simulated scenario: fictional site · local grid {grid} m" in text
+    assert "basemap.notice" in script and "basemap.attribution" in script
