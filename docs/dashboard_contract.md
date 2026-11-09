@@ -294,7 +294,7 @@ Content-Type: application/json
 | `POST /api/alerts/alert-1/label` with `{}` | `422` | `{"detail": "Field required"}` |
 | `POST /api/alerts/alert-1/label` after the run ended, or during a replay | `409` | `{"detail": "no run that keeps evidence is going"}` |
 
-**Try it on the reference page:** start a live run, then use the Confirm, Dismiss and Export buttons on any card. The page shows the reply below the controls.
+**Try it on the reference page:** start a live run, then use the Confirm, Dismiss and Export hand-off JSON buttons on any card. The page shows the reply below the controls: for an export, the saved path and its SHA-256.
 
 ## Samples
 

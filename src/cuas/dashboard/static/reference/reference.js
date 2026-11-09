@@ -243,7 +243,7 @@ function drawQueue(frame) {
       <br>${esc(a.reasons.join(", "))}${a.label ? ` · labelled ${esc(a.label)}` : ""}
       · ${a.evidence_records} evidence records
       <br><button data-label="confirm">Confirm</button> <button data-label="dismiss">Dismiss</button>
-      <button data-export>Export</button>
+      <button data-export>Export hand-off JSON</button>
     </li>`).join("") : "<li>All clear</li>";
   if (frame) {
     for (const pre of frame.pre_alerts) {
@@ -269,7 +269,7 @@ async function act(button, alertId) {
     if (result) $("message").textContent = `${alertId} ${button.dataset.label}ed: record ${result.seq}`;
   } else {
     const result = await post(`${path}/export`, {});
-    if (result) $("message").textContent = `${alertId} exported to ${result.path}`;
+    if (result) $("message").textContent = `${alertId} saved to ${result.path}, sha256 ${result.sha256}`;
   }
 }
 
