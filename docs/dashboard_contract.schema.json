@@ -629,6 +629,66 @@
     "title": "Frame",
     "type": "object"
    },
+   "HeardView": {
+    "additionalProperties": false,
+    "description": "The latest microphone bearing the classifier matched to this track: a wedge from the\nstation, as wide as a station microphone's ``pre_alert`` wedge. Never drawn from a station\nname, a clip or the map: only this link.",
+    "properties": {
+     "bearing_deg": {
+      "title": "Bearing Deg",
+      "type": "number"
+     },
+     "compass": {
+      "enum": [
+       "N",
+       "NE",
+       "E",
+       "SE",
+       "S",
+       "SW",
+       "W",
+       "NW"
+      ],
+      "title": "Compass",
+      "type": "string"
+     },
+     "half_width_deg": {
+      "title": "Half Width Deg",
+      "type": "number"
+     },
+     "sensor_id": {
+      "title": "Sensor Id",
+      "type": "string"
+     },
+     "station_id": {
+      "title": "Station Id",
+      "type": "string"
+     },
+     "t": {
+      "title": "T",
+      "type": "number"
+     },
+     "x": {
+      "title": "X",
+      "type": "number"
+     },
+     "y": {
+      "title": "Y",
+      "type": "number"
+     }
+    },
+    "required": [
+     "sensor_id",
+     "station_id",
+     "x",
+     "y",
+     "bearing_deg",
+     "compass",
+     "half_width_deg",
+     "t"
+    ],
+    "title": "HeardView",
+    "type": "object"
+   },
    "Hello": {
     "additionalProperties": false,
     "description": "The first message on every connection.",
@@ -1132,6 +1192,14 @@
      "coasting": {
       "title": "Coasting",
       "type": "boolean"
+     },
+     "heard": {
+      "default": [],
+      "items": {
+       "$ref": "#/$defs/HeardView"
+      },
+      "title": "Heard",
+      "type": "array"
      },
      "level": {
       "anyOf": [

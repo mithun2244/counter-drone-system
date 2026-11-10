@@ -13,6 +13,7 @@ const MAP = {
   arrowSeconds: 5,
   closeUpMargin: 0.25,  // close-up: the outermost zone plus this share of its size on each side
   roadWidth: { motorway: 3, trunk: 2.5, primary: 2, secondary: 1.5, tertiary: 1 },
+  heardColour: "#ffd84a",  // the selected track's "Last heard from" wedge and label
   colour: { red: "#ff5c5c", amber: "#ffb347", info: "#a3adb8", none: "#8b949e", accent: "#4d9fff" },
 };
 const mapCache = { basemap: null, key: null };
@@ -51,7 +52,7 @@ function layer(width, height, ratio) {
 }
 
 // Draws everything, in the contract's order. `scene`: run, frame, basemap, rays, sectors, closeUp,
-// selectedTrack. The canvas fills the pane; the grid runs edge to edge under the basemap.
+// selectedTrack, avoid (the video overlay's box in canvas pixels, or null). The canvas fills the pane; the grid runs edge to edge under the basemap.
 function drawMap(canvas, scene) {
   const ratio = window.devicePixelRatio || 1;
   const width = canvas.clientWidth;
@@ -69,7 +70,7 @@ function drawMap(canvas, scene) {
   if (bounds) {
     const view = toScreen(bounds, width, height);
     drawBackground(ctx, view, basemap, bounds, { width, height, ratio });
-    if (run) drawSite(ctx, view, run.site, frame, scene, { width, height, ratio });
+    if (run) drawSite(ctx, view, run.site, frame, scene, { width, height, ratio, avoid: scene.avoid });
     drawScaleAndNorth(ctx, view, width, height);
   }
   drawNotice(ctx, basemap, width, height);
@@ -167,31 +168,41 @@ function drawSite(ctx, view, site, frame, scene, size) {
   if (!frame) { drawSensors(ctx, view, site, null); return; }
   if (frame.coverage && frame.coverage.warning) drawCoverageLoss(ctx, view, site, frame.coverage, size);
   if (scene.sectors) for (const wedge of frame.pre_alerts) drawWedge(ctx, view, wedge);  // this frame's only
+  const selected = frame.tracks.find((track) => track.track_id === scene.selectedTrack);
+  // Only the backend's match; a server started before `heard` existed sends none.
+  const heard = (selected && selected.status === "confirmed" && selected.heard) || [];
+  for (const wedge of heard) drawWedge(ctx, view, wedge, true);
   drawSensors(ctx, view, site, frame);
   if (scene.rays) drawRays(ctx, view, site, frame.rays);
   drawZoom(ctx, view, site, frame);
   for (const track of frame.tracks) drawTrack(ctx, view, track, track.track_id === scene.selectedTrack);
   const placed = [];  // label boxes already drawn this frame
   if (scene.sectors) for (const wedge of frame.pre_alerts) labelWedge(ctx, view, wedge, size, placed);
+  for (const wedge of heard) labelWedge(ctx, view, wedge, size, placed, heardText(wedge), MAP.heardColour);
 }
 
 function sectorText(wedge) {  // "st3 · Engine heard east · Unconfirmed"
   return t("sectorLabel", { sensor: wedge.sensor_id.split(".")[0], direction: t(`compassWord.${wedge.compass}`) });
 }
 
-function labelWedge(ctx, view, wedge, size, placed) {
+function heardText(wedge) {  // "Last heard from st3 · east · 01:23.4"
+  return t("heardLabel", { sensor: wedge.station_id, direction: t(`compassWord.${wedge.compass}`), t: clock(wedge.t) });
+}
+
+function labelWedge(ctx, view, wedge, size, placed, text = sectorText(wedge), colour = "#ffcf7a") {
   const [mx, my] = view.at(...along(wedge.x, wedge.y, wedge.bearing_deg, MAP.sectorLabelAt * MAP.wedgeReach));
-  const text = sectorText(wedge);
   ctx.font = "700 12px system-ui, sans-serif";
   const w = ctx.measureText(text).width;
-  const x = Math.min(Math.max(mx - w / 2, 6), size.width - w - 6);  // kept on the pane
+  let x = Math.min(Math.max(mx - w / 2, 6), size.width - w - 6);  // kept on the pane
   let y = Math.min(Math.max(my, 18), size.height - 26);
+  const a = size.avoid;  // the video overlay: keep labels to its left
+  if (a && x < a.x + a.w && a.x < x + w + 8 && y - 13 < a.y + a.h && a.y < y + 5) x = Math.max(6, a.x - w - 12);
   const hits = (yy) => placed.some((r) => x < r.x + r.w + 8 && r.x < x + w + 8 && Math.abs(r.y - yy) < 20);
   for (let tries = 0; tries < placed.length && hits(y); tries++) y -= 20;  // step clear of earlier labels
   placed.push({ x, y, w });
   ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
   ctx.fillRect(x - 4, y - 13, w + 8, 18);
-  ctx.fillStyle = "#ffcf7a";
+  ctx.fillStyle = colour;
   ctx.fillText(text, x, y);
   ctx.font = "12px system-ui, sans-serif";
 }
@@ -232,18 +243,22 @@ function drawCoverageLoss(ctx, view, site, coverage, size) {
   ctx.drawImage(canvas, 0, 0, size.width, size.height);
 }
 
-function drawWedge(ctx, view, wedge) {
+// Solid: an unconfirmed pre_alert. Heard: the selected track's matched bearing, dashed, unfilled.
+function drawWedge(ctx, view, wedge, heard = false) {
   const [x, y] = view.at(wedge.x, wedge.y);
   const toCanvas = (deg) => ((deg - 90) * Math.PI) / 180;
+  ctx.save();
   ctx.fillStyle = "rgba(255, 179, 71, 0.2)";
-  ctx.strokeStyle = "rgba(255, 179, 71, 0.6)";
+  ctx.strokeStyle = heard ? MAP.heardColour : "rgba(255, 179, 71, 0.6)";
+  if (heard) { ctx.lineWidth = 2; ctx.setLineDash([8, 5]); }
   ctx.beginPath();
   ctx.moveTo(x, y);
   ctx.arc(x, y, MAP.wedgeReach * view.scale,
     toCanvas(wedge.bearing_deg - wedge.half_width_deg), toCanvas(wedge.bearing_deg + wedge.half_width_deg));
   ctx.closePath();
-  ctx.fill();
+  if (!heard) ctx.fill();
   ctx.stroke();
+  ctx.restore();
 }
 
 function drawSensors(ctx, view, site, frame) {

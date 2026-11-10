@@ -15,7 +15,14 @@ from cuas.config import ClassifySettings
 from cuas.control.association import assign, bearing_distance2
 from cuas.control.behaviour import Features, Fix, MoveClue
 from cuas.geometry import angle_difference_deg, bearing_to
-from cuas.schemas import BearingDetection, ClueEvidence, PicketAlert, Track, TrackClass
+from cuas.schemas import (
+    BearingDetection,
+    ClueEvidence,
+    HeardBearing,
+    PicketAlert,
+    Track,
+    TrackClass,
+)
 from cuas.schemas.base import Vector3
 
 CAMERAS = ("rgb", "thermal", "zoom")
@@ -69,6 +76,7 @@ class _Evidence:
     zoom_looks: list[tuple[float, float]] = field(default_factory=list)
     wide_frames: set[str] = field(default_factory=set)
     latest_looks: dict[str, str] = field(default_factory=dict)
+    heard: dict[str, HeardBearing] = field(default_factory=dict)
     sounds: list[float] = field(default_factory=list)
     piston: list[float] = field(default_factory=list)
 
@@ -182,6 +190,9 @@ class Classifier:
                     (t, p)
                 )  # a frame already seen wide adds nothing
             return
+        evidence.heard[f"{bearing.station_id}.{sensor}"] = HeardBearing(
+            t=bearing.t, azimuth_deg=bearing.azimuth_deg, sigma_deg=bearing.sigma_deg
+        )
         if bearing.snapshot_ref is not None:
             evidence.latest_looks[f"{bearing.station_id}.{sensor}"] = (
                 bearing.snapshot_ref
@@ -232,6 +243,7 @@ class Classifier:
             p_attack_drone=p_attack,
             evidence=ClueEvidence(**clues),
             looks=dict(sorted(evidence.latest_looks.items())),
+            heard=dict(sorted(evidence.heard.items())),
         )
         return Classified(
             track,

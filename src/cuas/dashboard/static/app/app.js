@@ -415,8 +415,10 @@ function render() {
   renderAcoustic();
   renderDetails();
   const card = selectedCard();
+  const o = $("video-overlay").getBoundingClientRect(), m = $("map").getBoundingClientRect();
+  const avoid = $("video-overlay").hidden ? null : { x: o.left - m.left, y: o.top - m.top, w: o.width, h: o.height };
   drawMap($("map"), { run: state.run, frame: state.frame, basemap: state.basemap, selectedTrack: card && card.track_id,
-    rays: $("rays").checked, sectors: $("sectors").checked, closeUp: $("close-up").checked });
+    rays: $("rays").checked, sectors: $("sectors").checked, closeUp: $("close-up").checked, avoid });
 }
 
 async function loadBasemap() {

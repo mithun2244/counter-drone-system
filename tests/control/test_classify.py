@@ -13,7 +13,7 @@ from cuas.control.classify import (
     sound_probability,
 )
 from cuas.geometry import bearing_to
-from cuas.schemas import BearingDetection, PicketAlert, Track
+from cuas.schemas import BearingDetection, HeardBearing, PicketAlert, Track
 
 WEIGHTS = {"look": 1.0, "move": 1.0, "sound": 1.0}
 FLOOR = 0.02
@@ -339,3 +339,30 @@ def test_a_track_class_names_the_latest_sound_window_from_each_microphone(
     unrecorded = looking_at(site, TARGET, 0.0, "acoustic", sound, station_index=1)
     (out,) = classifier.update(0.0, [track("trk-1", TARGET, 0.0)], [heard, unrecorded])
     assert out.track_class.looks == {"st1.acoustic": "a:3"}
+
+
+def test_a_track_class_keeps_the_microphone_bearing_the_gate_matched_to_it(
+    classifier: Classifier, site: SiteConfig
+) -> None:
+    """The dashboard's "Last heard from" wedge: the matched bearing itself, never a guess."""
+    sound = {"electric_drone": 0.7, "engine": 0.1, "background": 0.2}
+    heard = looking_at(site, TARGET, 1.0, "acoustic", sound, frame="a:3")
+    away = (-5 * TARGET[0], -5 * TARGET[1], TARGET[2])  # the opposite side of the site
+    elsewhere = looking_at(site, away, 1.0, "acoustic", sound, station_index=1)
+    (out,) = classifier.update(1.0, [track("trk-1", TARGET, 1.0)], [heard, elsewhere])
+    assert out.track_class.heard == {
+        "st1.acoustic": HeardBearing(
+            t=1.0, azimuth_deg=heard.azimuth_deg, sigma_deg=heard.sigma_deg
+        )
+    }
+    assert '"heard"' in out.track_class.model_dump_json()
+
+
+def test_a_track_class_with_no_microphone_match_leaves_heard_out_of_the_json(
+    classifier: Classifier, site: SiteConfig
+) -> None:
+    """So output without recorded media, and its digests, stay as they were."""
+    look = looking_at(site, TARGET, 0.0, "rgb", {"drone": 0.6, "bird": 0.2})
+    (out,) = classifier.update(0.0, [track("trk-1", TARGET, 0.0)], [look])
+    assert out.track_class.heard == {}
+    assert "heard" not in out.track_class.model_dump_json()

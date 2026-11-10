@@ -16,6 +16,7 @@ from cuas.dashboard.contract import (
     CoverageView,
     EvidenceHead,
     Frame,
+    HeardView,
     LookRef,
     PicketHeard,
     PicketView,
@@ -154,6 +155,7 @@ class FrameBuilder:
             coverage.design_target
         ]
         self._stations = {s.id: s.position_enu_m for s in site.stations}
+        self._heard_sigmas = site.tracker.acoustic_sector_sigmas
         self._look_period_s = site.station_ai.look.period_s
         self._next_k = 0
         self._tracks: dict[str, Track] = {}
@@ -330,6 +332,7 @@ class FrameBuilder:
             p_drone=None if cls is None else cls.p_drone,
             p_attack_drone=None if cls is None else cls.p_attack_drone,
             p_bird=None if cls is None else cls.p_bird,
+            heard=[] if cls is None else self._heard(cls),
         )
 
     def _card(self, threat: ThreatAssessment, alert_id: str) -> AlertCard:
@@ -394,6 +397,25 @@ class FrameBuilder:
                 clip = ref.rpartition(":")[0]
                 url = CLIP_URL.format(station=station, clip=clip)
                 out.append(SoundRef(source=source, station_id=station, clip_url=url))
+        return out
+
+    def _heard(self, track_class: TrackClass) -> list[HeardView]:
+        out = []
+        for sensor_id, bearing in track_class.heard.items():
+            station = sensor_id.partition(".")[0]
+            x, y, _ = self._stations[station]
+            out.append(
+                HeardView(
+                    sensor_id=sensor_id,
+                    station_id=station,
+                    x=x,
+                    y=y,
+                    bearing_deg=bearing.azimuth_deg,
+                    compass=compass(bearing.azimuth_deg),
+                    half_width_deg=self._heard_sigmas * bearing.sigma_deg,
+                    t=bearing.t,
+                )
+            )
         return out
 
     def _pre_alert(self, sector: SectorTrack, first_t: float) -> PreAlert:

@@ -5,12 +5,13 @@ from itertools import pairwise
 import pytest
 
 from cuas.config import ScenarioMetadata, SiteConfig, ZoneLabels
-from cuas.dashboard.contract import EvidenceHead
+from cuas.dashboard.contract import EvidenceHead, HeardView
 from cuas.dashboard.frames import FrameBuilder, compass, profiles, replay, site_map
 from cuas.schemas import (
     ClueEvidence,
     CoverageStatus,
     EvidenceRecord,
+    HeardBearing,
     PicketAlert,
     RejectedMessage,
     SectorTrack,
@@ -70,6 +71,37 @@ def classed(
         evidence=ClueEvidence(),
         looks=looks or {},
     )
+
+
+def test_a_microphone_bearing_matched_to_a_track_becomes_a_wedge_from_its_station(
+    builder: FrameBuilder, site: SiteConfig
+) -> None:
+    bearing = HeardBearing(t=0.4, azimuth_deg=91.0, sigma_deg=2.0)
+    heard = classed("trk-1", 0.4, 0.9).model_copy(
+        update={"heard": {"st2.acoustic": bearing}}
+    )
+    feed(
+        builder,
+        track("trk-1", 0.4),
+        track("trk-2", 0.4),
+        heard,
+        classed("trk-2", 0.4, 0.9),
+    )
+    tracks = {tr.track_id: tr for tr in builder.flush().tracks}
+    x, y, _ = next(s.position_enu_m for s in site.stations if s.id == "st2")
+    assert tracks["trk-1"].heard == [
+        HeardView(
+            sensor_id="st2.acoustic",
+            station_id="st2",
+            x=x,
+            y=y,
+            bearing_deg=91.0,
+            compass="E",
+            half_width_deg=site.tracker.acoustic_sector_sigmas * 2.0,
+            t=0.4,
+        )
+    ]
+    assert tracks["trk-2"].heard == []
 
 
 def feed(builder: FrameBuilder, *messages) -> list:

@@ -163,8 +163,8 @@ def models_in_schemas() -> list[type[BaseModel]]:
 
 def test_no_schema_has_a_ground_truth_field() -> None:
     assert (
-        len(models_in_schemas()) == 16
-    )  # 13 messages, ClueEvidence, FileRef and the Message base
+        len(models_in_schemas()) == 17
+    )  # 13 messages, ClueEvidence, FileRef, HeardBearing and the Message base
     for model in models_in_schemas():
         for field in model.model_fields:
             assert not re.search("target|true|truth", field), (

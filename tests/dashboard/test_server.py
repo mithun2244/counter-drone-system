@@ -363,3 +363,4 @@ def test_the_operator_dashboard_draws_labelled_acoustic_sectors() -> None:
     assert '"Acoustic sectors"' in text and '"Acoustic detections"' in text
     assert "{sensor} · Engine heard {direction} · Unconfirmed" in text
     assert "Outside basemap coverage" in text
+    assert "Last heard from {sensor} · {direction} · {t}" in text

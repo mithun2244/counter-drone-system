@@ -11,7 +11,7 @@ from cuas.schemas.sector_track import SectorTrack
 from cuas.schemas.sensor_status import SensorStatus
 from cuas.schemas.threat_assessment import ThreatAssessment
 from cuas.schemas.track import Track
-from cuas.schemas.track_class import ClueEvidence, TrackClass
+from cuas.schemas.track_class import ClueEvidence, HeardBearing, TrackClass
 from cuas.schemas.zoom_task import ZoomTask
 
 __all__ = [
@@ -21,6 +21,7 @@ __all__ = [
     "EvidenceRecord",
     "ExportRequest",
     "FileRef",
+    "HeardBearing",
     "Message",
     "OperatorLabel",
     "PicketAlert",

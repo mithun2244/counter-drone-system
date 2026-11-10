@@ -94,6 +94,7 @@ const TEXT = {
     simulated: "Simulated scenario: fictional site · local grid {grid} m (no basemap)",
     zoomTask: "zoom",
     sectorLabel: "{sensor} · Engine heard {direction} · Unconfirmed",
+    heardLabel: "Last heard from {sensor} · {direction} · {t}",  // selected track's matched microphone bearing
     compassWord: {
       N: "north", NE: "north-east", E: "east", SE: "south-east",
       S: "south", SW: "south-west", W: "west", NW: "north-west",

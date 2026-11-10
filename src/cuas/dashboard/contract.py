@@ -135,6 +135,24 @@ class RunInfo(ContractModel):
     site: SiteMap
 
 
+class HeardView(ContractModel):
+    """The latest microphone bearing the classifier matched to this track: a wedge from the
+    station, as wide as a station microphone's ``pre_alert`` wedge. Never drawn from a station
+    name, a clip or the map: only this link."""
+
+    sensor_id: str
+    """``station.acoustic``, for example ``st3.acoustic``."""
+    station_id: str
+    x: float
+    y: float
+    """The station."""
+    bearing_deg: float
+    compass: Compass
+    half_width_deg: float
+    t: float
+    """When the station heard it."""
+
+
 class TrackView(ContractModel):
     track_id: str
     status: Literal["tentative", "confirmed"]
@@ -153,6 +171,8 @@ class TrackView(ContractModel):
     p_drone: float | None
     p_attack_drone: float | None
     p_bird: float | None
+    heard: list[HeardView] = []
+    """Microphone bearings matched to this track. Empty in a simulator-only run."""
 
 
 class LookRef(ContractModel):
