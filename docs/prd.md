@@ -61,8 +61,9 @@ Use real AI models on real recordings, plus a simulator for the parts that need 
 | S2 | One quadcopter over a fictional stadium | Small-target detection, zoom confirmation, triangulation |
 | S3 | Flock of birds plus one quadcopter | Birds rejected, only the drone alerted |
 | S4 | S2 during a dust storm | Visibility model lowers coverage and the dashboard warns the operator |
+| S5 | Acoustic-first demo: one attack drone toward the processing unit in fog, calm air | A station microphone warns before any camera detects the drone. Fog is chosen to leave the cameras less range than the microphones, so this is a demonstration, not a performance claim |
 
-The client walkthrough opens with S2. All scenario sites are fictional. They share one site geometry, zone IDs and zone weights; display labels come from each scenario's metadata (industrial for S1, stadium for S2, S3 and S4).
+The client walkthrough opens with S2. All scenario sites are fictional. They share one site geometry, zone IDs and zone weights; display labels come from each scenario's metadata (industrial for S1 and S5, stadium for S2, S3 and S4).
 
 ## 6. Functional requirements
 
