@@ -364,3 +364,8 @@ def test_the_operator_dashboard_draws_labelled_acoustic_sectors() -> None:
     assert "{sensor} · Engine heard {direction} · Unconfirmed" in text
     assert "Outside basemap coverage" in text
     assert "Last heard from {sensor} · {direction} · {t}" in text
+    assert (
+        "{sensor} · heard {direction} · Acoustic warning · Camera unconfirmed" in text
+    )
+    assert "Acoustic warning, {direction}, camera unconfirmed" in text
+    assert "no camera recording was matched to this track" in text

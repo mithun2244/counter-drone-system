@@ -181,8 +181,11 @@ function drawSite(ctx, view, site, frame, scene, size) {
   for (const wedge of heard) labelWedge(ctx, view, wedge, size, placed, heardText(wedge), MAP.heardColour);
 }
 
-function sectorText(wedge) {  // "st3 · Engine heard east · Unconfirmed"
-  return t("sectorLabel", { sensor: wedge.sensor_id.split(".")[0], direction: t(`compassWord.${wedge.compass}`) });
+// Picket: "pk4 · Engine heard south-east · Unconfirmed". Station microphone: "st3 · heard east ·
+// Acoustic warning · Camera unconfirmed"; the backend drops a microphone sector a camera track explains.
+function sectorText(wedge) {
+  const key = wedge.sensor_id.endsWith(".acoustic") ? "micSectorLabel" : "sectorLabel";
+  return t(key, { sensor: wedge.sensor_id.split(".")[0], direction: t(`compassWord.${wedge.compass}`) });
 }
 
 function heardText(wedge) {  // "Last heard from st3 · east · 01:23.4"

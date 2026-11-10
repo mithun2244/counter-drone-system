@@ -13,7 +13,7 @@ from cuas.sim.scenario import Environment, Scenario, load_scenario
 from cuas.sim.station import in_field_of_view
 from cuas.sim.trajectories import build_trajectories
 
-ALL_SCENARIOS = ["s1", "s2", "s3", "s4"]
+ALL_SCENARIOS = ["s1", "s2", "s3", "s4", "s5"]
 NOISE_LIMIT_SIGMAS = 6.0
 
 

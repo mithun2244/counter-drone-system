@@ -51,6 +51,7 @@ const TEXT = {
     lookKind: { rgb: "RGB", thermal: "Thermal", zoom: "Zoom" },
     clipAt: "{source} at {at} s",
     noClip: "No video for this alert. A simulator-only run has no recordings.",
+    noClipRecorded: "No video for this alert: no camera recording was matched to this track.",
     audioTitle: "Recorded audio",
     audioNote: "Clean source audio. The classifier heard it mixed with background noise at a simulated distance and wind.",
     station: "Station {id}",
@@ -93,7 +94,9 @@ const TEXT = {
     runFolder: "Run folder: runs/{run}",
     simulated: "Simulated scenario: fictional site · local grid {grid} m (no basemap)",
     zoomTask: "zoom",
-    sectorLabel: "{sensor} · Engine heard {direction} · Unconfirmed",
+    sectorLabel: "{sensor} · Engine heard {direction} · Unconfirmed",  // picket
+    micSectorLabel: "{sensor} · heard {direction} · Acoustic warning · Camera unconfirmed",  // station microphone
+    micHeard: "Acoustic warning, {direction}, camera unconfirmed",
     heardLabel: "Last heard from {sensor} · {direction} · {t}",  // selected track's matched microphone bearing
     compassWord: {
       N: "north", NE: "north-east", E: "east", SE: "south-east",

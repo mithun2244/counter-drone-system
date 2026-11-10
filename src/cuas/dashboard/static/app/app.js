@@ -144,8 +144,9 @@ function renderQueue() {
   });
   for (const gone of cards.values()) gone.remove();
   const pre = state.frame ? state.frame.pre_alerts : [];
-  $("pre-alerts").replaceChildren(...pre.map((p) =>
-    el("li", "pre", `${t("engineHeard", { compass: p.compass })} (${p.sensor_id})`)));
+  $("pre-alerts").replaceChildren(...pre.map((p) => el("li", "pre", `${p.sensor_id.endsWith(".acoustic")
+    ? t("micHeard", { direction: t(`compassWord.${p.compass}`) })
+    : t("engineHeard", { compass: p.compass })} (${p.sensor_id})`)));
   const clear = state.frame && !alerts.length && !pre.length;
   $("all-clear").textContent = clear ? t("allClear", { clock: clock(state.frame.t) }) : "";
   if (!state.frame) $("all-clear").textContent = state.run ? t("waiting") : t("idle");
@@ -307,7 +308,8 @@ function refreshTabs(looks) {  // keyed by source; zoom first
     b.setAttribute("aria-selected", String(on));
   }
   $("video-overlay").classList.toggle("empty", !state.source);
-  if (!state.source) $("clip-note").textContent = state.looks.length ? "" : t("noClip");
+  const none = state.run && state.run.recorded_media ? "noClipRecorded" : "noClip";
+  if (!state.source) $("clip-note").textContent = state.looks.length ? "" : t(none);
 }
 
 function loadSource(source, autoplay) {  // the RGB / thermal / zoom tabs

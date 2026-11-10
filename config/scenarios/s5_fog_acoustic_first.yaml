@@ -1,0 +1,29 @@
+# Fictional scenario, for the demo only: a station-microphone warning before any camera sees the
+# target. Fog cuts camera range to 0.4 of clear air (attack drone: 1200 m), below the station
+# microphones' 1500 m in calm air. That condition is chosen on purpose and is not a performance
+# claim. Nothing is shifted or delayed: the order comes from these ranges alone.
+metadata:
+  id: s5
+  title: "Acoustic-first demo: plant watch in fog"
+  venue: Fictional Processing Plant
+  zone_labels:
+    critical: Processing Unit
+    important: Plant Area
+    perimeter: Site Perimeter
+
+seed: 5005
+duration_s: 120.0
+environment:
+  visibility_factor: 0.4
+  wind_mps: 0.0
+
+targets:  # S1's first route: from 5000 m out at azimuth 115 degrees, ending at the site centre
+  - id: atk-1
+    type: attack_drone
+    seed: 51
+    start_s: 0.0
+    speed_mps: 50.0
+    jitter: {amplitude_m: 5.0, period_s: 20.0}
+    waypoints:
+      - {position_enu_m: [4531.5, -2113.1, 80.0]}
+      - {position_enu_m: [0.0, 0.0, 80.0]}

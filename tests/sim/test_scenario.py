@@ -15,7 +15,7 @@ from cuas.sim.scenario import (
     load_scenario,
 )
 
-ALL_IDS = ["s1", "s2", "s3", "s4"]
+ALL_IDS = ["s1", "s2", "s3", "s4", "s5"]
 INDUSTRIAL = {
     "critical": "Processing Unit",
     "important": "Plant Area",
@@ -37,7 +37,7 @@ def flocks(scenario: Scenario) -> list[BirdFlock]:
     return [t for t in scenario.targets if isinstance(t, BirdFlock)]
 
 
-def test_the_four_scenarios_are_available(config_dir: Path) -> None:
+def test_the_five_scenarios_are_available(config_dir: Path) -> None:
     assert available_scenarios(config_dir) == ALL_IDS
 
 
@@ -103,7 +103,13 @@ def test_s4_is_s2_in_a_dust_storm(config_dir: Path) -> None:
 
 @pytest.mark.parametrize(
     ("scenario_id", "labels"),
-    [("s1", INDUSTRIAL), ("s2", STADIUM), ("s3", STADIUM), ("s4", STADIUM)],
+    [
+        ("s1", INDUSTRIAL),
+        ("s2", STADIUM),
+        ("s3", STADIUM),
+        ("s4", STADIUM),
+        ("s5", INDUSTRIAL),
+    ],
 )
 def test_zone_labels(
     config_dir: Path, scenario_id: str, labels: dict[str, str]

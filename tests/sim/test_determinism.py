@@ -10,7 +10,7 @@ import pytest
 
 from cuas.schemas import BearingDetection, Message
 
-ALL_SCENARIOS = ["s1", "s2", "s3", "s4"]
+ALL_SCENARIOS = ["s1", "s2", "s3", "s4", "s5"]
 RUN_DEMO = Path(__file__).resolve().parents[2] / "scripts" / "run_demo.py"
 
 

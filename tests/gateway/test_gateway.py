@@ -156,7 +156,7 @@ async def test_the_task_keeps_order_and_splits_accepted_from_rejected(
     assert [reason(m) async for m in rejected] == ["unknown_sensor"]
 
 
-@pytest.mark.parametrize("scenario_id", ["s1", "s2", "s3", "s4"])
+@pytest.mark.parametrize("scenario_id", ["s1", "s2", "s3", "s4", "s5"])
 async def test_nothing_the_simulator_sends_is_rejected(
     record, site: SiteConfig, scenario_id: str
 ) -> None:

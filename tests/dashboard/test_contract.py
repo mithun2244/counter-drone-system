@@ -20,7 +20,11 @@ from cuas.sim.scenario import available_scenarios, load_scenario
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA = ROOT / "docs" / "dashboard_contract.schema.json"
 SAMPLES = ROOT / "docs" / "samples"
-RECORDED = {"s1_seed1001.jsonl": "s1", "s4_seed2002.jsonl": "s4"}
+RECORDED = {
+    "s1_seed1001.jsonl": "s1",
+    "s4_seed2002.jsonl": "s4",
+    "s5_seed5005.jsonl": "s5",
+}
 MESSAGES = TypeAdapter(ServerMessage)
 TARGET_TYPES = {"attack_drone", "quadcopter", "friendly_drone", "bird"}
 
