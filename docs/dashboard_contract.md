@@ -106,6 +106,7 @@ A full snapshot every 0.4 s of simulated time: 2.5 a second at 1× speed, which 
 - `trail`: `[t, x, y]` points over the last 20 s, oldest first, at least 0.5 s apart.
 - `level`, which is `red`, `amber`, `info`, or null before the first assessment; and `alert_id`.
 - `p_drone`, `p_attack_drone`, `p_bird`.
+- `heard`: the latest bearing from each station microphone that the classifier's bearing gate matched to this track (`design.md` A7), one entry per microphone: `sensor_id` (`st3.acoustic`), `station_id`, the station's `x`, `y`, `bearing_deg`, `compass`, `half_width_deg` (as wide as a station microphone's `pre_alert` wedge) and `t`, when it was heard. It stays until the track is lost, so `t` can be well before the frame's. This is the only link between a track and a microphone bearing: never infer one from a station name, a recording or where a wedge falls on the map. Empty in a simulator-only run. Added after version 1 shipped; defaults to `[]`, so the version stays 1.
 
 Colour tracks by level, and always add a text label too, so colour is never the only signal (`design.md` B2).
 

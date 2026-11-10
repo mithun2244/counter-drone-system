@@ -135,7 +135,7 @@ All parts talk only through typed messages on the bus. This mirrors the real sys
 | `PicketAlert` | picket → gateway | picket_id, t, bearing_deg (coarse), loudness, engine_type_probs |
 | `Track` | tracker → classify, threat, dashboard | track_id, t, position_enu_m, velocity_mps, covariance, n_stations, status (tentative, confirmed, lost) |
 | `SectorTrack` | tracker → classify, threat, dashboard | sector_id, t, sensor_id, origin_enu_m, bearing_deg, half_width_deg, status (active, lost) |
-| `TrackClass` | classify → threat, dashboard, evidence | track_id, t, p_drone, p_bird, p_attack_drone, evidence (look, move, sound), looks (latest frame per camera, latest sound window per microphone) |
+| `TrackClass` | classify → threat, dashboard, evidence | track_id, t, p_drone, p_bird, p_attack_drone, evidence (look, move, sound), looks (latest frame per camera, latest sound window per microphone), heard (latest matched bearing per microphone; left out of the JSON when empty) |
 | `ThreatAssessment` | threat → scheduler, dashboard, evidence | track_id, t, score, level, zone, time_to_impact_s, reasons, alert_id |
 | `CoverageStatus` | visibility → scheduler, dashboard | t, coverage_pct, warning |
 | `ZoomTask` | scheduler → station | station_id, t, camera_id, track_id, azimuth_deg, elevation_deg |
