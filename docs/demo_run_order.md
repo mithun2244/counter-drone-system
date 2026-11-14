@@ -40,20 +40,25 @@ Then **■ Stop** → **Stop run**. Note the run folder shown under System statu
 
 Export and Confirm work only while the run is live: do them before Stop.
 
-## 2. S1: wave of three attack drones (about 1.5 minutes)
+## 2. S1: wave of three attack drones (about 2 minutes)
 
-**Clicks:** Site profile **Fictional Processing Plant** → **S1: Processing plant watch** → leave **Recorded media unticked** → **Start monitoring** → **5×**. Tick **Close-up** once tracks appear.
+**Clicks:** Site profile **Fictional Processing Plant** → **S1: Processing plant watch** → leave **Recorded media unticked** → **Start monitoring** → **2×** until 01:10, then **5×**. **Do not click a card before 01:16**: with nothing selected, the video panel follows the highest-priority detection by itself. Tick **Close-up** once tracks appear.
+
+The video panel shows a **SIMULATED camera view** drawn by the dashboard: no footage exists for fixed-wing drones. It is labelled "SIMULATED CAMERA VIEW - not real footage" on every frame. Pause at each step if you want more time to talk.
 
 | Clock | What appears | What to say |
 | --- | --- | --- |
-| 00:19 | Amber wedges at the outer pickets: "pk… · Engine heard … · Unconfirmed" | "Acoustic pickets 3 km out hear engines long before any camera. They give a direction only, so we show a wedge, not a dot." |
-| 01:06 | Tracks confirmed as the drones come within camera range | "When cameras on two masts see a drone, it gets a position and a track." |
-| 01:16 | Three **RED** cards ranked by time to impact | "Several targets at once, ranked by which one arrives first." |
+| 00:19 | Amber wedges at the outer pickets: "pk4 · Engine heard … · Unconfirmed" | "Acoustic pickets 3 km out hear a piston engine long before any camera. A picket gives a direction only, so we show a wedge, not a dot." |
+| 00:23 | **Step 1.** The video panel opens by itself with no picture: "Acoustic detection only - camera cued to bearing 137°, searching" | "The system points the nearest camera at the picket that heard it. Nothing is seen yet, so we say so: there is no picture to show." |
+| 00:39 | **Step 2.** The panel shows the simulated camera view: a bright dot off-centre, "range unknown (one bearing)", and "Camera detection at 00:38.6 by st2". The evidence head under System status moves to record 1 | "A camera has found it, about 20 degrees from where the picket pointed us. One camera gives a direction but no range. The detection is written to the evidence chain at that moment." |
+| 01:06 | **Step 3.** The panel switches to the **Zoom** tab: a larger dot near the crosshair, FOV 2°, range about 1.4 km | "A second mast also sees it, so it has a position and a range. The zoom camera is assigned and takes over: narrower field, larger target." |
+| 01:16 | Three **RED** cards ranked by time to impact. Cards whose camera view is not on screen carry a yellow **Camera detected** badge | "Several targets at once, ranked by which one arrives first. The panel follows the top one; the badge says the others have been seen by a camera too." |
+| after 01:16 | Click any card: the panel shows that drone's own view | "The operator chooses what to look at; the system never takes the panel away from a chosen alert." |
 | 01:38 | **INSIDE ZONE** on the first card | |
 
-**■ Stop** when the point is made, or let it end (2 minutes simulated, about 24 s at 5×).
+**■ Stop** when the point is made, or let it end (2 minutes simulated).
 
-S1 has no video: the public datasets contain no fixed-wing drone footage. Say so if asked.
+If asked "is that a real camera?": no. It is a drawing of what the camera reported: the direction from the simulated camera bearing or the estimated track, sized for a 2.5 m drone at the estimated range. The public datasets contain no fixed-wing drone footage.
 
 ## 3. S3 on the simulator only: birds and one drone (about 1 minute)
 
@@ -88,6 +93,7 @@ It prints `verified … records, … files, head seq …`. Open the hand-off fil
 | A run misbehaves | **■ Stop** → **Stop run**, then start it again |
 | "Recorded media unavailable: …" | Run S2 without Recorded media: the tracking and alerts are the same, with no video or audio |
 | The server window shows an error, or the page cannot connect | Ctrl+C in the server window, start it again (models ready in about 4 s), reload the page |
+| The map shows a grid and "local grid 500 m (no basemap)" | Press F5. The page fetches the map once when it loads; if the server was not answering at that moment (for example the tab reopened before the server started), it keeps the grid until reloaded |
 | Run title says "failed: see the server console" | Stop showing that scenario; continue with the next |
 | Nothing works | Replay a recorded stream: `uv run python scripts/run_demo.py --dashboard --replay docs/samples/s1_seed1001.jsonl` (no evidence, no video) |
 

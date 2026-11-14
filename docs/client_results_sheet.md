@@ -21,6 +21,7 @@ Sources: `docs/memory.md` (Measured results), `REVIEW.md`, and the evaluator out
 | Picket wedges "Engine heard …" | SIMULATED | Simulated pickets. With Recorded media the engine guess comes from the real audio model on a public clip |
 | Evidence record count, SHA-256 hashes, `cuas verify` | Computed for real | Real SHA-256 over the files this run wrote |
 | Clock (mm:ss.s) | SIMULATED | Simulated time |
+| SIMULATED camera view in S1 (dot, crosshair, range in km, "Camera detection at 00:38.6 by st2") | SIMULATED | Drawn by the dashboard from the simulated camera bearing or the estimated track; no footage. The dot is sized for a 2.5 m drone (client brief), not measured |
 
 ## Detection and classification on public clips (MEASURED on public dataset clips)
 

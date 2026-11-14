@@ -108,6 +108,14 @@ A full snapshot every 0.4 s of simulated time: 2.5 a second at 1× speed, which 
 | `coverage` | `pct`, `warning`, and `reach_m` per station; null until the first figure |
 | `sensors` | `sensor_id` (for example `st1.rgb` or `pk3`), `ok`, `visibility` |
 | `evidence_head` | `seq` and `record_hash` of the newest evidence record, or null |
+| `cues` | Big-drone camera cues, one per engagement; empty for small drones (S2, S3, S4). See below |
+
+**`cues`**, the big-drone video sequence (S1, S5). An engagement starts when a picket hears a piston engine (`picket_id`, `heard_t`) and goes through `stage`:
+- `acoustic`: the nearest station's camera (`cue_station_id`) is cued at the picket (`cue_bearing_deg`). Show no picture, only "Acoustic detection only - camera cued to bearing <deg>, searching".
+- `camera`: a camera reported a bearing within `dashboard.camera_cue.search_half_width_deg` of its station's bearing to the picket (`detected_t`, `detected_by`). It is also written to the evidence chain as a `camera_detection` record. A confirmed track near the picket then links (`track_id`, and `alert_id` once it has an alert).
+- `zoom`: a zoom camera is tasked on that track.
+
+`views` holds what to draw in a SIMULATED camera view, never footage: the `wide` view once detected, then the `zoom` view. Each has the `station_id`, the camera's pointing direction, `fov_deg`, the direction of what it saw (`seen_azimuth_deg`, `seen_elevation_deg`: the camera's reported bearing, or the direction to the estimated track), `range_m` (null before a track exists) and `drawn_span_m` for the dot size. Label every drawing "SIMULATED CAMERA VIEW - not real footage". A further drone of the wave near an engaged picket gets its own cue, detected by the camera bearing that started its track.
 
 **`tracks[]` fields:**
 - `track_id`; `status`, which is `tentative` or `confirmed`.
@@ -149,7 +157,7 @@ The B4 card is "Engine heard, `compass`, unconfirmed".
 ### `evidence`
 
 **Fields:** `run_id`, `seq`, `kind`, `alert_id`, `t`, `record_hash`.
-- `kind` is `alert`, `escalation`, `label` or `export`.
+- `kind` is `alert`, `escalation`, `label`, `export` or `camera_detection`. A `camera_detection` record (live runs, big drones) has an empty `alert_id`: it comes before any alert, and its details are the picket, station, sensor and the camera's reported bearing.
 - Sent when a record joins the evidence chain: when an alert is raised and when it first turns red, for each label and export, and an export of every alert as the run ends. Live runs only; a replay sends what its file holds.
 
 ## HTTP API
