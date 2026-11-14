@@ -510,3 +510,33 @@ def test_simulated_values_are_tagged_capped_and_inside_zone_replaces_tti() -> No
     assert "Math.round(100 * card.confidence)" not in script
     assert 'insideZone: "INSIDE ZONE"' in text and 'a.approach === "inside"' in script
     assert script.count("simTag()") >= 4  # card, summary, sensor rows, faults line
+
+
+def test_a_request_the_keeper_cannot_answer_times_out_and_the_next_one_works(
+    tmp_path: Path, monkeypatch
+) -> None:
+    run = RunInfo.model_validate_json(EDGE.read_text(encoding="utf-8").splitlines()[1])
+    hub = Hub(EvidenceLauncher(run, tmp_path / "run"), request_timeout_s=0.5)
+    real_handle = EvidenceKeeper.handle
+
+    def broken_once(keeper, request):
+        monkeypatch.setattr(EvidenceKeeper, "handle", real_handle)
+        raise OSError("disk full")
+
+    with (
+        TestClient(create_app(hub, app_dir=tmp_path / "no-app")) as client,
+        client.websocket_connect("/ws") as ws,
+    ):
+        ws.receive_json()
+        client.post("/api/runs", json=STADIUM)
+        client.post("/api/run/control", json={"action": "pause"})
+        assert next_evidence(ws)["kind"] == "alert"
+        monkeypatch.setattr(EvidenceKeeper, "handle", broken_once)
+        lost = client.post("/api/alerts/alert-1/label", json={"label": "confirm"})
+        assert (
+            lost.status_code == 504
+            and "did not answer in 0.5 s" in lost.json()["detail"]
+        )
+        again = client.post("/api/alerts/alert-1/label", json={"label": "confirm"})
+        assert again.status_code == 200 and again.json()["seq"] == 2
+        client.post("/api/run/stop")

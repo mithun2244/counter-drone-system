@@ -242,7 +242,11 @@ async def _keep(
     async def answer() -> None:
         async for request in requests:
             if isinstance(request, OperatorLabel | ExportRequest):
-                record = keeper.handle(request)
+                try:
+                    record = keeper.handle(request)
+                except Exception:  # one bad request must not stop the answers (logged)
+                    log.exception("could not answer %s", request.request_id)
+                    continue  # its sender times out with the reason in the server console
                 if (
                     record is not None
                 ):  # publishing never yields, so no record is half-sent

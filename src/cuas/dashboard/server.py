@@ -93,6 +93,10 @@ class ModelsNotReady(Exception):
     """A recorded-media run was asked for before the models loaded, or after they failed."""
 
 
+class NoAnswer(Exception):
+    """The evidence keeper did not answer a label or export in time."""
+
+
 class UnknownAlert(Exception):
     """No alert with that ID has been raised in this run."""
 
@@ -118,8 +122,13 @@ class _Client:
 
 
 class Hub:
-    def __init__(self, launcher: Launcher) -> None:
+    def __init__(
+        self, launcher: Launcher, request_timeout_s: float | None = None
+    ) -> None:
+        """``request_timeout_s``: how long a label or export waits for the evidence keeper;
+        ``None`` waits until the run ends."""
         self._launcher = launcher
+        self._request_timeout_s = request_timeout_s
         self.profiles = launcher.profiles()
         self.run: RunInfo | None = None
         self.frame: Frame | None = None
@@ -251,7 +260,14 @@ class Hub:
         except RuntimeError as error:  # the evidence bus closed: the run is ending
             self._pending.pop(request.request_id, None)
             raise LookupError("the run has ended") from error
-        return await waiting
+        try:
+            return await asyncio.wait_for(waiting, self._request_timeout_s)
+        except TimeoutError as error:
+            self._pending.pop(request.request_id, None)
+            raise NoAnswer(
+                f"the evidence keeper did not answer in {self._request_timeout_s:g} s;"
+                " see the server console"
+            ) from error
 
     async def _listen(self, records: AsyncIterator[Message]) -> None:
         async for record in records:
@@ -371,6 +387,8 @@ def create_app(
             return await hub.label(alert_id, request.label)
         except UnknownAlert as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
+        except NoAnswer as error:
+            raise HTTPException(status_code=504, detail=str(error)) from error
         except LookupError as error:
             raise HTTPException(status_code=409, detail=str(error)) from error
 
@@ -380,6 +398,8 @@ def create_app(
             return await hub.export(alert_id)
         except UnknownAlert as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
+        except NoAnswer as error:
+            raise HTTPException(status_code=504, detail=str(error)) from error
         except LookupError as error:
             raise HTTPException(status_code=409, detail=str(error)) from error
 

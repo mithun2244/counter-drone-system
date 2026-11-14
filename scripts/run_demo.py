@@ -401,7 +401,7 @@ async def serve_dashboard(args: argparse.Namespace, site: SiteConfig) -> None:
         if basemap
         else "basemap: none (scripts/fetch_basemap.py); the local grid is drawn"
     )
-    hub = Hub(launcher)
+    hub = Hub(launcher, site.dashboard.request_timeout_s)
     loading = None
     if isinstance(launcher, LiveLauncher):  # off the event loop: the page never freezes
         loading = asyncio.create_task(launcher.load_models(hub.publish))
