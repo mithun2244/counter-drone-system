@@ -69,6 +69,12 @@ def load_starting_weights(model: nn.Module, path: Path) -> list[str]:
     return copy_except_class_head(model, state)
 
 
+def use_inference_threads(settings: DetectorSettings) -> None:
+    """Set torch's thread count in the calling thread, the one that will run inference.
+    Models loaded in a worker thread set it there, which may not reach the event loop's."""
+    torch.set_num_threads(settings.threads)
+
+
 def load_trained(settings: DetectorSettings, path: Path) -> "Detector":
     """A detector from weights fine-tuned by ``scripts/train_detector.py``."""
     model = build_model(settings)

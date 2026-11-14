@@ -709,6 +709,17 @@
        }
       ]
      },
+     "models": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/ModelStatus"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null
+     },
      "profiles": {
       "items": {
        "$ref": "#/$defs/SiteProfile"
@@ -764,6 +775,85 @@
      "at_s"
     ],
     "title": "LookRef",
+    "type": "object"
+   },
+   "ModelStatus": {
+    "additionalProperties": false,
+    "description": "Sent as the server loads the AI models at start, once per step. ``ready``: recorded-media\nruns can start. ``failed``: they cannot, and the steps say which model and why; simulator\nruns are unaffected.",
+    "properties": {
+     "contract": {
+      "const": 1,
+      "default": 1,
+      "title": "Contract",
+      "type": "integer"
+     },
+     "state": {
+      "enum": [
+       "loading",
+       "ready",
+       "failed"
+      ],
+      "title": "State",
+      "type": "string"
+     },
+     "steps": {
+      "items": {
+       "$ref": "#/$defs/ModelStep"
+      },
+      "title": "Steps",
+      "type": "array"
+     },
+     "type": {
+      "const": "models",
+      "default": "models",
+      "title": "Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "state",
+     "steps"
+    ],
+    "title": "ModelStatus",
+    "type": "object"
+   },
+   "ModelStep": {
+    "additionalProperties": false,
+    "description": "One step of loading the AI models: a model, or the warm-up inference.",
+    "properties": {
+     "detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Detail"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "state": {
+      "enum": [
+       "waiting",
+       "loading",
+       "ready",
+       "missing",
+       "failed"
+      ],
+      "title": "State",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "state"
+    ],
+    "title": "ModelStep",
     "type": "object"
    },
    "PicketHeard": {
@@ -1426,6 +1516,7 @@
     "evidence": "#/$defs/EvidenceEvent",
     "frame": "#/$defs/Frame",
     "hello": "#/$defs/Hello",
+    "models": "#/$defs/ModelStatus",
     "run": "#/$defs/RunInfo"
    },
    "propertyName": "type"
@@ -1442,6 +1533,9 @@
    },
    {
     "$ref": "#/$defs/EvidenceEvent"
+   },
+   {
+    "$ref": "#/$defs/ModelStatus"
    }
   ]
  },

@@ -39,6 +39,7 @@ from cuas.dashboard.contract import (
     Label,
     LabelRequest,
     LabelResult,
+    ModelStatus,
     RunControl,
     RunInfo,
     SiteProfile,
@@ -57,7 +58,7 @@ CLIP_ID = re.compile(r"^[0-9a-f]{16}$")
 # Camera clips and microphone recordings, as the recorder keeps them.
 CLIP_TYPES = {".mp4": "video/mp4", ".wav": "audio/wav"}
 
-Outgoing = Hello | RunInfo | Frame | EvidenceEvent
+Outgoing = Hello | RunInfo | Frame | EvidenceEvent | ModelStatus
 Publish = Callable[[Outgoing], None]
 
 
@@ -86,6 +87,10 @@ class Launcher(Protocol):
 
 class Busy(Exception):
     """A run is already going."""
+
+
+class ModelsNotReady(Exception):
+    """A recorded-media run was asked for before the models loaded, or after they failed."""
 
 
 class UnknownAlert(Exception):
@@ -118,6 +123,8 @@ class Hub:
         self.profiles = launcher.profiles()
         self.run: RunInfo | None = None
         self.frame: Frame | None = None
+        self.models: ModelStatus | None = None
+        """Set by the first ``models`` message; ``None`` while the server loads no models."""
         self._started: Started | None = None
         self._clients: set[_Client] = set()
         self._watcher: asyncio.Task[None] | None = None
@@ -131,11 +138,15 @@ class Hub:
         return self.run is not None and self.run.state != "ended"
 
     def hello(self) -> Hello:
-        return Hello(profiles=self.profiles, run=self.run, frame=self.frame)
+        return Hello(
+            profiles=self.profiles, run=self.run, frame=self.frame, models=self.models
+        )
 
     async def start(self, request: StartRun) -> RunInfo:
         if self.active:
             raise Busy("a run is already going")
+        if request.recorded_media:
+            self._check_models()
         started = await self._launcher.start(request, self.publish)
         self._started, self.frame = started, None
         self._alert_ids, self._pending = set(), {}
@@ -145,6 +156,19 @@ class Hub:
         self.publish(started.run)
         self._watcher = asyncio.create_task(self._end_when_done(started))
         return started.run
+
+    def _check_models(self) -> None:
+        models = self.models
+        if models is None or models.state == "ready":
+            return
+        if models.state == "loading":
+            raise ModelsNotReady("the AI models are still loading")
+        problems = [
+            f"{s.name}: {s.detail}"
+            for s in models.steps
+            if s.state in ("missing", "failed")
+        ]
+        raise ModelsNotReady(f"recorded media is unavailable: {'; '.join(problems)}")
 
     async def stop(self) -> RunInfo:
         """End the run at its next tick, the way a finished run ends: the pipeline drains and
@@ -261,6 +285,8 @@ class Hub:
             self.run = message
         elif isinstance(message, Frame):
             self.frame = message
+        elif isinstance(message, ModelStatus):
+            self.models = message
         text = message.model_dump_json()
         for client in self._clients:
             client.put(message.type, text)
@@ -318,7 +344,7 @@ def create_app(
     async def start_run(request: StartRun) -> RunInfo:
         try:
             return await hub.start(request)
-        except Busy as error:
+        except (Busy, ModelsNotReady) as error:
             raise HTTPException(status_code=409, detail=str(error)) from error
         except LookupError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error

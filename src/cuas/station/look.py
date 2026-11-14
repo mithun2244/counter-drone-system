@@ -22,6 +22,10 @@ class CachedDetector:
         self._detect = detect
         self._boxes: dict[str, list[Box]] = {}
 
+    def warm_up(self, frame: np.ndarray) -> None:
+        """One inference outside the memo: the first costs seconds, so pay it before a run."""
+        self._detect(frame)
+
     def boxes(self, frame_key: str, frame: np.ndarray) -> list[Box]:
         """``frame_key`` must be opaque, such as a clip hash and frame number."""
         if frame_key not in self._boxes:

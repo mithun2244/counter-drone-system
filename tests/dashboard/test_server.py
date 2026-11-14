@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from cuas.bus import InProcessBus
 from cuas.clock import SimClock
 from cuas.config import SiteConfig, ZoneLabels
-from cuas.dashboard.contract import RunInfo, contract_schema
+from cuas.dashboard.contract import ModelStatus, ModelStep, RunInfo, contract_schema
 from cuas.dashboard.replay import ReplayLauncher
 from cuas.dashboard.server import STATIC, Hub, Started, create_app
 from cuas.evidence.handoff import HandoffPackage
@@ -440,3 +440,48 @@ def test_the_operator_dashboard_has_a_stop_with_its_own_confirm() -> None:
     assert 'id="stop"' in page and 'id="stop-confirm"' in page
     assert '"/api/run/stop"' in script
     assert "confirm(" not in script.replace("stop-confirm", "")  # no browser dialog
+
+
+def test_recorded_media_waits_for_the_models_and_simulator_runs_do_not(
+    site: SiteConfig, tmp_path: Path
+) -> None:
+    hub = Hub(ReplayLauncher(EDGE, site.simulation.tick_s, pace=FAST))
+    media = {**STADIUM, "recorded_media": True}
+    with (
+        TestClient(create_app(hub, app_dir=tmp_path)) as client,
+        client.websocket_connect("/ws") as ws,
+    ):
+        assert ws.receive_json()["models"] is None  # a replay loads no models
+        steps = [
+            ModelStep(name="RGB detector", state="ready"),
+            ModelStep(name="Thermal detector", state="loading"),
+        ]
+        hub.publish(ModelStatus(state="loading", steps=steps))
+        assert ws.receive_json()["type"] == "models"
+        loading = client.post("/api/runs", json=media)
+        assert (
+            loading.status_code == 409 and "still loading" in loading.json()["detail"]
+        )
+        steps[1] = ModelStep(
+            name="Thermal detector", state="failed", detail="RuntimeError: bad file"
+        )
+        hub.publish(ModelStatus(state="failed", steps=steps))
+        failed = client.post("/api/runs", json=media)
+        assert failed.status_code == 409
+        assert "Thermal detector: RuntimeError: bad file" in failed.json()["detail"]
+        assert client.post("/api/runs", json=STADIUM).status_code == 200
+    with (
+        TestClient(create_app(hub, app_dir=tmp_path)) as client,
+        client.websocket_connect("/ws") as late,
+    ):
+        assert late.receive_json()["models"]["state"] == "failed"
+
+
+def test_the_operator_dashboard_shows_model_loading() -> None:
+    app = STATIC / "app"
+    text = (app / "text.js").read_text(encoding="utf-8")
+    script = (app / "app.js").read_text(encoding="utf-8")
+    assert "Loading models… {done} of {total} ({step})" in text
+    assert "Simulator runs still work." in text
+    assert 'message.type === "models"' in script
+    assert '$("go").disabled' in script and '$("media").disabled' in script

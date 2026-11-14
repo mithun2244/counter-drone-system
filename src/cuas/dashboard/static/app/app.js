@@ -3,7 +3,7 @@
 "use strict";
 
 const state = {
-  profiles: [], run: null, frame: null, frameWall: 0, basemap: null, ttis: new Map(),
+  profiles: [], run: null, frame: null, models: null, frameWall: 0, basemap: null, ttis: new Map(),
   selected: null, lastCard: null, looks: [], source: null, sounds: [], results: new Map(), collapsed: false,
 };
 const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
@@ -34,11 +34,14 @@ function receive(message) {
   if (message.type === "hello") {
     state.profiles = message.profiles;
     state.run = message.run;
+    state.models = message.models;
     setFrame(message.frame);
     fillProfiles();
   } else if (message.type === "run") {
     if (!state.run || state.run.run_id !== message.run_id) { setFrame(null); select(null); }
     state.run = message;
+  } else if (message.type === "models") {
+    state.models = message;
   } else if (message.type === "frame") {
     setFrame(message);
     refreshMedia();
@@ -88,7 +91,30 @@ function startRun() {
   post("/api/runs", body);
 }
 
+function modelsText(models) {  // null: this server loads no models (a replay)
+  if (!models) return "";
+  const finished = models.steps.filter((s) => !["waiting", "loading"].includes(s.state)).length;
+  if (models.state === "loading") {
+    const step = models.steps.find((s) => s.state === "loading") || models.steps[finished] || {};
+    return t("modelsLoading", { done: finished, total: models.steps.length, step: step.name || "" });
+  }
+  if (models.state === "ready") return t("modelsReady");
+  const problems = models.steps.filter((s) => ["missing", "failed"].includes(s.state))
+    .map((s) => t("modelProblem", { name: s.name, detail: s.detail }));
+  return t("modelsFailed", { problems: problems.join("; ") });
+}
+
+function renderModels() {  // Start waits for the models; recorded media needs them ready
+  const models = state.models;
+  $("go").disabled = Boolean(models && models.state === "loading");
+  $("media").disabled = Boolean(models && models.state !== "ready");
+  if ($("media").disabled) $("media").checked = false;
+  $("models").textContent = modelsText(models);
+  $("models").classList.toggle("failed", Boolean(models && models.state === "failed"));
+}
+
 function renderTopBar() {
+  renderModels();
   const run = state.run;
   const live = run && run.state !== "ended";
   $("start").hidden = Boolean(live);

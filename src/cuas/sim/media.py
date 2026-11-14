@@ -23,7 +23,7 @@ from cuas.sim.station import Look
 from cuas.station.detector import load_trained
 from cuas.station.look import CachedDetector, LookStream
 from cuas.station.recorder import Recorder
-from cuas.station.sound import load_sound_model
+from cuas.station.sound import SoundModel, load_sound_model
 
 # No fixed-wing drone is in the footage, so an attack drone has no clips and no real look.
 CAMERA_LABELS: Mapping[TargetType, str] = {
@@ -193,24 +193,59 @@ class MediaLink:
         state.next_tick = tick + self._look_every_ticks
 
 
+LOOK_SENSORS: tuple[SensorKind, ...] = ("rgb", "thermal")
+SOUND_WEIGHTS = "sound.pt"
+
+
+@dataclass(frozen=True)
+class LoadedModels:
+    """Models loaded once, for every recorded-media run of a dashboard server to share. The
+    detector memo is keyed by clip and frame, so sharing it changes no run's output."""
+
+    looks: Mapping[SensorKind, LookModel]
+    sound: SoundModel | None
+
+
+def look_weights(models_dir: Path, sensor: SensorKind) -> Path:
+    return models_dir / f"look_{sensor}.pt"
+
+
+def load_look_model(
+    models_dir: Path, settings: DetectorSettings, sensor: SensorKind
+) -> LookModel | None:
+    """One camera's trained model, or ``None`` if it has none."""
+    weights = look_weights(models_dir, sensor)
+    if not weights.exists():
+        return None
+    record = json.loads(
+        (models_dir / f"look_{sensor}.json").read_text(encoding="utf-8")
+    )
+    detector = load_trained(settings, weights)
+    return LookModel(
+        CachedDetector(detector.detect), settings.classes, record["high_score"]
+    )
+
+
 def load_look_models(
     models_dir: Path, settings: DetectorSettings
 ) -> dict[SensorKind, LookModel]:
     """Each camera's trained model. A camera with no trained model has no real look."""
-    models: dict[SensorKind, LookModel] = {}
-    sensors: tuple[SensorKind, ...] = ("rgb", "thermal")
-    for sensor in sensors:
-        weights = models_dir / f"look_{sensor}.pt"
-        if not weights.exists():
-            continue
-        record = json.loads(
-            (models_dir / f"look_{sensor}.json").read_text(encoding="utf-8")
-        )
-        detector = load_trained(settings, weights)
-        models[sensor] = LookModel(
-            CachedDetector(detector.detect), settings.classes, record["high_score"]
-        )
-    return models
+    models = {s: load_look_model(models_dir, settings, s) for s in LOOK_SENSORS}
+    return {sensor: model for sensor, model in models.items() if model is not None}
+
+
+def load_sound(models_dir: Path, ai: StationAiSettings) -> SoundModel | None:
+    weights = models_dir / SOUND_WEIGHTS
+    return load_sound_model(ai.sound, weights) if weights.exists() else None
+
+
+def warm_up(models: LoadedModels, ai: StationAiSettings) -> None:
+    """One inference per model on blank input, so a run's first look is not the slow one."""
+    size = ai.detector.input_size
+    for look in models.looks.values():
+        look.detector.warm_up(np.zeros((size, size, 3), dtype=np.uint8))
+    if models.sound is not None:
+        models.sound.classify(np.zeros(ai.sound.window_samples))
 
 
 def clip_frames(
@@ -234,12 +269,13 @@ def build_sound_link(
     wind_mps: float,
     seed: int,
     on_open: OnOpen,
+    model: SoundModel | None = None,
 ) -> SoundLink | None:
-    weights = models_dir / "sound.pt"
-    if not weights.exists():
+    """``model``: one already loaded; otherwise ``sound.pt`` is loaded here, if it exists."""
+    model = model or load_sound(models_dir, ai)
+    if model is None:
         return None
     settings = ai.sound
-    model = load_sound_model(settings, weights)
 
     def load_audio(clip: ClipEntry) -> np.ndarray:
         return read_wav(data_dir / clip.path, settings.sample_rate)
@@ -279,15 +315,26 @@ def build_media_link(
     tick_s: float,
     wind_mps: float,
     seed: int,
+    loaded: LoadedModels | None = None,
 ) -> MediaLink:
-    models = load_look_models(models_dir, ai.detector)
+    """``loaded``: models a dashboard server loaded once at start; otherwise loaded here."""
+    models = loaded.looks if loaded else load_look_models(models_dir, ai.detector)
     if not models:
         raise FileNotFoundError(f"no trained models in {models_dir}")
     clips = load_manifest(config_dir).clips
     look_every_ticks = round(ai.look.period_s / tick_s)
     save = recording_saver(run_dir, data_dir)
+    sound_model = loaded.sound if loaded else None
     sound = build_sound_link(
-        clips, data_dir, models_dir, ai, look_every_ticks, wind_mps, seed, save
+        clips,
+        data_dir,
+        models_dir,
+        ai,
+        look_every_ticks,
+        wind_mps,
+        seed,
+        save,
+        sound_model,
     )
     return MediaLink(
         clips,

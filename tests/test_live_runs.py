@@ -2,6 +2,7 @@
 
 import asyncio
 import importlib.util
+import re
 from pathlib import Path
 from types import ModuleType
 
@@ -10,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from cuas.clock import SimClock
 from cuas.config import SiteConfig, ZoneLabels
-from cuas.dashboard.contract import EvidenceHead, Frame, StartRun
+from cuas.dashboard.contract import EvidenceHead, Frame, ModelStatus, StartRun
 from cuas.dashboard.frames import FrameBuilder
 from cuas.dashboard.server import Hub, create_app
 from cuas.evidence.verify import verify_chain
@@ -164,3 +165,56 @@ def test_a_live_run_stopped_while_paused_keeps_valid_evidence_and_frees_the_serv
         again = client.post("/api/runs", json=S2_SEED_7.model_dump())
         assert again.status_code == 200 and again.json()["run_id"] == "s2_seed7_002"
         client.post("/api/run/stop")
+
+
+async def test_missing_and_broken_models_are_named_and_never_shared(
+    live: ModuleType, tmp_path: Path
+) -> None:
+    models = tmp_path / "models"
+    models.mkdir()
+    (models / "look_rgb.pt").write_bytes(b"not a torch file")
+    (models / "look_rgb.json").write_text('{"high_score": 0.5}', encoding="utf-8")
+    loader = launcher(live, tmp_path / "runs", models)
+    published: list[ModelStatus] = []
+    await loader.load_models(published.append)
+    final = published[-1]
+    steps = {s.name: s for s in final.steps}
+    assert final.state == "failed"
+    assert steps["RGB detector"].state == "failed" and steps["RGB detector"].detail
+    assert steps["Thermal detector"].state == "missing"
+    assert "look_thermal.pt not found" in steps["Thermal detector"].detail
+    assert all(m.state == "loading" for m in published[:-1])
+    assert loader._loaded is None
+
+
+@pytest.mark.media
+async def test_models_loaded_once_give_the_same_run_as_models_loaded_per_run(
+    live: ModuleType, tmp_path: Path, capsys, monkeypatch
+) -> None:
+    from cuas.sim import media
+
+    if not (ROOT / "models" / "look_rgb.pt").exists():
+        pytest.skip("models not trained here")
+    request = S2_SEED_7.model_copy(
+        update={"recorded_media": True, "zoom_per_station": 0}
+    )
+    for preload in (True, False):
+        loader = launcher(live, tmp_path / str(preload))
+        if preload:
+            published: list[ModelStatus] = []
+            await loader.load_models(published.append)
+            done = [sum(s.state == "ready" for s in m.steps) for m in published]
+            assert done == sorted(done) and published[-1].state == "ready"
+            assert all(s.state == "ready" for s in published[-1].steps)
+
+            def no_reload(*args) -> None:
+                raise AssertionError("a run reloaded the models")
+
+            monkeypatch.setattr(media, "load_look_models", no_reload)
+            monkeypatch.setattr(media, "load_sound", no_reload)
+        else:
+            monkeypatch.undo()
+        started = await loader.start(request, lambda message: None)
+        await started.done
+    digests = re.findall(r"control digest (sha256:\w+)", capsys.readouterr().out)
+    assert len(digests) == 2 and digests[0] == digests[1]

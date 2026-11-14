@@ -306,6 +306,26 @@ class Frame(ContractModel):
     evidence_head: EvidenceHead | None
 
 
+class ModelStep(ContractModel):
+    """One step of loading the AI models: a model, or the warm-up inference."""
+
+    name: str
+    state: Literal["waiting", "loading", "ready", "missing", "failed"]
+    detail: str | None = None
+    """Why a step is missing or failed, in words."""
+
+
+class ModelStatus(ContractModel):
+    """Sent as the server loads the AI models at start, once per step. ``ready``: recorded-media
+    runs can start. ``failed``: they cannot, and the steps say which model and why; simulator
+    runs are unaffected."""
+
+    contract: Literal[1] = CONTRACT_VERSION
+    type: Literal["models"] = "models"
+    state: Literal["loading", "ready", "failed"]
+    steps: list[ModelStep]
+
+
 class Hello(ContractModel):
     """The first message on every connection."""
 
@@ -314,6 +334,8 @@ class Hello(ContractModel):
     profiles: list[SiteProfile]
     run: RunInfo | None
     frame: Frame | None
+    models: ModelStatus | None = None
+    """``None``: this server loads no models, as a replay does."""
 
 
 class EvidenceEvent(ContractModel):
@@ -328,7 +350,7 @@ class EvidenceEvent(ContractModel):
 
 
 ServerMessage = Annotated[
-    Hello | RunInfo | Frame | EvidenceEvent, Field(discriminator="type")
+    Hello | RunInfo | Frame | EvidenceEvent | ModelStatus, Field(discriminator="type")
 ]
 
 

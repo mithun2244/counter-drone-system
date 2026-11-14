@@ -9,17 +9,28 @@ dashboard. The evidence keeper writes the run's chain, snapshots and hand-off pa
 run folder, and answers the operator's labels and exports over the evidence bus. When a run
 ends, the console gets its control digest: the one ``run_demo.py --scenario ... --fast`` prints
 for the same scenario, seed and zoom cameras.
+
+``load_models`` loads the AI models once, off the event loop, as the server starts, and reports
+each step; every recorded-media run then shares them. Without it (tests, the plain CLI), a
+recorded-media run loads its own.
 """
 
 import asyncio
 import hashlib
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
+from functools import partial
 from pathlib import Path
 
 from cuas.bus import WILDCARD, InProcessBus
 from cuas.clock import SimClock
 from cuas.config import SiteConfig, load_site
-from cuas.dashboard.contract import RunInfo, SiteProfile, StartRun
+from cuas.dashboard.contract import (
+    ModelStatus,
+    ModelStep,
+    RunInfo,
+    SiteProfile,
+    StartRun,
+)
 from cuas.dashboard.frames import FrameBuilder, profiles, run_info
 from cuas.dashboard.server import Publish, Started
 from cuas.evidence.keeper import EvidenceKeeper, start_keeper
@@ -32,6 +43,8 @@ from cuas.sim.scenario import Scenario, available_scenarios, load_scenario
 from cuas.sim.station import LookSource
 
 REAL_TIME = 1.0
+LOOK_STEPS = {"rgb": "RGB detector", "thermal": "Thermal detector"}
+SOUND_STEP, WARM_UP_STEP = "Sound classifier", "Warm-up inference"
 
 
 def digest(messages: list[Message]) -> str:
@@ -85,9 +98,48 @@ class LiveLauncher:
         loaded = [load_scenario(config_dir, s) for s in available_scenarios(config_dir)]
         self._scenarios = {s.metadata.id: s for s in loaded}
         self._profiles = profiles([s.metadata for s in loaded])
+        self._loaded = None
 
     def profiles(self) -> list[SiteProfile]:
         return self._profiles
+
+    async def load_models(self, publish: Callable[[ModelStatus], None]) -> None:
+        """Load every model once in a worker thread, publishing each step, so the server keeps
+        serving. Recorded-media runs share them once this ends ``ready``. A model that fails
+        is named with the error; simulator runs never need the models."""
+        from cuas.sim.media import (
+            SOUND_WEIGHTS,
+            LoadedModels,
+            load_look_model,
+            load_sound,
+            look_weights,
+            warm_up,
+        )
+        from cuas.station.detector import use_inference_threads
+
+        ai = load_site(self._config_dir).station_ai
+        steps = _Steps([*LOOK_STEPS.values(), SOUND_STEP, WARM_UP_STEP], publish)
+        looks = {}
+        for sensor, name in LOOK_STEPS.items():
+            missing = (
+                f"{look_weights(self._models_dir, sensor).name} not found in models/"
+            )
+            load = partial(load_look_model, self._models_dir, ai.detector, sensor)
+            if (model := await steps.attempt(name, load, missing)) is not None:
+                looks[sensor] = model
+        missing = f"{SOUND_WEIGHTS} not found in models/"
+        sound = await steps.attempt(
+            SOUND_STEP, partial(load_sound, self._models_dir, ai), missing
+        )
+        loaded = LoadedModels(looks, sound)
+        if looks:
+            await steps.attempt(WARM_UP_STEP, partial(_warmed, warm_up, loaded, ai), "")
+        else:
+            steps.report(WARM_UP_STEP, "missing", "no camera model to warm up")
+        use_inference_threads(ai.detector)  # in the loop's thread, where inference runs
+        if looks and not steps.failed:
+            self._loaded = loaded
+        steps.finish(ready=self._loaded is not None)
 
     async def start(self, request: StartRun, publish: Publish) -> Started:
         scenario = self._scenario(request)
@@ -134,13 +186,12 @@ class LiveLauncher:
         seed: int,
         run_dir: Path,
     ) -> LookSource | None:
-        """Imported only when asked for, so simulator-only runs never load torch."""
+        """Imported only when asked for, so simulator-only runs never load torch. Uses the
+        models ``load_models`` loaded, if it ran; otherwise loads them here, in the loop."""
         if not request.recorded_media:
             return None
         from cuas.sim.media import build_media_link
 
-        # ponytail: loads the models in the event loop, so the server stalls for a few
-        # seconds before a recorded-media run; move it to a thread if that matters.
         try:
             return build_media_link(
                 self._config_dir,
@@ -151,6 +202,7 @@ class LiveLauncher:
                 site.simulation.tick_s,
                 scenario.environment.wind_mps,
                 seed,
+                self._loaded,
             )
         except FileNotFoundError as error:
             raise LookupError(f"recorded media is not ready: {error}") from error
@@ -203,3 +255,45 @@ class LiveLauncher:
         publish(builder.flush())
         print(f"run {run.run_id} ended: control digest sha256:{digest(controlled)}")
         print(f"  {len(records)} evidence records; check: uv run cuas verify {run_dir}")
+
+
+def _warmed(warm_up: Callable, models: object, settings: object) -> bool:
+    """True, so the warm-up step reads ready rather than missing."""
+    warm_up(models, settings)
+    return True
+
+
+class _Steps:
+    """The steps of loading the models, published to the dashboard as each one changes."""
+
+    def __init__(
+        self, names: list[str], publish: Callable[[ModelStatus], None]
+    ) -> None:
+        self._steps = {name: ModelStep(name=name, state="waiting") for name in names}
+        self._publish = publish
+
+    @property
+    def failed(self) -> bool:
+        return any(step.state == "failed" for step in self._steps.values())
+
+    def report(self, name: str, state: str, detail: str | None = None) -> None:
+        self._steps[name] = ModelStep(name=name, state=state, detail=detail)
+        self._publish(ModelStatus(state="loading", steps=list(self._steps.values())))
+
+    def finish(self, ready: bool) -> None:
+        state = "ready" if ready else "failed"
+        self._publish(ModelStatus(state=state, steps=list(self._steps.values())))
+
+    async def attempt(self, name: str, load: Callable[[], object], missing: str):
+        """Run one load in a worker thread. ``None`` back means the weights are not there."""
+        self.report(name, "loading")
+        try:
+            result = await asyncio.to_thread(load)
+        except Exception as error:  # noqa: BLE001 -- any load error goes to the operator's panel, naming the model
+            self.report(name, "failed", f"{type(error).__name__}: {error}")
+            return None
+        if result is None:
+            self.report(name, "missing", missing)
+        else:
+            self.report(name, "ready")
+        return result
