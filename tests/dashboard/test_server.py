@@ -552,7 +552,7 @@ def test_acoustic_panel_lists_linked_events_and_zero_records_say_why() -> None:
     acoustic = acoustic[: acoustic.index("function recordsText")]
     assert "pre_alerts" in acoustic and "tr.heard" in acoustic
     assert 'a.reasons.includes("engine heard")' in acoustic
-    assert 'microphone or picket sound linked to {track}' in text
+    assert "microphone or picket sound linked to {track}" in text
     assert "Evidence record being written…" in text
     assert "No evidence kept: replayed stream" in text
     assert script.count("recordsText(") == 3  # defined once, used on cards and details

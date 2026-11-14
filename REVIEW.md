@@ -3,6 +3,29 @@
 Review date: 2026-11-14. Branch `phase-5-operator-dashboard` at `2bb90c3`, clean tree. Reviewer: Claude Code. No code was changed; this file is the only addition.
 Client brief reviewed against: Haris Unmanned Systems (critical-infrastructure counter-UAV).
 
+## Status after fixes (2026-11-15, tag `demo-final-2026-11-15`)
+
+The review below is kept as written on 2026-11-14. Since then:
+
+| Review item | Status |
+| --- | --- |
+| Risk 1: dashboard only on this laptop | **Fixed**: branch pushed, tags `demo-backup-2026-11-14`, `stage1-2026-11-14`, `demo-final-2026-11-15`; processed basemap committed; private zip of `data/` and `models/` |
+| Risk 2: S3 with recorded media alerts on birds | **Not fixed**. Workaround: S3 on the simulator only (`docs/demo_run_order.md`) |
+| Risk 3: a run cannot be stopped | **Fixed**: Stop button and `POST /api/run/stop` |
+| Risk 4: model loading freezes the page; silent lag | Loading **fixed** (once, at server start, with progress). Lag notice **not done**: run recorded media at 1× or 2× |
+| Risk 5: only this laptop has the media | **Not fixed** (licences, size). Workaround: this laptop, or restore from the private zip |
+| Risk 6: things that look wrong live | Partly: INSIDE ZONE added; label crowding, S1's slow start and S3 ghost tracks have workarounds in `docs/known_issues.md` |
+| Risk 7: buttons stick on "Saving…" | **Fixed** |
+| Honesty 1 and 2: video captions, "Zoom" | **Fixed**: "Sample clip from <dataset> - not footage of this track", "Zoom (stand-in clip)", "Sample recording from <dataset>", from the media manifest |
+| Honesty 3 and 4: health ticks, confidence | **Fixed**: SIM tags and a legend; confidence capped at 99% |
+| Honesty 5: hand-off says mock, not simulated | Not fixed; next sprint |
+| Honesty 6 and 7: caveats and missed targets | Covered by `docs/client_results_sheet.md` |
+| Code issues 1 to 5 (request hang, fetch errors, Stop, failed run, model loading) | **Fixed**, with tests |
+| Code issues 6 to 10 | Not fixed; next sprint (`docs/known_issues.md`) |
+| Brief gaps: 15 km, interceptor and authorisation, aircraft, audit trail, incident report | Not built; listed as gaps in `docs/known_issues.md`, with honest answers in `docs/demo_run_order.md` |
+
+Tests after the fixes: 1019 before the deadline plan, 1025 passed (1 known deprecation warning) at the tag; lint clean; S1–S5 control digests unchanged throughout.
+
 ## Summary
 
 1. The software is solid for what it is: a deterministic, single-laptop simulator with real detectors and an audio classifier run on public recordings, plus an offline operator dashboard and a tamper-evident evidence chain. Tests 1007 passed (0 skipped), lint clean, all five scenarios run without an error or warning, and repeated runs give identical digests.
