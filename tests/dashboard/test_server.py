@@ -540,3 +540,19 @@ def test_a_request_the_keeper_cannot_answer_times_out_and_the_next_one_works(
         again = client.post("/api/alerts/alert-1/label", json={"label": "confirm"})
         assert again.status_code == 200 and again.json()["seq"] == 2
         client.post("/api/run/stop")
+
+
+def test_acoustic_panel_lists_linked_events_and_zero_records_say_why() -> None:
+    """The panel lists what the wedges and alert reasons use, so it never says None while an
+    alert says "engine heard"; a card never shows a bare "0 evidence records"."""
+    app = STATIC / "app"
+    text = (app / "text.js").read_text(encoding="utf-8")
+    script = (app / "app.js").read_text(encoding="utf-8")
+    acoustic = script[script.index("function renderAcoustic") :]
+    acoustic = acoustic[: acoustic.index("function recordsText")]
+    assert "pre_alerts" in acoustic and "tr.heard" in acoustic
+    assert 'a.reasons.includes("engine heard")' in acoustic
+    assert "Picket engine report linked to {track} ({alert})" in text
+    assert "Evidence record being written…" in text
+    assert "No evidence kept: replayed stream" in text
+    assert script.count("recordsText(") == 3  # defined once, used on cards and details

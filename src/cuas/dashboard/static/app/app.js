@@ -169,7 +169,7 @@ function fillCard(card, a) {
   const meta = card.querySelector(".meta");
   meta.replaceChildren();
   if (a.label) meta.append(el("span", "label", t(`labelled.${a.label}`)), " · ");
-  meta.append(a.evidence_records === 1 ? t("oneRecord") : t("records", { n: a.evidence_records }));
+  meta.append(recordsText(a.evidence_records));
 }
 
 function renderQueue() {
@@ -207,14 +207,34 @@ function tickTti() {  // counts down between frames by `speed` per wall second
 
 // --- acoustic detections: heard, not placed (pre_alerts) ---
 
+// Every acoustic event the map or an alert uses: unplaced sectors (the wedges), station
+// microphone bearings matched to tracks, and picket engine reports behind "engine heard".
 function renderAcoustic() {
-  const pre = state.frame ? state.frame.pre_alerts : [];  // in the order sent
-  $("acoustic").replaceChildren(...(pre.length ? pre.map((p) => {
+  const frame = state.frame;
+  const pre = frame ? frame.pre_alerts : [];  // in the order sent
+  const rows = pre.map((p) => {
     const values = { sensor: p.sensor_id.split(".")[0], direction: t(`compassWord.${p.compass}`), last: clock(p.last_t), n: p.reports };
     const row = el("li", "", t(p.reports === 1 ? "acousticRowOne" : "acousticRow", values));
     row.dataset.sector = p.sector_id;
     return row;
-  }) : [el("li", "note", t("acousticNone"))]));
+  });
+  const placed = [];
+  for (const tr of frame ? frame.tracks : []) {
+    for (const h of tr.heard || []) {
+      placed.push(el("li", "placed", t("acousticMic", { sensor: h.station_id, track: tr.track_id, direction: t(`compassWord.${h.compass}`), last: clock(h.t) })));
+    }
+  }
+  for (const a of frame ? frame.alerts : []) {
+    if (a.reasons.includes("engine heard")) placed.push(el("li", "placed", t("acousticPicket", { track: a.track_id, alert: a.alert_id })));
+  }
+  if (placed.length) rows.push(el("li", "note", t("acousticPlaced")), ...placed);
+  $("acoustic").replaceChildren(...(rows.length ? rows : [el("li", "note", t("acousticNone"))]));
+}
+
+function recordsText(n) {  // 0: a live record is a moment away; a replayed stream keeps none
+  if (n === 1) return t("oneRecord");
+  if (n > 0) return t("records", { n });
+  return state.frame && state.frame.evidence_head ? t("recordPending") : t("noEvidenceKept");
 }
 
 // --- system status (design.md B1, B4) ---
@@ -418,7 +438,7 @@ function renderDetails() {
   if (!selectedCard()) $("details").append(el("p", "note", t("alertGone")));
   const evidence = [
     el("p", card.label ? "label" : "unavailable", card.label ? t(`labelled.${card.label}`) : t("noLabel")),
-    el("p", "", card.evidence_records === 1 ? t("oneRecord") : t("records", { n: card.evidence_records })),
+    el("p", "", recordsText(card.evidence_records)),
   ];
   const result = state.results.get(card.alert_id);
   if (result) { const node = el("div"); showResult(node, result); evidence.push(node); }

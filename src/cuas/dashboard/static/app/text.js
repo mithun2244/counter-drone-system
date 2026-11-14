@@ -122,6 +122,11 @@ const TEXT = {
     acousticRow: "{sensor} · heard from {direction} · last {last} · {n} reports",
     acousticRowOne: "{sensor} · heard from {direction} · last {last} · 1 report",
     acousticNone: "None",
+    acousticPlaced: "Linked to tracks",
+    acousticMic: "{sensor} microphone heard {track} from {direction} · last {last}",
+    acousticPicket: "Picket engine report linked to {track} ({alert})",
+    recordPending: "Evidence record being written…",
+    noEvidenceKept: "No evidence kept: replayed stream",
     heard: "{id} heard",
   },
 };
