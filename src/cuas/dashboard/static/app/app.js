@@ -208,7 +208,8 @@ function tickTti() {  // counts down between frames by `speed` per wall second
 // --- acoustic detections: heard, not placed (pre_alerts) ---
 
 // Every acoustic event the map or an alert uses: unplaced sectors (the wedges), station
-// microphone bearings matched to tracks, and picket engine reports behind "engine heard".
+// microphone bearings matched to tracks, and each alert whose reasons say "engine heard"
+// (sound evidence from a station microphone or a picket, control/classify.py).
 function renderAcoustic() {
   const frame = state.frame;
   const pre = frame ? frame.pre_alerts : [];  // in the order sent
@@ -225,7 +226,7 @@ function renderAcoustic() {
     }
   }
   for (const a of frame ? frame.alerts : []) {
-    if (a.reasons.includes("engine heard")) placed.push(el("li", "placed", t("acousticPicket", { track: a.track_id, alert: a.alert_id })));
+    if (a.reasons.includes("engine heard")) placed.push(el("li", "placed", t("acousticAlert", { track: a.track_id, alert: a.alert_id })));
   }
   if (placed.length) rows.push(el("li", "note", t("acousticPlaced")), ...placed);
   $("acoustic").replaceChildren(...(rows.length ? rows : [el("li", "note", t("acousticNone"))]));

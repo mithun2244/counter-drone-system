@@ -124,7 +124,7 @@ const TEXT = {
     acousticNone: "None",
     acousticPlaced: "Linked to tracks",
     acousticMic: "{sensor} microphone heard {track} from {direction} · last {last}",
-    acousticPicket: "Picket engine report linked to {track} ({alert})",
+    acousticAlert: "{alert} \"engine heard\": microphone or picket sound linked to {track}",
     recordPending: "Evidence record being written…",
     noEvidenceKept: "No evidence kept: replayed stream",
     heard: "{id} heard",
