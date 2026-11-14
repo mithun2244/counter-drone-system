@@ -133,6 +133,9 @@ class RunInfo(ContractModel):
     speed: float
     """Simulated seconds per wall second: 1, 2 or 5."""
     site: SiteMap
+    ended_reason: Literal["completed", "stopped", "failed"] | None = None
+    """Why an ended run ended: it played to the end, the operator stopped it, or it raised an
+    error (the server console has it). ``None`` until it ends."""
 
 
 class HeardView(ContractModel):

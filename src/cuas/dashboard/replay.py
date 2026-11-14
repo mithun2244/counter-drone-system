@@ -65,4 +65,6 @@ class ReplayLauncher:
         for message in self._played:
             while clock.now + EARLY < message.t:
                 await clock.tick()
+                if clock.stopped:
+                    return
             publish(message)

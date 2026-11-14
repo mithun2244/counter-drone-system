@@ -369,3 +369,74 @@ def test_the_operator_dashboard_draws_labelled_acoustic_sectors() -> None:
     )
     assert "Acoustic warning, {direction}, camera unconfirmed" in text
     assert "no camera recording was matched to this track" in text
+
+
+def test_stop_ends_the_run_and_leaves_the_server_ready(
+    site: SiteConfig, tmp_path: Path
+) -> None:
+    slow = ReplayLauncher(EDGE, site.simulation.tick_s, pace=1.0)  # 40 s at real time
+    with (
+        TestClient(create_app(Hub(slow), app_dir=tmp_path)) as client,
+        client.websocket_connect("/ws") as ws,
+    ):
+        ws.receive_json()
+        assert client.post("/api/run/stop").status_code == 409  # nothing to stop yet
+        client.post("/api/runs", json=STADIUM)
+        client.post("/api/run/control", json={"action": "pause"})
+        stopped = client.post("/api/run/stop")
+        assert stopped.status_code == 200
+        assert (stopped.json()["state"], stopped.json()["ended_reason"]) == (
+            "ended",
+            "stopped",
+        )
+        ended = until_ended(ws)[-1]
+        assert ended["ended_reason"] == "stopped"
+        assert client.post("/api/run/stop").status_code == 409
+        again = client.post("/api/runs", json=STADIUM)
+        assert again.status_code == 200 and again.json()["state"] == "running"
+
+
+def test_a_run_that_finishes_or_fails_says_so(site: SiteConfig, tmp_path: Path) -> None:
+    fast = ReplayLauncher(EDGE, site.simulation.tick_s, pace=FAST)
+    with (
+        TestClient(create_app(Hub(fast), app_dir=tmp_path)) as client,
+        client.websocket_connect("/ws") as ws,
+    ):
+        ws.receive_json()
+        client.post("/api/runs", json=STADIUM)
+        assert until_ended(ws)[-1]["ended_reason"] == "completed"
+    run = RunInfo.model_validate_json(EDGE.read_text(encoding="utf-8").splitlines()[1])
+    with (
+        TestClient(create_app(Hub(FailingLauncher(run)), app_dir=tmp_path)) as client,
+        client.websocket_connect("/ws") as ws,
+    ):
+        ws.receive_json()
+        client.post("/api/runs", json=STADIUM)
+        assert until_ended(ws)[-1]["ended_reason"] == "failed"
+
+
+class FailingLauncher:
+    """A run whose task raises, as a crash in the simulator or pipeline would."""
+
+    def __init__(self, run: RunInfo) -> None:
+        self._run = run
+
+    def profiles(self) -> list:
+        return []
+
+    async def start(self, request, publish) -> Started:
+        async def crash() -> None:
+            await asyncio.sleep(0.01)
+            raise RuntimeError("a deliberate failure")
+
+        clock = SimClock(0.2, pace=1.0)
+        return Started(self._run, clock, 1.0, None, asyncio.create_task(crash()))
+
+
+def test_the_operator_dashboard_has_a_stop_with_its_own_confirm() -> None:
+    app = STATIC / "app"
+    page = (app / "index.html").read_text(encoding="utf-8")
+    script = (app / "app.js").read_text(encoding="utf-8")
+    assert 'id="stop"' in page and 'id="stop-confirm"' in page
+    assert '"/api/run/stop"' in script
+    assert "confirm(" not in script.replace("stop-confirm", "")  # no browser dialog

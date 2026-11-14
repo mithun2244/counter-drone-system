@@ -143,8 +143,20 @@ class Hub:
             records = started.evidence.subscribe(EVIDENCE_RECORD)
             self._listener = asyncio.create_task(self._listen(records))
         self.publish(started.run)
-        self._watcher = asyncio.create_task(self._end_when_done(started.done))
+        self._watcher = asyncio.create_task(self._end_when_done(started))
         return started.run
+
+    async def stop(self) -> RunInfo:
+        """End the run at its next tick, the way a finished run ends: the pipeline drains and
+        the evidence keeper exports every alert. Returns once it has ended, ready for a new run."""
+        started, watcher = self._started, self._watcher
+        if not self.active or started is None or watcher is None:
+            raise LookupError("no run is going")
+        started.clock.stop()
+        await asyncio.shield(watcher)
+        if self.run is None:
+            raise LookupError("no run is going")
+        return self.run
 
     def control(self, request: RunControl) -> RunInfo:
         if not self.active or self._started is None or self.run is None:
@@ -272,13 +284,17 @@ class Hub:
     def leave(self, client: _Client) -> None:
         self._clients.discard(client)
 
-    async def _end_when_done(self, done: asyncio.Task[None]) -> None:
+    async def _end_when_done(self, started: Started) -> None:
         try:
-            await done
+            await started.done
         except Exception:
             log.exception("the run stopped with an error")
+            reason = "failed"
+        else:
+            reason = "stopped" if started.clock.stopped else "completed"
         if self.run is not None:
-            self.publish(self.run.model_copy(update={"state": "ended"}))
+            update = {"state": "ended", "ended_reason": reason}
+            self.publish(self.run.model_copy(update=update))
 
 
 def create_app(
@@ -313,6 +329,13 @@ def create_app(
     ) -> RunInfo:  # in the loop: it moves the clock
         try:
             return hub.control(request)
+        except LookupError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+
+    @app.post("/api/run/stop")
+    async def stop_run() -> RunInfo:
+        try:
+            return await hub.stop()
         except LookupError as error:
             raise HTTPException(status_code=409, detail=str(error)) from error
 

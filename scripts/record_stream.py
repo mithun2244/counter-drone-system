@@ -114,7 +114,7 @@ async def record(args: argparse.Namespace, seed: int) -> list[str]:
         Hello(profiles=known, run=None, frame=None),
         run,
         *frames,
-        run.model_copy(update={"state": "ended"}),
+        run.model_copy(update={"state": "ended", "ended_reason": "completed"}),
     ]
     return [m.model_dump_json() for m in messages]
 
@@ -249,7 +249,7 @@ def edge_states() -> list[str]:
         ),
         frame(40.0, tracks=[quad], alerts=[dismissed], evidence_head=head),
         run.model_copy(update={"state": "paused"}),
-        run.model_copy(update={"state": "ended"}),
+        run.model_copy(update={"state": "ended", "ended_reason": "completed"}),
     ]
     return [m.model_dump_json() for m in messages]
 

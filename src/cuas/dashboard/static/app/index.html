@@ -22,6 +22,12 @@
       <strong id="run-title"></strong>
       <span id="clock" class="clock"></span>
       <button id="play-pause"></button>
+      <button id="stop" class="danger" data-text="stop"></button>
+      <span id="stop-confirm" class="confirm" role="alertdialog" aria-labelledby="stop-question" hidden>
+        <span id="stop-question" data-text="stopQuestion"></span>
+        <button id="stop-yes" class="danger" data-text="stopYes"></button>
+        <button id="stop-no" data-text="stopNo"></button>
+      </span>
       <span class="speeds"><button data-speed="1">1×</button><button data-speed="2">2×</button><button data-speed="5">5×</button></span>
       <label><input type="checkbox" id="sectors" checked> <span data-text="sectors"></span></label>
       <label><input type="checkbox" id="rays"> <span data-text="rays"></span></label>

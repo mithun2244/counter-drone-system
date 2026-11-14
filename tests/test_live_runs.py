@@ -140,3 +140,27 @@ def until_ended(ws) -> list[dict]:
     while not (received[-1]["type"] == "run" and received[-1]["state"] == "ended"):
         received.append(ws.receive_json())
     return received
+
+
+def test_a_live_run_stopped_while_paused_keeps_valid_evidence_and_frees_the_server(
+    live: ModuleType, tmp_path: Path
+) -> None:
+    real_time = live.LiveLauncher(
+        ROOT / "config", ROOT / "data", ROOT / "models", tmp_path
+    )
+    app = create_app(Hub(real_time), app_dir=tmp_path / "no-app")
+    with TestClient(app) as client, client.websocket_connect("/ws") as ws:
+        ws.receive_json()
+        client.post("/api/runs", json=S2_SEED_7.model_dump())
+        while ws.receive_json()["type"] != "frame":  # it is under way
+            pass
+        client.post("/api/run/control", json={"action": "pause"})
+        stopped = client.post("/api/run/stop").json()
+        assert (stopped["state"], stopped["ended_reason"]) == ("ended", "stopped")
+        frames = [m for m in until_ended(ws) if m["type"] == "frame"]
+        assert not frames or frames[-1]["t"] < 30.0  # far short of the 120 s scenario
+        report = verify_chain(tmp_path / "s2_seed7_001")
+        assert report.problems == []
+        again = client.post("/api/runs", json=S2_SEED_7.model_dump())
+        assert again.status_code == 200 and again.json()["run_id"] == "s2_seed7_002"
+        client.post("/api/run/stop")

@@ -928,6 +928,23 @@
       "title": "Duration S",
       "type": "number"
      },
+     "ended_reason": {
+      "anyOf": [
+       {
+        "enum": [
+         "completed",
+         "stopped",
+         "failed"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Ended Reason"
+     },
      "profile_id": {
       "title": "Profile Id",
       "type": "string"

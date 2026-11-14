@@ -68,9 +68,15 @@ function fillScenarios() {
 }
 
 async function post(path, body) {
-  const response = await fetch(path, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-  });
+  let response;
+  try {
+    response = await fetch(path, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+  } catch (error) {  // the server is unreachable: say so, and let callers reset their buttons
+    $("message").textContent = String(error);
+    return null;
+  }
   const reply = await response.json().catch(() => ({ detail: response.statusText }));
   $("message").textContent = response.ok ? "" : reply.detail;
   return response.ok ? reply : null;
@@ -88,7 +94,11 @@ function renderTopBar() {
   $("start").hidden = Boolean(live);
   $("running").hidden = !run;
   if (!run) return;
-  $("run-title").textContent = `${run.title} · ${run.venue} · ${t(`runState.${run.state}`)}`;
+  const ended = run.state === "ended" && run.ended_reason;
+  $("run-title").textContent = `${run.title} · ${run.venue} · ${ended ? t(`endedReason.${run.ended_reason}`) : t(`runState.${run.state}`)}`;
+  $("run-title").classList.toggle("failed", run.ended_reason === "failed");
+  $("stop").hidden = !live || !$("stop-confirm").hidden;
+  if (!live) $("stop-confirm").hidden = true;
   $("clock").textContent = state.frame ? clock(state.frame.t) : "--:--.-";
   $("play-pause").textContent = run.state === "running" ? t("pause") : t("play");
   $("play-pause").disabled = !live;
@@ -460,6 +470,22 @@ $("audio").addEventListener("ended", stopAudio);
 select(null);
 $("play-pause").addEventListener("click", () =>
   post("/api/run/control", { action: state.run.state === "running" ? "pause" : "play" }));
+function askStop(open) {  // the dashboard's own confirm, not a browser dialog
+  $("stop-confirm").hidden = !open;
+  renderTopBar();
+  if (open) $("stop-no").focus();
+}
+$("stop").addEventListener("click", () => askStop(true));
+$("stop-no").addEventListener("click", () => askStop(false));
+$("stop-confirm").addEventListener("keydown", (event) => { if (event.key === "Escape") askStop(false); });
+$("stop-yes").addEventListener("click", async () => {
+  $("stop-yes").disabled = true;
+  $("stop-yes").textContent = t("stopping");
+  await post("/api/run/stop", {});
+  $("stop-yes").disabled = false;
+  $("stop-yes").textContent = t("stopYes");
+  askStop(false);
+});
 for (const b of document.querySelectorAll("[data-speed]")) {
   b.addEventListener("click", () => post("/api/run/control", { action: "speed", speed: Number(b.dataset.speed) }));
 }
