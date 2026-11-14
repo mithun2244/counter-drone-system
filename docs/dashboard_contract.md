@@ -43,13 +43,14 @@
 ## Message sequence
 
 ```
-connect ──> hello                       profiles; the current run and latest frame, if any
+connect ──> hello                       profiles; the current run and latest frame, if any; model status
+        ──> models ...                  live server only: one per model-loading step at start
 operator starts a run (POST /api/runs)
         ──> run   (state "running")     the site map comes with it
         ──> frame, frame, frame ...     every 0.4 s of simulated time
         ──> evidence ...                whenever a record is written
         ──> run   (state "paused" / "running", or a new speed)
-        ──> run   (state "ended")
+        ──> run   (state "ended", with ended_reason)
 ```
 
 A client that connects mid-run gets `hello` with `run` and the latest `frame`, so it can draw at once.
@@ -63,11 +64,20 @@ A client that connects mid-run gets `hello` with `run` and the latest `frame`, s
 | `profiles` | The saved site profiles the operator can pick. Each has `profile_id`, `venue`, `zone_labels` and the `scenarios` that run there, each with `scenario_id` and `title` |
 | `run` | The current run, as in `run` below, or null when idle |
 | `frame` | The latest frame, or null |
+| `models` | The latest `models` message, or null when this server loads no models (a replay) |
+
+### `models`
+
+Sent by a live server while it loads the AI models at start, once per step, and once more when loading ends.
+
+**Fields:** `state` is `loading`, `ready` or `failed`. `steps` lists each step (`RGB detector`, `Thermal detector`, `Sound classifier`, `Warm-up inference`) with `name`, `state` (`waiting`, `loading`, `ready`, `missing` or `failed`) and `detail`, the reason in words when a step is missing or failed.
+- Disable Start while `state` is `loading`. Recorded media needs `ready`; with `failed`, show the steps' reasons. Simulator runs never need the models.
 
 ### `run`
 
 **Fields:** `run_id`, `profile_id`, `scenario_id`, `title`, `venue`, `seed`, `duration_s`, `recorded_media`, `zoom_per_station`, `state`, `speed` and `site`.
 - `state` is `running`, `paused` or `ended`.
+- `ended_reason` is null until the run ends, then `completed` (it played to the end), `stopped` (the operator stopped it) or `failed` (it raised an error; the server console has it).
 - `speed` is simulated seconds per wall second: 1, 2 or 5.
 
 **`site`, the map:**
@@ -144,13 +154,14 @@ The B4 card is "Engine heard, `compass`, unconfirmed".
 
 ## HTTP API
 
-Errors return `{"detail": "..."}`, always a string: `404` for an unknown alert, clip, profile or scenario, or recorded media this machine does not have; `409` if a run is already active, for control with no run, or for a label or export when no live run is going (a replay keeps no evidence, and an ended run's evidence is closed); `422` for a bad body.
+Errors return `{"detail": "..."}`, always a string: `404` for an unknown alert, clip, profile or scenario, or recorded media this machine does not have; `409` if a run is already active, for control or stop with no run, for a recorded-media start while the models load or after they failed (the reason says which model), or for a label or export when no live run is going (a replay keeps no evidence, and an ended run's evidence is closed); `422` for a bad body.
 
 | Request | Body | Returns |
 | --- | --- | --- |
 | `GET /api/profiles` | — | The list of profiles, as in `hello` |
 | `POST /api/runs` | `profile_id`, `scenario_id`, optional `seed`, `recorded_media` (default false), `zoom_per_station` (0, 1 or 2) | The `run` message |
 | `POST /api/run/control` | `action`: `pause` or `play`; or `speed` with `speed`: 1, 2 or 5 | The `run` message |
+| `POST /api/run/stop` | — | The `run` message with `state` `ended` and `ended_reason` `stopped`. Returns once the run has ended the normal way (pipeline drained, every alert exported, chain valid), so a new run can start at once |
 | `POST /api/alerts/{alert_id}/label` | `label`: `confirm` or `dismiss` | `alert_id`, `seq`, `record_hash` |
 | `POST /api/alerts/{alert_id}/export` | — | `alert_id`, `path`, `sha256`, and the hand-off `package` (`docs/handoff.schema.json`). Every alert is also exported when the run ends |
 | `GET /api/clips/{station}/{clip}` | — | The recording: H.264 MP4 (`video/mp4`) for a `looks` entry, for a `<video>` element, seeking to `at_s`; WAV (`audio/wav`) for a `sounds` entry, for an `<audio>` element |

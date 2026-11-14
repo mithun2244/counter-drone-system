@@ -7,7 +7,7 @@
 
 - **Current phase:** Phase 5 — Dashboard and evidence. The backend was merged to `main` as `f3610a2` (PR #1) before acceptance; the operator dashboard is on `phase-5-operator-dashboard`, cut from `f3610a2`, not pushed
 - **Last session:** 2026-11-14
-- **Pre-demo work (client demo on Monday 2026-11-16):** `REVIEW.md` lists the findings; the stage order is in the decisions log (2026-11-14). Stage 0 (backup) done; each later stage waits for the user's approval of its plan
+- **Pre-demo work (client demo on Monday 2026-11-16):** `REVIEW.md` lists the findings; the stage order is in the decisions log (2026-11-14). Stage 0 (backup) done. Stage 1 done without its slower-than-real-time notice, moved to `docs/known_issues.md` by the user; tag `stage1-2026-11-14`
 - **Blocked on:** the user's review of the Phase 5 acceptance report and the dashboard revisions (session log below). Two checks need the user: the offline start with the network disconnected, and hearing the audio in a real browser
 - **Tested checkpoint:** `91efcd9` (backend, evidence, reference page). Operator dashboard commits `ac4e516`, `6da027a`, `980221a`, `5932113`, docs `eddcb38`; three-column revision `b262f28`, docs `d93db91`; acoustic sectors and edge-to-edge map `931a825`, docs `f11143d`; "Last heard from" cue `03280d9`, docs `a08a3bf`; acoustic-first S5 and warning wording `48ca114`, then its docs commit
 - **Phase 6:** planned and approved (`phases.md`, Phase 6 Plan); not started. Implementation starts only after Phase 5 is accepted and merged, on `phase-6-demo` from `main`. Second-machine (C1) and GPU (C2) checks are pending: no machine named yet
@@ -132,7 +132,7 @@
 - **Evidence: the newest records.** Removing the newest record together with the file it lists leaves a valid, shorter chain, and `cuas verify` passes (pinned by a test, `design.md` A11). Exports carry the chain head and the dashboard shows it; a real system needs an outside anchor
 - Evidence: a recording no alert's looks or sounds use (for example the background-noise WAV mixed into each sound window) is protected only by the recorder's hash list, which no record anchors. Labels and exports need a live run (`409` otherwise)
 - The export response rounds the package's numbers to 3 decimals like every number sent; `sha256` is of the stored file, which keeps full precision
-- Starting a recorded-media dashboard run loads the models in the server's event loop, so the server stalls for a few seconds (marked `ponytail:` in `scripts/live_runs.py`)
+- Fixed 2026-11-14: the dashboard server loads the models once at start in a worker thread, so a recorded-media start no longer stalls it. The plain CLI (`run_demo.py --scenario --recorded-media`) still loads them per run
 - The committed sample streams carry no evidence (`evidence_head` null)
 - Operator dashboard: no JavaScript unit tests (no JS test runner in the project). Its behaviour is checked by a scripted headless-Chrome check kept outside the repo, and by Python tests for `/`, required wording and offline files. At the full 7.2 km view, station, zone and track labels overlap near the site; Close-up helps. Headless Chrome is muted, so audio was checked as playing but not heard. At 1366×768 the selected alert panel scrolls to reach the audio rows, and the queue shows about one card at a time while an alert is selected
 - "Last heard from" keeps a microphone's latest matched bearing until the track is lost, so it can be old: in S2 recorded media the age at frame time was median 3.0 s, up to 48.6 s (st2 heard at 01:09.0, still shown at 01:57.6). The label carries the time. At 1366×768 the video overlay covers part of a wedge pointing east; its label moves left of the overlay, and collapsing the video shows the wedge
@@ -198,6 +198,12 @@ Approved by the user on 2026-11-07, for the Phase 2 demo. The plan's CPU time re
 - [ ] GPU laptop available for the live demo?
 
 ## Session log (newest first)
+
+### 2026-11-14 — Stage 1: Stop and models at server start
+- Done: `9a106c6` (`SimClock.stop()` and `behind_s`; the engine ends a stopped run like a finished one), `4ff831f` (`POST /api/run/stop`, Stop button with the dashboard's own confirm, `ended_reason` completed/stopped/failed, `post()` no longer leaves buttons stuck when the server is unreachable), `02c195a` (models loaded once at server start in a worker thread, a `models` message per step, Start disabled while loading, a missing or broken model named and recorded media refused with 409, simulator runs unaffected). Contract kept at version 1: added fields and the `models` message; samples changed only in `hello` and `run` lines.
+- Checks: stop while paused on a live S2 run leaves a verifying chain and a free server; preloaded models give the same control digest as models loaded per run, and a run never reloads them (both caught by sabotage, 6 sabotages in all). Real server: accepting connections 3.6 s after launch, models ready at 3.8 s, recorded-media start answered in 0.41 s.
+- Decision (user): the slower-than-real-time notice is skipped for the demo and listed in `docs/known_issues.md`.
+- Backup zip moved to `C:\Users\roym6\cuas-backup\` (not the OneDrive Desktop, which syncs to the cloud), hash unchanged.
 
 ### 2026-11-14 — Pre-demo review and Stage 0 backup
 - Done: `REVIEW.md` (read, run and report only; regular suite 1007 passed, lint clean, S1–S5 fast runs and recorded-media S2 clean, digests repeatable). Stage 0: basemap exception in `.gitignore`, `rules.md` §5, `data/README.md`, `mapping.md`, README; branch pushed and tag `demo-backup-2026-11-14` pushed; private zip of `data/` and `models/` made in the scratchpad for the user to copy.
