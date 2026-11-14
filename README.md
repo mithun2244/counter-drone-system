@@ -24,6 +24,13 @@ Open [the operator dashboard](http://127.0.0.1:8000/). It works offline and load
 
 The processed basemap `data/basemap/portsmouth.json` is committed, so a fresh clone draws the map offline; `scripts/fetch_basemap.py` rebuilds it, and without it the map draws a local grid. For recorded-media runs, prepare the local recordings and model weights as described in the [dashboard contract](docs/dashboard_contract.md) and [data source notes](data/README.md). The [reference page](http://127.0.0.1:8000/reference/) is a minimal independent check of the same contract. See [phase status and acceptance checks](docs/phases.md) for Phase 5 acceptance and the Phase 6 plan.
 
+## Client demo documents
+
+- [Demo run order](docs/demo_run_order.md): exact clicks, what to say, backup plan, honest answers
+- [Results sheet](docs/client_results_sheet.md): every number, labelled MEASURED, SIMULATED or PROJECTED
+- [Known issues](docs/known_issues.md) and [licences](docs/licences.md)
+- [Pre-demo review](REVIEW.md)
+
 ## Project docs
 
 - [GitHub workflow](GITHUB.md)
