@@ -1,9 +1,10 @@
+import asyncio
 import math
 from pathlib import Path
 
 import pytest
 
-from cuas.bus import InProcessBus
+from cuas.bus import WILDCARD, InProcessBus
 from cuas.clock import SimClock
 from cuas.config import SiteConfig
 from cuas.geometry import angle_difference_deg
@@ -168,3 +169,23 @@ async def test_s3_birds_are_seen_so_later_phases_have_something_to_reject(
     assert bird_bearings
     assert {b.sensor for b in bird_bearings} == {"rgb", "thermal"}
     assert not alerts_in(messages)
+
+
+async def test_a_stopped_clock_ends_the_run_early(
+    site: SiteConfig, config_dir: Path
+) -> None:
+    scenario = load_scenario(config_dir, "s2")
+    clock = SimClock(site.simulation.tick_s)
+    bus = InProcessBus()
+    heard = bus.subscribe(WILDCARD)
+
+    async def stop_at_five_seconds() -> None:
+        async for message in heard:
+            if message.t >= 5.0:
+                clock.stop()
+                return
+
+    stopper = asyncio.create_task(stop_at_five_seconds())
+    await asyncio.wait_for(run_scenario(scenario, site, bus, clock), 60)
+    await asyncio.wait_for(stopper, 1)
+    assert clock.stopped and 5.0 <= clock.now < 6.0 < scenario.duration_s

@@ -20,6 +20,8 @@ class SimClock:
         self._pace = pace
         self._ticks = 0
         self._wall_start: float | None = None
+        self._stopped = False
+        self._behind_s = 0.0
         self._running = asyncio.Event()
         self._running.set()
 
@@ -34,6 +36,22 @@ class SimClock:
     @property
     def paused(self) -> bool:
         return not self._running.is_set()
+
+    @property
+    def stopped(self) -> bool:
+        return self._stopped
+
+    @property
+    def behind_s(self) -> float:
+        """Wall seconds the last paced tick came after its deadline: how far the run is behind
+        real time at its pace. Zero while paused, and always zero for a fast clock."""
+        return 0.0 if self.paused else self._behind_s
+
+    def stop(self) -> None:
+        """End the run: a paused ``tick`` returns at once, and no later ``tick`` waits. The loop
+        calling ``tick`` must check ``stopped``; simulated time is never rewound."""
+        self._stopped = True
+        self._running.set()
 
     def pause(self) -> None:
         """Hold the next ``tick`` until ``resume``: simulated time stops, nothing else changes."""
@@ -73,6 +91,8 @@ class SimClock:
         """Advance one tick and let other tasks run, holding the pace if one is set."""
         self._ticks += 1
         await self._running.wait()
+        if self._stopped:
+            return
         if self._pace is None:
             await asyncio.sleep(0)
             return
@@ -81,4 +101,5 @@ class SimClock:
             self._wall_start = loop.time()
         # Sleep to a deadline, not for a fixed time, so timer overshoot does not build up.
         deadline = self._wall_start + self.now / self._pace
+        self._behind_s = max(0.0, loop.time() - deadline)
         await asyncio.sleep(max(0.0, deadline - loop.time()))

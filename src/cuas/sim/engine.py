@@ -78,6 +78,10 @@ async def run_scenario(
         await _publish_alerts(bus, pickets, tick, t, truth)
         if tick < last_tick:
             await clock.tick()
+            if (
+                clock.stopped
+            ):  # the operator stopped the run: end it like a finished one
+                break
     if intake is not None:
         intake.cancel()
         with contextlib.suppress(asyncio.CancelledError):

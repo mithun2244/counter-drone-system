@@ -127,3 +127,39 @@ async def test_a_pace_must_be_positive() -> None:
 def test_bad_settings_are_rejected(kwargs: dict[str, float]) -> None:
     with pytest.raises(ValueError):
         SimClock(**kwargs)
+
+
+async def test_stop_wakes_a_paused_tick_and_no_later_tick_waits() -> None:
+    clock = SimClock(0.2, pace=1.0)
+    clock.start()
+    clock.pause()
+    waiting = asyncio.create_task(clock.tick())
+    await asyncio.sleep(0.05)
+    assert not waiting.done()
+    clock.stop()
+    await asyncio.wait_for(waiting, 0.5)
+    start = time.perf_counter()
+    for _ in range(50):  # 10 simulated seconds at real time, were it not stopped
+        await clock.tick()
+    assert clock.stopped and time.perf_counter() - start < 0.5
+
+
+async def test_behind_measures_lag_and_clears_once_caught_up() -> None:
+    clock = SimClock(0.2, pace=10.0)  # a tick every 0.02 s of wall time
+    clock.start()
+    time.sleep(0.3)  # noqa: ASYNC251 -- blocks the loop on purpose, as inference does
+    await clock.tick()
+    assert clock.behind_s > 0.2
+    lagging = clock.behind_s
+    clock.pause()
+    assert clock.behind_s == 0.0  # a pause is not lag
+    clock.resume()  # rebased: no race to catch up
+    await clock.tick()
+    assert clock.behind_s < lagging and clock.behind_s < 0.05
+
+
+async def test_a_fast_clock_is_never_behind() -> None:
+    clock = SimClock(0.2)
+    time.sleep(0.05)  # noqa: ASYNC251 -- blocking on purpose
+    await clock.tick()
+    assert clock.behind_s == 0.0
