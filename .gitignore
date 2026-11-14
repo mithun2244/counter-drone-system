@@ -3,5 +3,9 @@ __pycache__/
 # Dataset contents stay out of git; data/README.md records name, URL and licence (rules.md §5).
 data/*
 !data/README.md
+# Exception (rules.md §5): the processed OSM display basemap, ODbL, attribution shown.
+!data/basemap/
+data/basemap/*
+!data/basemap/portsmouth.json
 models/
 runs/

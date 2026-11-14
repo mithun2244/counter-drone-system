@@ -43,7 +43,7 @@ This records published terms and is not legal advice. Have counsel review before
 
 - **URL:** fetched with one request to the Overpass API, https://overpass-api.de/api/interpreter (the endpoint used is recorded in the file's `source`), by `uv run python scripts/fetch_basemap.py`. The query is in the script and saved with the raw response.
 - **Licence:** Open Database License (ODbL) 1.0, https://www.openstreetmap.org/copyright. Any map drawn from it must show "© OpenStreetMap contributors". The dashboard shows that, and the "Simulated scenario" notice, at all times.
-- **Kept:** `data/basemap/portsmouth.osm.json` (raw response) and `portsmouth.json` (projected into site metres, simplified to 2 m). Neither is committed or distributed. If the derived file were ever shared publicly, ODbL's share-alike terms would apply to it.
+- **Kept:** `data/basemap/portsmouth.osm.json` (raw response, not committed) and `portsmouth.json` (projected into site metres, simplified to 2 m). `portsmouth.json` (152 KB) is committed to the private repository since 2026-11-14, as the one exception to `rules.md` §5, so a clone draws the map offline. It is not distributed outside the repository. If the derived file were ever shared publicly, ODbL's share-alike terms would apply to it.
 - **Fetched:** 2026-11-09, about 7.2 km square around Southsea Common: coastline, water, roads from motorway to tertiary, railways, parks and grass.
 - **Used for:** display only. It is drawn under the fictional site and never reaches tracking, alerts or evidence (`docs/mapping.md`).
 

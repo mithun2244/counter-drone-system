@@ -39,6 +39,7 @@
 - Public datasets only. Record each dataset's name, URL and licence in `data/README.md`.
 - Check each licence before use. Some (for example Drone-vs-Bird) are non-commercial only.
 - Never commit `data/`, `models/` or `runs/`.
+- Exception: the processed OpenStreetMap display basemap `data/basemap/portsmouth.json` (ODbL, attribution shown on screen) is committed.
 - Never put client footage or Saudi site data in this repo. The real system keeps such data in the Kingdom.
 - No secrets, keys or passwords in code or config. Use environment variables.
 
