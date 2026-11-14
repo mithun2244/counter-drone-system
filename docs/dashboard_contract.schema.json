@@ -764,6 +764,18 @@
       "title": "Clip Url",
       "type": "string"
      },
+     "dataset": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Dataset"
+     },
      "source": {
       "title": "Source",
       "type": "string"
@@ -1235,6 +1247,18 @@
      "clip_url": {
       "title": "Clip Url",
       "type": "string"
+     },
+     "dataset": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Dataset"
      },
      "source": {
       "title": "Source",

@@ -35,6 +35,7 @@ from cuas.dashboard.frames import FrameBuilder, profiles, run_info
 from cuas.dashboard.server import Publish, Started
 from cuas.evidence.keeper import EvidenceKeeper, start_keeper
 from cuas.evidence.store import EvidenceStore, fresh_run_dir
+from cuas.media_manifest import dataset_names, load_manifest
 from cuas.pipeline import start_pipeline
 from cuas.schemas import EvidenceRecord, Message
 from cuas.schemas.topics import EVIDENCE_RECORD, GATEWAY_ACCEPTED, ZOOM_TASK
@@ -220,7 +221,10 @@ class LiveLauncher:
     ) -> None:
         sensor, ingest, control = InProcessBus(), InProcessBus(), InProcessBus()
         labels = scenario.metadata.zone_labels
-        builder = FrameBuilder(run.run_id, site, labels)
+        datasets = (
+            {} if media is None else dataset_names(load_manifest(self._config_dir))
+        )
+        builder = FrameBuilder(run.run_id, site, labels, datasets)
         store = EvidenceStore(run_dir)
         keeper = start_keeper(
             EvidenceKeeper(store, run.run_id, labels), control, evidence

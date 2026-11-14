@@ -353,7 +353,7 @@ function loadSource(source, autoplay) {  // the RGB / thermal / zoom tabs
   if (!look) return;
   state.source = source;
   $("clip").src = `${look.clip_url}#t=${look.at_s}`;  // media fragment: start near the look
-  $("clip-note").textContent = t("clipAt", { source: look.source, at: look.at_s.toFixed(1) });
+  $("clip-note").textContent = t("clipAt", { dataset: look.dataset || t("someDataset") });
   refreshTabs(state.looks);
   if (autoplay) $("clip").play().catch(() => {});  // a blocked autoplay leaves the controls
 }
@@ -422,8 +422,10 @@ function showSounds(sounds) {
   state.sounds = sounds;
   $("sounds").replaceChildren(...(sounds.length ? sounds.map((s) => {
     const row = el("li", "", t("station", { id: s.station_id }));
-    const button = el("button", "", t("playAudio"));
+    const label = t("playAudio", { dataset: s.dataset || t("someDataset") });
+    const button = el("button", "", label);
     button.dataset.src = s.clip_url;
+    button.dataset.label = label;
     row.append(button);
     return row;
   }) : [el("li", "note", t("noSound"))]));
@@ -432,7 +434,7 @@ function showSounds(sounds) {
 function stopAudio() {
   $("audio").pause();
   $("audio").removeAttribute("src");
-  for (const b of $("sounds").querySelectorAll("button")) b.textContent = t("playAudio");
+  for (const b of $("sounds").querySelectorAll("button")) b.textContent = b.dataset.label;
 }
 
 function playSound(button) {
@@ -441,7 +443,7 @@ function playSound(button) {
   if (playing) return;
   $("audio").src = button.dataset.src;
   button.textContent = t("stopAudio");
-  $("audio").play().catch((error) => { button.textContent = t("playAudio"); $("message").textContent = String(error); });
+  $("audio").play().catch((error) => { button.textContent = button.dataset.label; $("message").textContent = String(error); });
 }
 
 // --- drawing ---

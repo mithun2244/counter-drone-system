@@ -485,3 +485,14 @@ def test_the_operator_dashboard_shows_model_loading() -> None:
     assert "Simulator runs still work." in text
     assert 'message.type === "models"' in script
     assert '$("go").disabled' in script and '$("media").disabled' in script
+
+
+def test_clip_captions_say_they_are_dataset_samples_not_this_track() -> None:
+    app = STATIC / "app"
+    text = (app / "text.js").read_text(encoding="utf-8")
+    script = (app / "app.js").read_text(encoding="utf-8")
+    assert "Sample clip from {dataset} - not footage of this track" in text
+    assert 'zoom: "Zoom (stand-in clip)"' in text
+    assert "Sample recording from {dataset}" in text
+    assert "{source} at {at} s" not in text
+    assert "look.dataset" in script and "s.dataset" in script

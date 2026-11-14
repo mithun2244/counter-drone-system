@@ -186,6 +186,9 @@ class LookRef(ContractModel):
     clip_url: str
     at_s: float
     """Seconds into the clip of the frame the model looked at (approximate)."""
+    dataset: str | None = None
+    """The public dataset the recording comes from, for its caption: never this track's
+    footage. ``None`` if the server does not know."""
 
 
 class SoundRef(ContractModel):
@@ -199,6 +202,8 @@ class SoundRef(ContractModel):
     """``station.acoustic``, for example ``st1.acoustic``."""
     station_id: str
     clip_url: str
+    dataset: str | None = None
+    """The public dataset the recording comes from, as for ``LookRef``."""
 
 
 class AlertCard(ContractModel):

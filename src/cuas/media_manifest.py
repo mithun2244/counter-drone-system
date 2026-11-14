@@ -42,6 +42,18 @@ class MediaManifest(ConfigModel):
     excluded: tuple[ExcludedEntry, ...]
 
 
+# The folder each clip's path starts with, and the dataset's name for on-screen captions.
+DATASET_NAMES = {
+    "svanstrom": "Svanström Drone Detection Dataset",
+    "fsd50k": "FSD50K",
+}
+
+
+def dataset_names(manifest: MediaManifest) -> dict[str, str]:
+    """Each clip's public dataset, by clip ID. Clip IDs are opaque, so this reveals no label."""
+    return {c.id: DATASET_NAMES[c.path.split("/", 1)[0]] for c in manifest.clips}
+
+
 def load_manifest(config_dir: Path) -> MediaManifest:
     raw = yaml.safe_load((config_dir / MANIFEST_NAME).read_text(encoding="utf-8"))
     return MediaManifest.model_validate(raw)

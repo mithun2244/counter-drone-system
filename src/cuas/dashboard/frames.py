@@ -7,7 +7,7 @@ messages only, never ground truth. The same message sequence always gives the sa
 
 import heapq
 from collections import deque
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 from cuas.config import DashboardSettings, ScenarioMetadata, SiteConfig, ZoneLabels
 from cuas.dashboard.contract import (
@@ -145,8 +145,16 @@ def run_info(
 
 
 class FrameBuilder:
-    def __init__(self, run_id: str, site: SiteConfig, labels: ZoneLabels) -> None:
+    def __init__(
+        self,
+        run_id: str,
+        site: SiteConfig,
+        labels: ZoneLabels,
+        datasets: Mapping[str, str] | None = None,
+    ) -> None:
+        """``datasets``: each recording's public dataset by clip ID, for captions."""
         self._run_id = run_id
+        self._datasets = datasets or {}
         self._settings: DashboardSettings = site.dashboard
         self._labels = labels
         coverage = site.coverage
@@ -383,12 +391,12 @@ class FrameBuilder:
                     source=source,
                     clip_url=CLIP_URL.format(station=station, clip=clip),
                     at_s=int(index) * self._look_period_s,
+                    dataset=self._datasets.get(clip),
                 )
             )
         return out
 
-    @staticmethod
-    def _sounds(track_class: TrackClass) -> list[SoundRef]:
+    def _sounds(self, track_class: TrackClass) -> list[SoundRef]:
         """No time into the clip: the source loops, so a window index can pass its end."""
         out = []
         for source, ref in track_class.looks.items():
@@ -396,7 +404,12 @@ class FrameBuilder:
             if sensor == ACOUSTIC:
                 clip = ref.rpartition(":")[0]
                 url = CLIP_URL.format(station=station, clip=clip)
-                out.append(SoundRef(source=source, station_id=station, clip_url=url))
+                dataset = self._datasets.get(clip)
+                out.append(
+                    SoundRef(
+                        source=source, station_id=station, clip_url=url, dataset=dataset
+                    )
+                )
         return out
 
     def _heard(self, track_class: TrackClass) -> list[HeardView]:

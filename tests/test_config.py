@@ -189,3 +189,14 @@ def test_fit_spans_out_of_order_fail_on_load(
 
 def test_scenario_metadata_holds_no_truth() -> None:
     assert set(ScenarioMetadata.model_fields) == {"id", "title", "venue", "zone_labels"}
+
+
+def test_every_clip_names_its_public_dataset_and_video_is_svanstrom() -> None:
+    from cuas.media_manifest import DATASET_NAMES, dataset_names, load_manifest
+
+    manifest = load_manifest(Path(__file__).resolve().parents[1] / "config")
+    names = dataset_names(manifest)
+    assert set(names) == {clip.id for clip in manifest.clips}
+    assert set(names.values()) <= set(DATASET_NAMES.values())
+    videos = {names[c.id] for c in manifest.clips if c.modality != "audio"}
+    assert videos == {"Svanström Drone Detection Dataset"}

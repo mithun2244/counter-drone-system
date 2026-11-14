@@ -40,6 +40,7 @@ from cuas.dashboard.frames import (
     site_map,
 )
 from cuas.evidence.handoff import handoff_schema_text
+from cuas.media_manifest import dataset_names, load_manifest
 from cuas.pipeline import start_pipeline
 from cuas.schemas.topics import GATEWAY_ACCEPTED, ZOOM_TASK
 from cuas.sim.engine import run_scenario
@@ -109,7 +110,9 @@ async def record(args: argparse.Namespace, seed: int) -> list[str]:
     run = run_info(
         run_id, meta, known, site, seed, scenario.duration_s, media is not None
     )
-    frames = replay(FrameBuilder(run_id, site, labels), accepted, controlled)
+    datasets = {} if media is None else dataset_names(load_manifest(CONFIG_DIR))
+    builder = FrameBuilder(run_id, site, labels, datasets)
+    frames = replay(builder, accepted, controlled)
     messages = [
         Hello(profiles=known, run=None, frame=None),
         run,

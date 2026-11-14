@@ -388,3 +388,25 @@ def test_the_latest_frame_again_shows_what_changed_since(
     assert again is not None and again.t == first.t == 0.0
     assert (first.alerts[0].label, again.alerts[0].label) == (None, "confirm")
     assert again.evidence_head == EvidenceHead(seq=2, record_hash="2" * 64)
+
+
+def test_looks_and_sounds_name_their_public_dataset(site: SiteConfig) -> None:
+    datasets = {"abcdef0123456789": "Dataset A", "1111222233334444": "Dataset B"}
+    builder = FrameBuilder("run-1", site, LABELS, datasets)
+    looks = {
+        "st1.rgb": "abcdef0123456789:7",
+        "st2.thermal": "9999999999999999:0",  # not in the map: no name invented
+        "st1.acoustic": "1111222233334444:3",
+    }
+    feed(
+        builder,
+        track("trk-1", 0.0),
+        classed("trk-1", 0.0, 0.9, looks=looks),
+        threat("trk-1", 0.0, "red", "alert-1"),
+    )
+    card = builder.flush().alerts[0]
+    assert [(r.source, r.dataset) for r in card.looks] == [
+        ("st1.rgb", "Dataset A"),
+        ("st2.thermal", None),
+    ]
+    assert [s.dataset for s in card.sounds] == ["Dataset B"]
