@@ -311,6 +311,17 @@ class BasemapSettings(ConfigModel):
     """Line simplification tolerance; far below what the map can show."""
 
 
+class CameraCueSettings(ConfigModel):
+    """The big-drone video sequence: a picket hears a piston engine, the nearest station's camera
+    is cued at the picket, a camera ray near that bearing is the detection, and a confirmed
+    track near the picket carries it on to the zoom camera."""
+
+    search_half_width_deg: Annotated[float, Field(gt=0.0, le=90.0)]
+    same_target_deg: Positive
+    link_reach_factor: Positive
+    target_span_m: Positive
+
+
 class DashboardSettings(ConfigModel):
     """What the dashboard stream carries (docs/dashboard_contract.md)."""
 
@@ -323,6 +334,7 @@ class DashboardSettings(ConfigModel):
     """A card says attack or drone once that probability reaches this, else unclassified."""
     map_margin_fraction: NonNegative
     """Space around the outermost pickets and zones, as a share of the site's extent."""
+    camera_cue: CameraCueSettings
     request_timeout_s: Positive
     """How long a label or export waits for the evidence keeper before it fails."""
     host: Literal["127.0.0.1", "localhost"]

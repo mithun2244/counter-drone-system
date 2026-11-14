@@ -218,3 +218,19 @@ async def test_models_loaded_once_give_the_same_run_as_models_loaded_per_run(
         await started.done
     digests = re.findall(r"control digest (sha256:\w+)", capsys.readouterr().out)
     assert len(digests) == 2 and digests[0] == digests[1]
+
+
+async def test_big_drone_camera_detections_are_written_to_the_evidence_chain(
+    live: ModuleType, tmp_path: Path
+) -> None:
+    published: list = []
+    request = StartRun(profile_id="fictional-processing-plant", scenario_id="s1")
+    started = await launcher(live, tmp_path).start(request, published.append)
+    await started.done
+    report = verify_chain(tmp_path / started.run.run_id)
+    detections = [r for r in report.records if r.kind == "camera_detection"]
+    frames = [m for m in published if isinstance(m, Frame)]
+    cues = {(c.picket_id, c.detected_t) for f in frames for c in f.cues if c.detected_t}
+    assert report.problems == [] and detections
+    assert {(r.details["picket_id"], r.t) for r in detections} == cues
+    assert all(r.alert_id == "" and r.files == () for r in detections)

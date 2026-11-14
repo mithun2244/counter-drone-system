@@ -297,7 +297,7 @@ def test_root_serves_the_operator_dashboard_and_its_files(site: SiteConfig) -> N
     with TestClient(create_app(Hub(launcher))) as client:  # the real static/app
         root = client.get("/", follow_redirects=False)
         assert root.status_code == 200
-        for name in ("app.css", "text.js", "map.js", "app.js"):
+        for name in ("app.css", "text.js", "map.js", "simview.js", "app.js"):
             assert name in root.text
             assert client.get(f"/{name}").status_code == 200, name
         assert client.get("/reference/").status_code == 200
@@ -556,3 +556,23 @@ def test_acoustic_panel_lists_linked_events_and_zero_records_say_why() -> None:
     assert "Evidence record being written…" in text
     assert "No evidence kept: replayed stream" in text
     assert script.count("recordsText(") == 3  # defined once, used on cards and details
+
+
+def test_big_drone_video_panel_wording_and_simulated_view() -> None:
+    """S1's sequence: acoustic only, then a SIMULATED camera view, never presented as footage;
+    auto-open never changes the operator's selection."""
+    app = STATIC / "app"
+    page = (app / "index.html").read_text(encoding="utf-8")
+    text = (app / "text.js").read_text(encoding="utf-8")
+    script = (app / "app.js").read_text(encoding="utf-8")
+    view = (app / "simview.js").read_text(encoding="utf-8")
+    assert '<canvas id="simview"></canvas>' in page
+    assert '<script src="simview.js"></script>' in page
+    assert "Acoustic detection only - camera cued to bearing {deg}°, searching" in text
+    assert "Camera detection at {t} by {station}" in text
+    assert 'simLabel: "SIMULATED CAMERA VIEW - not real footage"' in text
+    assert 'cameraDetected: "Camera detected"' in text
+    assert 't("simLabel")' in view and "drawCrosshair" in view
+    pick = script[script.index("function pickCue") : script.index("function showBadge")]
+    assert "state.selected =" not in pick  # picking a cue never selects an alert
+    assert 'cue.views.find((v) => v.camera === "zoom")' in script  # zoom once assigned

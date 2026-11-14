@@ -31,7 +31,7 @@ FRAME_DESCRIPTION = (
 Level = Literal["red", "amber", "info"]
 Compass = Literal["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 Label = Literal["confirm", "dismiss"]
-RecordKind = Literal["alert", "escalation", "label", "export"]
+RecordKind = Literal["alert", "escalation", "label", "export", "camera_detection"]
 XY = tuple[float, float]
 
 
@@ -292,6 +292,44 @@ class EvidenceHead(ContractModel):
     record_hash: str
 
 
+class SimCameraView(ContractModel):
+    """What to draw in the SIMULATED camera view: no footage. The target direction is a camera's
+    reported bearing, or the direction to the estimated track; never the true position."""
+
+    camera: Literal["wide", "zoom"]
+    station_id: str
+    pointing_azimuth_deg: float
+    pointing_elevation_deg: float
+    fov_deg: float
+    """Horizontal field of view."""
+    seen_azimuth_deg: float
+    seen_elevation_deg: float
+    range_m: float | None
+    """From the station to the estimated track; ``None`` before a track exists."""
+    drawn_span_m: float
+    """The size the target is drawn at, for its apparent size at ``range_m``."""
+
+
+class CameraCue(ContractModel):
+    """A big-drone engagement (piston engine heard by a picket), in three stages: ``acoustic``
+    (camera cued, searching), ``camera`` (a camera reported a bearing near the cue), ``zoom``
+    (a zoom camera is on its track). Small drones never get one."""
+
+    cue_id: str
+    picket_id: str
+    heard_t: float
+    stage: Literal["acoustic", "camera", "zoom"]
+    cue_station_id: str
+    cue_bearing_deg: float
+    """From the cued station towards the picket that heard the engine."""
+    detected_t: float | None
+    detected_by: str | None
+    track_id: str | None
+    alert_id: str | None
+    views: list[SimCameraView]
+    """The wide view once detected, then the zoom view once a zoom camera is assigned."""
+
+
 class Frame(ContractModel):
     """A snapshot, every 0.4 s of simulated time while a run is going."""
 
@@ -309,6 +347,8 @@ class Frame(ContractModel):
     coverage: CoverageView | None
     sensors: list[SensorView]
     evidence_head: EvidenceHead | None
+    cues: list[CameraCue] = []
+    """Big-drone camera cues (S1, S5); always empty for small drones."""
 
 
 class ModelStep(ContractModel):

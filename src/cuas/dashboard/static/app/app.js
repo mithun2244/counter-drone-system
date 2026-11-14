@@ -4,7 +4,7 @@
 
 const state = {
   profiles: [], run: null, frame: null, models: null, frameWall: 0, basemap: null, ttis: new Map(), inside: new Set(),
-  selected: null, lastCard: null, looks: [], source: null, sounds: [], results: new Map(), collapsed: false,
+  selected: null, lastCard: null, cue: null, cueTabs: new Map(), simShown: false, looks: [], source: null, sounds: [], results: new Map(), collapsed: false,
 };
 const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 const STATIONARY_MPS = 0.5;  // below this ground speed a course means nothing
@@ -145,7 +145,7 @@ function makeCard(alertId) {
   card.dataset.alert = alertId;
   card.tabIndex = 0;
   const head = el("div", "head");
-  head.append(el("span", "level"), el("span", "class"), el("span", "tti"));
+  head.append(el("span", "level"), el("span", "class"), el("span", "badge"), el("span", "tti"));
   const actions = el("div", "actions");
   for (const action of ["confirm", "dismiss", "export"]) {
     const button = el("button", "", t(action));
@@ -161,6 +161,7 @@ function fillCard(card, a) {
   const ended = !state.run || state.run.state === "ended";  // an ended run's evidence is closed
   for (const b of card.querySelectorAll("[data-action]")) b.disabled = ended || b.dataset.busy === "1";
   card.querySelector(".level").textContent = t(`level.${a.level}`);
+  showBadge(card.querySelector(".badge"), state.frame ? cueOf((c) => c.alert_id === a.alert_id) : null);
   card.querySelector(".class").replaceChildren(`${t(`classKey.${a.class_key}`)} ${pct(a.confidence)}%`, simTag());
   const where = a.zone_label ? t(`approach.${a.approach}`, { zone: a.zone_label }) : t("approach.none");
   const seen = a.coasting ? t("coasting") : a.n_stations === 1 ? t("oneStation") : t("stations", { n: a.n_stations });
@@ -184,9 +185,15 @@ function renderQueue() {
   });
   for (const gone of cards.values()) gone.remove();
   const pre = state.frame ? state.frame.pre_alerts : [];
-  $("pre-alerts").replaceChildren(...pre.map((p) => el("li", "pre", `${p.sensor_id.endsWith(".acoustic")
-    ? t("micHeard", { direction: t(`compassWord.${p.compass}`) })
-    : t("engineHeard", { compass: p.compass })} (${p.sensor_id})`)));
+  $("pre-alerts").replaceChildren(...pre.map((p) => {
+    const row = el("li", "pre", `${p.sensor_id.endsWith(".acoustic")
+      ? t("micHeard", { direction: t(`compassWord.${p.compass}`) })
+      : t("engineHeard", { compass: p.compass })} (${p.sensor_id})`);
+    const badge = el("span", "badge");
+    showBadge(badge, cueOf((c) => c.picket_id === p.sensor_id && !c.alert_id));
+    row.append(badge);
+    return row;
+  }));
   const clear = state.frame && !alerts.length && !pre.length;
   $("all-clear").textContent = clear ? t("allClear", { clock: clock(state.frame.t) }) : "";
   if (!state.frame) $("all-clear").textContent = state.run ? t("waiting") : t("idle");
@@ -475,10 +482,74 @@ function playSound(button) {
   $("audio").play().catch((error) => { button.textContent = button.dataset.label; $("message").textContent = String(error); });
 }
 
+// --- big-drone camera cues: acoustic -> camera -> zoom, as a SIMULATED view (simview.js) ---
+
+const STAGE_ORDER = { zoom: 0, camera: 1, acoustic: 2 };
+
+function cueOf(match) {
+  return state.frame ? (state.frame.cues || []).find(match) || null : null;
+}
+
+// A selected alert shows its own cue; with nothing selected the highest-priority cue opens by
+// itself (alert rank, then stage, then first heard). Never changes what the operator selected.
+function pickCue() {
+  if (!state.frame) return null;
+  if (state.selected) {
+    const own = cueOf((c) => c.alert_id === state.selected);
+    return own && { cue: own, auto: false };
+  }
+  const rank = new Map(state.frame.alerts.map((a, i) => [a.alert_id, i]));
+  const cues = [...(state.frame.cues || [])].sort((a, b) =>
+    (rank.get(a.alert_id) ?? Infinity) - (rank.get(b.alert_id) ?? Infinity)
+    || STAGE_ORDER[a.stage] - STAGE_ORDER[b.stage] || a.heard_t - b.heard_t);
+  return cues.length ? { cue: cues[0], auto: true } : null;
+}
+
+function showBadge(node, cue) {  // camera detected, but not the cue in the video panel
+  const shown = cue && cue.stage !== "acoustic" && (!state.cue || state.cue.cue_id !== cue.cue_id);
+  node.textContent = shown ? t("cameraDetected") : "";
+  node.hidden = !shown;
+}
+
+function renderCue() {
+  const pick = pickCue();
+  const overlay = $("video-overlay");
+  state.cue = pick ? pick.cue : null;
+  overlay.classList.toggle("sim", Boolean(pick));
+  if (!pick) {
+    overlay.classList.remove("viewing");
+    $("cue-note").textContent = "";
+    if (state.simShown) { state.simShown = false; refreshTabs(state.looks); }
+    overlay.hidden = !state.selected;
+    return;
+  }
+  state.simShown = true;
+  overlay.hidden = false;  // auto-open: shows the panel, selects nothing
+  if (!$("clip").paused) $("clip").pause();
+  const cue = pick.cue;
+  const chosen = state.cueTabs.get(cue.cue_id);  // the operator's tab, else zoom once assigned
+  const view = cue.views.find((v) => v.camera === chosen) || cue.views.find((v) => v.camera === "zoom") || cue.views[0];
+  $("looks").replaceChildren(...cue.views.map((v) => {
+    const button = el("button", v === view ? "on" : "", t(v.camera === "zoom" ? "simZoomTab" : "simWideTab", { station: v.station_id }));
+    button.dataset.cam = v.camera;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", String(v === view));
+    return button;
+  }));
+  overlay.classList.toggle("viewing", Boolean(view));
+  overlay.classList.remove("empty");
+  $("clip-note").textContent = view
+    ? t("cameraDetection", { t: clock(cue.detected_t), station: cue.detected_by })
+    : t("acousticOnly", { deg: Math.round(cue.cue_bearing_deg) });
+  $("cue-note").textContent = pick.auto ? t("autoFollow") : "";
+  if (view && !state.collapsed) drawSimView($("simview"), view);
+}
+
 // --- drawing ---
 
 function render() {
   renderTopBar();
+  renderCue();  // before the queue, so badges know which cue the panel shows
   renderQueue();
   renderStatus();
   renderAcoustic();
@@ -514,10 +585,12 @@ $("alerts").addEventListener("keydown", (event) => {
   if (event.key === "Enter" && event.target.classList.contains("card")) { select(event.target.dataset.alert); render(); }
 });
 $("looks").addEventListener("click", (event) => {
+  const cam = event.target.closest("button[data-cam]");
+  if (cam && state.cue) { state.cueTabs.set(state.cue.cue_id, cam.dataset.cam); render(); return; }
   const button = event.target.closest("button[data-source]");
   if (button) loadSource(button.dataset.source, true);
 });
-$("collapse").addEventListener("click", () => setCollapsed(!state.collapsed));
+$("collapse").addEventListener("click", () => { setCollapsed(!state.collapsed); render(); });  // redraws a simulated view
 setCollapsed(false);
 $("sounds").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-src]");

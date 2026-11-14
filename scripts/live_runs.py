@@ -21,7 +21,7 @@ from collections.abc import AsyncIterator, Callable
 from functools import partial
 from pathlib import Path
 
-from cuas.bus import WILDCARD, InProcessBus
+from cuas.bus import WILDCARD, Bus, InProcessBus
 from cuas.clock import SimClock
 from cuas.config import SiteConfig, load_site
 from cuas.dashboard.contract import (
@@ -38,7 +38,12 @@ from cuas.evidence.store import EvidenceStore, fresh_run_dir
 from cuas.media_manifest import dataset_names, load_manifest
 from cuas.pipeline import start_pipeline
 from cuas.schemas import EvidenceRecord, Message
-from cuas.schemas.topics import EVIDENCE_RECORD, GATEWAY_ACCEPTED, ZOOM_TASK
+from cuas.schemas.topics import (
+    CAMERA_DETECTION,
+    EVIDENCE_RECORD,
+    GATEWAY_ACCEPTED,
+    ZOOM_TASK,
+)
 from cuas.sim.engine import run_scenario
 from cuas.sim.scenario import Scenario, available_scenarios, load_scenario
 from cuas.sim.station import LookSource
@@ -59,18 +64,35 @@ def digest(messages: list[Message]) -> str:
 
 
 async def feed(
-    builder: FrameBuilder, tap: AsyncIterator[Message], publish: Publish
+    builder: FrameBuilder,
+    tap: AsyncIterator[Message],
+    publish: Publish,
+    evidence: Bus | None = None,
 ) -> list[Message]:
     """Pass every message to the frame builder and publish its frames. Returns the messages.
-    An evidence record also sends the latest frame again, so a label shows while paused."""
+    An evidence record also sends the latest frame again, so a label shows while paused.
+    Big-drone camera detections the builder notices go to the evidence keeper."""
     seen = []
     async for message in tap:
         seen.append(message)
         for frame in builder.ingest(message):
             publish(frame)
+        for note in builder.take_camera_detections():
+            await _note(evidence, note)
         if isinstance(message, EvidenceRecord) and (frame := builder.again()):
             publish(frame)
     return seen
+
+
+async def _note(evidence: Bus | None, note: Message) -> None:
+    if evidence is None:
+        return
+    try:
+        await evidence.publish(CAMERA_DETECTION, note)
+    except (
+        RuntimeError
+    ):  # the evidence bus closed as the run ended: nothing left to record
+        return
 
 
 async def on_time(builder: FrameBuilder, clock: SimClock, publish: Publish) -> None:
@@ -234,7 +256,9 @@ class LiveLauncher:
             control.subscribe(WILDCARD),
             evidence.subscribe(EVIDENCE_RECORD),
         )
-        feeds = [asyncio.create_task(feed(builder, tap, publish)) for tap in taps]
+        feeds = [
+            asyncio.create_task(feed(builder, tap, publish, evidence)) for tap in taps
+        ]
         ticker = asyncio.create_task(on_time(builder, clock, publish))
         zoom_tasks = control.subscribe(ZOOM_TASK)
         pipeline = start_pipeline(

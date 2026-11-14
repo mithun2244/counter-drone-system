@@ -2,6 +2,7 @@
 
 from cuas.schemas.base import Message
 from cuas.schemas.bearing_detection import BearingDetection, SensorKind
+from cuas.schemas.camera_detection import CameraDetection
 from cuas.schemas.coverage_status import CoverageStatus
 from cuas.schemas.evidence_record import EvidenceRecord, FileRef
 from cuas.schemas.operator_request import ExportRequest, OperatorLabel
@@ -16,6 +17,7 @@ from cuas.schemas.zoom_task import ZoomTask
 
 __all__ = [
     "BearingDetection",
+    "CameraDetection",
     "ClueEvidence",
     "CoverageStatus",
     "EvidenceRecord",

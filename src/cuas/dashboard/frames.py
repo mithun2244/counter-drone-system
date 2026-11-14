@@ -33,8 +33,10 @@ from cuas.dashboard.contract import (
     ZoneView,
     ZoomView,
 )
+from cuas.dashboard.cues import CueTracker
 from cuas.schemas import (
     BearingDetection,
+    CameraDetection,
     CoverageStatus,
     EvidenceRecord,
     Message,
@@ -179,6 +181,7 @@ class FrameBuilder:
         self._head: EvidenceHead | None = None
         self._records: dict[str, int] = {}
         self._operator_labels: dict[str, str] = {}
+        self._cues = CueTracker(site)
 
     def ingest(self, message: Message) -> list[Frame]:
         """Take one message. Returns the frames for every mark it shows has passed."""
@@ -212,7 +215,12 @@ class FrameBuilder:
     def _mark(self) -> float:
         return self._next_k * self._settings.frame_period_s
 
+    def take_camera_detections(self) -> list[CameraDetection]:
+        """Big-drone camera detections since the last call, for the evidence chain."""
+        return self._cues.take_notes()
+
     def _apply(self, message: Message) -> None:
+        self._cues.ingest(message)
         if isinstance(message, Track):
             self._track(message)
         elif isinstance(message, TrackClass):
@@ -318,6 +326,7 @@ class FrameBuilder:
                 for _, s in sorted(self._sensors.items())
             ],
             evidence_head=self._head,
+            cues=self._cues.views(self._tracks, list(self._zoom.values()), threats),
         )
 
     def _track_view(self, track: Track, threat: ThreatAssessment | None) -> TrackView:

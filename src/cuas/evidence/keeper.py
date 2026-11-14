@@ -32,6 +32,7 @@ from cuas.evidence.handoff import (
 )
 from cuas.evidence.store import EVIDENCE_DIR, HANDOFF_DIR, EvidenceStore
 from cuas.schemas import (
+    CameraDetection,
     EvidenceRecord,
     ExportRequest,
     Message,
@@ -115,6 +116,19 @@ class EvidenceKeeper:
             LabelEntry(label=request.label, t=request.t, seq=record.seq)
         )
         return record
+
+    def camera_detection(self, note: CameraDetection) -> EvidenceRecord:
+        """A camera's first detection where a picket heard a piston engine: before any alert,
+        so no alert ID; what the camera reported, not where the target was."""
+        self._t = max(self._t, note.t)
+        details: dict[str, str | float | None] = {
+            "picket_id": note.picket_id,
+            "station_id": note.station_id,
+            "sensor": note.sensor,
+            "azimuth_deg": note.azimuth_deg,
+            "elevation_deg": note.elevation_deg,
+        }
+        return self._store.append("camera_detection", note.t, "", (), (), details)
 
     def finish(self) -> list[EvidenceRecord]:
         """An export of every alert, in the order they were raised, as the run ends."""
@@ -241,7 +255,11 @@ async def _keep(
 ) -> None:
     async def answer() -> None:
         async for request in requests:
-            if isinstance(request, OperatorLabel | ExportRequest):
+            if isinstance(request, CameraDetection):
+                await evidence.publish(
+                    EVIDENCE_RECORD, keeper.camera_detection(request)
+                )
+            elif isinstance(request, OperatorLabel | ExportRequest):
                 try:
                     record = keeper.handle(request)
                 except Exception:  # one bad request must not stop the answers (logged)

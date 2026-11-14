@@ -5,7 +5,7 @@ from pydantic import Field
 from cuas.schemas.base import Message, SimTime
 
 Sha256Hex = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
-RecordKind = Literal["alert", "escalation", "label", "export"]
+RecordKind = Literal["alert", "escalation", "label", "export", "camera_detection"]
 
 
 class FileRef(Message):

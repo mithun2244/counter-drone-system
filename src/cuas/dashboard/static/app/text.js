@@ -128,6 +128,18 @@ const TEXT = {
     recordPending: "Evidence record being written…",
     noEvidenceKept: "No evidence kept: replayed stream",
     heard: "{id} heard",
+    acousticOnly: "Acoustic detection only - camera cued to bearing {deg}°, searching",
+    cameraDetection: "Camera detection at {t} by {station}",
+    simWideTab: "{station} camera (simulated)",
+    simZoomTab: "{station} Zoom (simulated)",
+    simWideName: "WIDE",
+    simZoomName: "ZOOM",
+    simRange: "range {km} km",
+    simRangeUnknown: "range unknown (one bearing)",
+    simOutside: "target outside view",
+    simLabel: "SIMULATED CAMERA VIEW - not real footage",
+    autoFollow: "Opened automatically: highest-priority detection",
+    cameraDetected: "Camera detected",
   },
 };
 

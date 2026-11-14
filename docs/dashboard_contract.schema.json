@@ -416,6 +416,107 @@
     "title": "Bounds",
     "type": "object"
    },
+   "CameraCue": {
+    "additionalProperties": false,
+    "description": "A big-drone engagement (piston engine heard by a picket), in three stages: ``acoustic``\n(camera cued, searching), ``camera`` (a camera reported a bearing near the cue), ``zoom``\n(a zoom camera is on its track). Small drones never get one.",
+    "properties": {
+     "alert_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Alert Id"
+     },
+     "cue_bearing_deg": {
+      "title": "Cue Bearing Deg",
+      "type": "number"
+     },
+     "cue_id": {
+      "title": "Cue Id",
+      "type": "string"
+     },
+     "cue_station_id": {
+      "title": "Cue Station Id",
+      "type": "string"
+     },
+     "detected_by": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Detected By"
+     },
+     "detected_t": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Detected T"
+     },
+     "heard_t": {
+      "title": "Heard T",
+      "type": "number"
+     },
+     "picket_id": {
+      "title": "Picket Id",
+      "type": "string"
+     },
+     "stage": {
+      "enum": [
+       "acoustic",
+       "camera",
+       "zoom"
+      ],
+      "title": "Stage",
+      "type": "string"
+     },
+     "track_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Track Id"
+     },
+     "views": {
+      "items": {
+       "$ref": "#/$defs/SimCameraView"
+      },
+      "title": "Views",
+      "type": "array"
+     }
+    },
+    "required": [
+     "cue_id",
+     "picket_id",
+     "heard_t",
+     "stage",
+     "cue_station_id",
+     "cue_bearing_deg",
+     "detected_t",
+     "detected_by",
+     "track_id",
+     "alert_id",
+     "views"
+    ],
+    "title": "CameraCue",
+    "type": "object"
+   },
    "CoverageView": {
     "additionalProperties": false,
     "properties": {
@@ -461,7 +562,8 @@
        "alert",
        "escalation",
        "label",
-       "export"
+       "export",
+       "camera_detection"
       ],
       "title": "Kind",
       "type": "string"
@@ -545,6 +647,14 @@
         "type": "null"
        }
       ]
+     },
+     "cues": {
+      "default": [],
+      "items": {
+       "$ref": "#/$defs/CameraCue"
+      },
+      "title": "Cues",
+      "type": "array"
      },
      "evidence_head": {
       "anyOf": [
@@ -1160,6 +1270,72 @@
      "visibility"
     ],
     "title": "SensorView",
+    "type": "object"
+   },
+   "SimCameraView": {
+    "additionalProperties": false,
+    "description": "What to draw in the SIMULATED camera view: no footage. The target direction is a camera's\nreported bearing, or the direction to the estimated track; never the true position.",
+    "properties": {
+     "camera": {
+      "enum": [
+       "wide",
+       "zoom"
+      ],
+      "title": "Camera",
+      "type": "string"
+     },
+     "drawn_span_m": {
+      "title": "Drawn Span M",
+      "type": "number"
+     },
+     "fov_deg": {
+      "title": "Fov Deg",
+      "type": "number"
+     },
+     "pointing_azimuth_deg": {
+      "title": "Pointing Azimuth Deg",
+      "type": "number"
+     },
+     "pointing_elevation_deg": {
+      "title": "Pointing Elevation Deg",
+      "type": "number"
+     },
+     "range_m": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Range M"
+     },
+     "seen_azimuth_deg": {
+      "title": "Seen Azimuth Deg",
+      "type": "number"
+     },
+     "seen_elevation_deg": {
+      "title": "Seen Elevation Deg",
+      "type": "number"
+     },
+     "station_id": {
+      "title": "Station Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "camera",
+     "station_id",
+     "pointing_azimuth_deg",
+     "pointing_elevation_deg",
+     "fov_deg",
+     "seen_azimuth_deg",
+     "seen_elevation_deg",
+     "range_m",
+     "drawn_span_m"
+    ],
+    "title": "SimCameraView",
     "type": "object"
    },
    "SiteMap": {

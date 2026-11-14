@@ -157,6 +157,11 @@ dashboard:  # docs/dashboard_contract.md
   class_threshold: 0.5
   map_margin_fraction: 0.1
   request_timeout_s: 10.0  # a label or export the evidence keeper has not answered by then fails (504)
+  camera_cue:  # big-drone video sequence (S1, S5): picket heard -> camera cued -> detected -> zoom
+    search_half_width_deg: 30.0  # a camera ray this close to the cued bearing counts; pickets err ~20 deg
+    same_target_deg: 2.0  # a ray this close to one already followed, same station, is that target
+    link_reach_factor: 1.5  # a confirmed track within this many hearing radii of the picket links to it
+    target_span_m: 2.5  # size of the drawn fixed-wing target (client brief: 2.5 m one-way attack drone)
   host: 127.0.0.1  # local only: no authentication, no outside connections
   port: 8000
   basemap:  # docs/mapping.md: a real basemap under the fictional site, for display only
