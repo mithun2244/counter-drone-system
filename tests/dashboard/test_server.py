@@ -496,3 +496,17 @@ def test_clip_captions_say_they_are_dataset_samples_not_this_track() -> None:
     assert "Sample recording from {dataset}" in text
     assert "{source} at {at} s" not in text
     assert "look.dataset" in script and "s.dataset" in script
+
+
+def test_simulated_values_are_tagged_capped_and_inside_zone_replaces_tti() -> None:
+    app = STATIC / "app"
+    page = (app / "index.html").read_text(encoding="utf-8")
+    text = (app / "text.js").read_text(encoding="utf-8")
+    script = (app / "app.js").read_text(encoding="utf-8")
+    assert 'class="note legend"' in page and 'data-text="simLegend"' in page
+    assert "not measured on a real sensor" in text and 'sim: "SIM"' in text
+    assert "const MAX_SHOWN_PCT = 99;" in script
+    assert "Math.round(100 * a.confidence)" not in script  # every % goes through pct()
+    assert "Math.round(100 * card.confidence)" not in script
+    assert 'insideZone: "INSIDE ZONE"' in text and 'a.approach === "inside"' in script
+    assert script.count("simTag()") >= 4  # card, summary, sensor rows, faults line

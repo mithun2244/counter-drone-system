@@ -24,6 +24,11 @@ button.danger:hover:not(:disabled) { background: #3d1a1a; border-color: var(--re
 .confirm[hidden] { display: none; }
 #run-title.failed { color: var(--red); }
 .models { color: var(--muted); font-size: 0.9em; }
+.sim { display: inline-block; font-size: 0.7em; font-weight: 700; letter-spacing: 0.05em; color: #c9b8ff; border: 1px solid #8a76d6; border-radius: 3px; padding: 0 0.3em; margin-left: 0.35em; vertical-align: middle; line-height: 1.4; }
+.legend .sim { margin-left: 0; }
+.inside { color: var(--red); font-weight: 700; font-size: 0.55em; letter-spacing: 0.04em; animation: flash 1s steps(2, start) infinite; }
+@keyframes flash { to { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .inside { animation: none; text-decoration: underline; } }
 .models.failed { color: #ff8a8a; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 

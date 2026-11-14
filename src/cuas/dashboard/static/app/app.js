@@ -3,12 +3,15 @@
 "use strict";
 
 const state = {
-  profiles: [], run: null, frame: null, models: null, frameWall: 0, basemap: null, ttis: new Map(),
+  profiles: [], run: null, frame: null, models: null, frameWall: 0, basemap: null, ttis: new Map(), inside: new Set(),
   selected: null, lastCard: null, looks: [], source: null, sounds: [], results: new Map(), collapsed: false,
 };
 const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 const STATIONARY_MPS = 0.5;  // below this ground speed a course means nothing
 const $ = (id) => document.getElementById(id);
+const MAX_SHOWN_PCT = 99;  // a confidence is never shown as certain
+const pct = (p) => Math.min(MAX_SHOWN_PCT, Math.round(100 * p));
+const simTag = () => { const tag = el("span", "sim", t("sim")); tag.title = t("simTitle"); return tag; };
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -53,6 +56,7 @@ function setFrame(frame) {
   state.frame = frame;
   state.frameWall = performance.now();
   state.ttis = new Map(frame ? frame.alerts.map((a) => [a.alert_id, a.tti_s]) : []);
+  state.inside = new Set(frame ? frame.alerts.filter((a) => a.approach === "inside").map((a) => a.alert_id) : []);
 }
 
 // --- top bar ---
@@ -157,7 +161,7 @@ function fillCard(card, a) {
   const ended = !state.run || state.run.state === "ended";  // an ended run's evidence is closed
   for (const b of card.querySelectorAll("[data-action]")) b.disabled = ended || b.dataset.busy === "1";
   card.querySelector(".level").textContent = t(`level.${a.level}`);
-  card.querySelector(".class").textContent = `${t(`classKey.${a.class_key}`)} ${Math.round(100 * a.confidence)}%`;
+  card.querySelector(".class").replaceChildren(`${t(`classKey.${a.class_key}`)} ${pct(a.confidence)}%`, simTag());
   const where = a.zone_label ? t(`approach.${a.approach}`, { zone: a.zone_label }) : t("approach.none");
   const seen = a.coasting ? t("coasting") : a.n_stations === 1 ? t("oneStation") : t("stations", { n: a.n_stations });
   card.querySelector(".sub").textContent = `${where} · ${seen}`;
@@ -195,6 +199,7 @@ function tickTti() {  // counts down between frames by `speed` per wall second
   for (const card of $("alerts").children) {
     const tti = state.ttis.get(card.dataset.alert);
     const node = card.querySelector(".tti");
+    if (state.inside.has(card.dataset.alert)) { node.replaceChildren(el("span", "inside", t("insideZone"))); continue; }
     if (tti === null || tti === undefined) { node.replaceChildren(el("small", "", t("noTti"))); continue; }
     node.replaceChildren(`${Math.max(0, tti - elapsed).toFixed(0)} s `, el("small", "", t("tti")));
   }
@@ -226,6 +231,7 @@ function renderStatus() {
   panel.append(sensorTable(frame.sensors));
   const down = frame.sensors.filter((s) => !s.ok).map((s) => s.sensor_id);
   const faults = el("p", down.length ? "down" : "", down.length ? t("faults", { list: down.join(", ") }) : t("noFaults"));
+  faults.append(simTag());  // simulated sensors never report a fault (docs/memory.md, mocks)
   const head = frame.evidence_head;
   panel.append(faults, el("p", "", head
     ? t("evidenceHead", { seq: head.seq, hash: head.record_hash.slice(0, 12) }) : t("noEvidence")));
@@ -246,6 +252,7 @@ function sensorTable(sensors) {
     const row = table.insertRow();
     row.append(el("th", "", unit));
     const cell = row.insertCell();
+    row.insertCell().append(simTag());  // every health value here comes from the simulator
     const allOk = list.every((s) => s.ok);
     if (unit === t("pickets") && allOk) {  // eight healthy pickets read as one line
       const lowest = Math.min(...list.map((s) => s.visibility));
@@ -389,9 +396,10 @@ function renderDetails() {
   const track = state.frame ? state.frame.tracks.find((tr) => tr.track_id === card.track_id) : null;  // joined by track_id
   const facts = track ? trackFacts(track) : null;
   const where = card.zone_label ? t(`approach.${card.approach}`, { zone: card.zone_label }) : t("approach.none");
-  const tti = card.tti_s === null ? t("noTti") : `${t("tti")} ${card.tti_s.toFixed(0)} s`;
+  const tti = card.approach === "inside" ? t("insideZone") : card.tti_s === null ? t("noTti") : `${t("tti")} ${card.tti_s.toFixed(0)} s`;
   const summary = el("p", `summary level ${card.level}`,
-    `${t(`level.${card.level}`)} · ${t(`classKey.${card.class_key}`)} ${Math.round(100 * card.confidence)}% · ${tti} · ${where}`);
+    `${t(`level.${card.level}`)} · ${t(`classKey.${card.class_key}`)} ${pct(card.confidence)}%`);
+  summary.append(simTag(), ` · ${tti} · ${where}`);
   const table = el("table");
   const row = (key, value) => {
     const tr = table.insertRow();
