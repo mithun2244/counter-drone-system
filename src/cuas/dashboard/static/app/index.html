@@ -57,9 +57,12 @@
           <span id="clip-tag" class="clip-tag" hidden></span>
           <canvas id="simview"></canvas>
           <div id="standin-box">
-            <video id="standin" muted loop playsinline></video>
-            <span id="standin-tag" class="clip-tag"></span>
-            <div class="slew-note" data-text="simSlewing"></div>
+            <div class="screen">
+              <video id="standin" muted playsinline></video>
+              <video id="standin-b" muted playsinline></video>
+              <span id="standin-tag" class="clip-tag"></span>
+              <div class="slew-note" data-text="simSlewing"></div>
+            </div>
             <div id="standin-note" class="note"></div>
           </div>
           <div id="clip-note" class="note"></div>

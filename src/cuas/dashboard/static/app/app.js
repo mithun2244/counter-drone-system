@@ -3,7 +3,7 @@
 "use strict";
 
 const state = {
-  profiles: [], run: null, frame: null, models: null, frameWall: 0, basemap: null, display: null, ttis: new Map(), inside: new Set(),
+  profiles: [], run: null, frame: null, models: null, frameWall: 0, basemap: null, display: null, trackSeen: new Map(), seenRun: null, ttis: new Map(), inside: new Set(),
   selected: null, lastCard: null, cue: null, cueTabs: new Map(), simShown: false, looks: [], source: null, sounds: [], results: new Map(), collapsed: false,
 };
 const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
@@ -53,6 +53,7 @@ function receive(message) {
 }
 
 function setFrame(frame) {
+  if (frame) noteTracks(frame);
   state.frame = frame;
   state.frameWall = performance.now();
   state.ttis = new Map(frame ? frame.alerts.map((a) => [a.alert_id, a.tti_s]) : []);
@@ -354,9 +355,11 @@ function select(alertId) {
   state.lastCard = selectedCard();
   state.source = null;
   const card = state.lastCard;
-  refreshTabs(card ? card.looks : []);
-  if (state.looks.length) loadSource(state.looks[0].source, true);
-  else { $("clip").removeAttribute("src"); $("clip").load(); }
+  if (!zoomOnly()) {
+    refreshTabs(card ? card.looks : []);
+    if (state.looks.length) loadSource(state.looks[0].source, true);
+    else { $("clip").removeAttribute("src"); $("clip").load(); }
+  }
   showSounds(card ? card.sounds : []);
   $("details-panel").hidden = !alertId;
   $("video-overlay").hidden = !alertId;
@@ -370,9 +373,11 @@ function refreshMedia() {
   const card = selectedCard();
   if (!card) return;
   state.lastCard = card;
-  refreshTabs(card.looks);
-  const kept = state.looks.some((l) => l.source === state.source);
-  if (state.looks.length && (!state.source || !kept) && $("clip").paused) loadSource(state.looks[0].source, false);
+  if (!zoomOnly()) {
+    refreshTabs(card.looks);
+    const kept = state.looks.some((l) => l.source === state.source);
+    if (state.looks.length && (!state.source || !kept) && $("clip").paused) loadSource(state.looks[0].source, false);
+  }
   if ($("audio").paused && urls(card.sounds) !== urls(state.sounds)) showSounds(card.sounds);
 }
 
@@ -384,9 +389,17 @@ function displayTabs() {  // this run's scenario's clips; a scenario listed ther
   return state.display && state.run ? state.display.scenarios[state.run.scenario_id] || null : null;
 }
 
-function displayClip(camera) {  // "wide" or "zoom"; null keeps the simulated view or the look clip
+// A tab's clips ("wide" or "zoom"): their tag and caption (the first clip's; a tab's clips share
+// them) and URLs, played in turn. null keeps the simulated view or the look clip.
+function displayClip(camera) {
   const tabs = displayTabs();
-  return tabs && tabs[camera] ? state.display.clips[tabs[camera]] : null;
+  const clips = ((tabs && tabs[camera]) || []).map((name) => state.display.clips[name]).filter(Boolean);
+  const parts = clips.map((c) => ({ url: c.url, start: c.start_s || 0, end: c.end_s }));
+  return clips.length ? { type: clips[0].type, caption: clips[0].caption, parts } : null;
+}
+
+function zoomOnly() {  // Option B (S1, S2): no video until a zoom camera is on the track
+  return Boolean(state.display && state.run && (state.display.zoom_only || []).includes(state.run.scenario_id));
 }
 
 function displayTabName(camera, station, clip) {
@@ -436,7 +449,7 @@ function loadSource(source, autoplay) {  // the RGB / thermal / zoom tabs
   state.source = source;
   const clip = displayClip(LOOK_CAMERA[source.split(".")[1]]);
   $("clip").loop = Boolean(clip);
-  $("clip").src = clip ? clip.url : `${look.clip_url}#t=${look.at_s}`;  // media fragment: start near the look
+  $("clip").src = clip ? clip.parts[0].url : `${look.clip_url}#t=${look.at_s}`;  // media fragment: start near the look
   $("clip-note").textContent = clip ? clip.caption : t("clipAt", { dataset: look.dataset || t("someDataset") });
   $("clip-tag").textContent = clip ? clip.type : "SAMPLE";
   refreshTabs(state.looks);
@@ -568,7 +581,7 @@ function renderCue() {
   overlay.classList.toggle("sim", Boolean(pick));
   if (!pick) {
     overlay.classList.remove("viewing", "standin");
-    $("standin").pause();
+    pauseParts();
     $("cue-note").textContent = "";
     if (state.simShown) { state.simShown = false; refreshTabs(state.looks); }
     overlay.hidden = !state.selected;
@@ -600,32 +613,146 @@ function renderCue() {
   // or with no clip on this machine, the simulated view.
   const clip = view && displayClip(view.camera);
   overlay.classList.toggle("standin", Boolean(clip));
-  if (clip) showDisplayClip(clip, view.camera === "zoom" && simTargetOutside(view));
-  else $("standin").pause();
+  if (clip) showParts(clip, view.camera === "zoom" && simTargetOutside(view));
+  else pauseParts();
   if (view && !clip && !state.collapsed) drawSimView($("simview"), view);
 }
 
+// --- Option B (S1, S2): text until a zoom camera is on the track, then only the Zoom clip ---
+
+// What the panel follows: the selected alert, else (by itself, selecting nothing) S1's
+// highest-priority cue, or S2's highest-ranked alert once a zoom camera is on its track.
+function zoomSubject() {
+  if (!state.frame) return null;
+  if (state.selected) {
+    const card = selectedCard();
+    const cue = cueOf((c) => c.alert_id === state.selected);
+    return card || cue ? { card, cue, auto: false } : null;
+  }
+  const pick = pickCue();
+  if (pick) return { card: null, cue: pick.cue, auto: true };
+  const card = state.frame.alerts.find((a) => zoomOnTrack(a.track_id));
+  return card ? { card, cue: null, auto: true } : null;
+}
+
+function zoomOnTrack(trackId) {
+  return trackId ? state.frame.zoom.find((z) => z.track_id === trackId) || null : null;
+}
+
+function subjectZoom(subject) {  // the zoom camera on it, with its view when S1 draws one
+  const view = subject.cue && subject.cue.views.find((v) => v.camera === "zoom");
+  if (view) return { station: view.station_id, view };
+  const task = zoomOnTrack(subject.card && subject.card.track_id);
+  return task ? { station: task.station_id, view: null } : null;
+}
+
+function zoomNote(subject, zoom) {
+  if (zoom) return t("zoomOn", { station: zoom.station });
+  const cue = subject.cue;
+  if (cue && cue.stage === "acoustic") return t("acousticOnly", { deg: Math.round(cue.cue_bearing_deg) });
+  if (cue) return t("wideSlewing", { t: clock(cue.detected_t), station: cue.detected_by });
+  const card = subject.card;
+  const looks = card.looks.filter((l) => !l.source.endsWith(".zoom"));
+  const station = looks.length ? looks[0].source.split(".")[0] : t("stationsCount", { n: card.n_stations });
+  return t("wideSlewing", { t: clock(state.trackSeen.get(card.track_id) ?? state.frame.t), station });
+}
+
+function renderZoomOnly() {
+  const overlay = $("video-overlay");
+  const subject = zoomSubject();
+  state.cue = subject ? subject.cue : null;  // badges
+  overlay.classList.add("sim");  // the look clip and its tabs stay hidden
+  overlay.classList.remove("empty");
+  if (!subject) {
+    overlay.classList.remove("viewing", "standin");
+    $("looks").replaceChildren();
+    $("cue-note").textContent = "";
+    pauseParts();
+    overlay.hidden = true;
+    return;
+  }
+  overlay.hidden = false;
+  const zoom = subjectZoom(subject);
+  const clip = zoom && displayClip("zoom");
+  const tab = el("button", "on zoom-tab", clip ? t("zoomTab", { kind: t(`displayKind.${clip.type}`) }) : t("zoomTabSim"));
+  tab.setAttribute("role", "tab");
+  tab.setAttribute("aria-selected", "true");
+  $("looks").replaceChildren(...(zoom ? [tab] : []));
+  overlay.classList.toggle("viewing", Boolean(zoom));
+  overlay.classList.toggle("standin", Boolean(clip));
+  $("clip-note").textContent = zoomNote(subject, zoom);
+  $("cue-note").textContent = subject.auto ? t("autoFollow") : "";
+  if (clip) showParts(clip, Boolean(zoom.view && simTargetOutside(zoom.view)));
+  else pauseParts();
+  if (zoom && zoom.view && !clip && !state.collapsed) drawSimView($("simview"), zoom.view);
+}
+
+function noteTracks(frame) {  // when this page first saw each track, per run
+  if (state.seenRun !== frame.run_id) { state.trackSeen = new Map(); state.seenRun = frame.run_id; }
+  for (const track of frame.tracks) if (!state.trackSeen.has(track.track_id)) state.trackSeen.set(track.track_id, frame.t);
+}
+
+// --- the clip player: plays a tab's clips in turn, looping, crossfading between them ---
+
+const FADE_S = 0.6;
+const player = { parts: [], key: "", i: 0, front: null, fading: false };
+const playerVideos = () => [$("standin"), $("standin-b")];
+
 // A zoom camera still slewing (target outside its field of view) dims the clip and says so.
-function showDisplayClip(clip, slewing) {
-  const video = $("standin");
-  if (video.dataset.url !== clip.url) { video.dataset.url = clip.url; video.src = clip.url; }
+function showParts(clip, slewing) {
   $("standin-tag").textContent = clip.type;
   $("standin-note").textContent = clip.caption;
   $("standin-box").classList.toggle("slewing", slewing);
-  if (slewing || state.collapsed) video.pause();
-  else video.play().catch(() => {});
+  const key = clip.parts.map((p) => `${p.url}@${p.start}-${p.end}`).join();
+  if (player.key !== key) startParts(clip.parts, key);
+  if (slewing || state.collapsed) pauseParts();
+  else player.front.play().catch(() => {});
 }
 
-// The clip loops; a short fade hides the jump from its last frame back to its first.
-$("standin").addEventListener("timeupdate", ({ target: v }) => {
-  v.style.opacity = v.currentTime < 0.2 || v.duration - v.currentTime < 0.4 ? 0 : 1;
-});
+function loadPart(video, part) {  // from the part's start; a media fragment seeks as it loads
+  video.src = `${part.url}#t=${part.start}`;
+}
+
+function startParts(parts, key) {
+  const [a, b] = playerVideos();
+  Object.assign(player, { parts, key, i: 0, front: a, fading: false });
+  loadPart(a, parts[0]);
+  a.style.opacity = 1;
+  b.removeAttribute("src");
+  b.style.opacity = 0;
+}
+
+function pauseParts() {
+  for (const v of playerVideos()) v.pause();
+}
+
+function nextPart(event) {  // near the end of the front clip, fade the next one in over it
+  const v = event.target;
+  if (v !== player.front || player.fading || !v.duration) return;
+  const end = Math.min(player.parts[player.i].end ?? v.duration, v.duration);
+  if (event.type === "timeupdate" && end - v.currentTime > FADE_S) return;
+  player.fading = true;
+  player.i = (player.i + 1) % player.parts.length;
+  const next = playerVideos().find((x) => x !== v);
+  loadPart(next, player.parts[player.i]);
+  next.play().catch(() => {});
+  next.style.opacity = 1;
+  v.style.opacity = 0;
+  player.front = next;
+  setTimeout(() => { v.pause(); player.fading = false; }, FADE_S * 1000);
+}
+
+for (const v of playerVideos()) {
+  v.addEventListener("timeupdate", nextPart);
+  v.addEventListener("ended", nextPart);
+}
 
 // --- drawing ---
 
 function render() {
   renderTopBar();
-  renderCue();  // before the queue, so badges know which cue the panel shows
+  if (zoomOnly()) renderZoomOnly();  // before the queue, so badges know which cue the panel shows
+  else renderCue();
   renderQueue();
   renderStatus();
   renderAcoustic();

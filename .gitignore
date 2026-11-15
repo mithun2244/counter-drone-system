@@ -11,6 +11,7 @@ data/basemap/*
 !data/standin/
 data/standin/*
 !data/standin/rq7b_shadow_dvids_493473.mp4
-!data/standin/rq7b_shadow_dvids_493473_far.mp4
+!data/standin/rq7b_shadow_dvids_493473_contrails.mp4
+!data/standin/rq7b_shadow_dvids_493473_lowpass.mp4
 models/
 runs/

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 import yaml
-from pydantic import Field
+from pydantic import BeforeValidator, Field
 
 from cuas.config import ConfigModel, DemoScenario
 from cuas.dashboard.contract import ScenarioChoice, SiteProfile
@@ -23,7 +23,15 @@ Camera = Literal["wide", "zoom"]
 log = logging.getLogger(__name__)
 
 
-class StandInClip(ConfigModel):
+class ClipBase(ConfigModel):
+    path: str
+    sha256: str
+    start_s: Annotated[float, Field(ge=0)] = 0.0
+    end_s: Annotated[float, Field(gt=0)] | None = None
+    """Play only from ``start_s`` to ``end_s`` (the file's end if unset): its clear stretch."""
+
+
+class StandInClip(ClipBase):
     type: Literal["STAND-IN"]
     title: str
     source: str
@@ -33,8 +41,6 @@ class StandInClip(ConfigModel):
     source_url: str
     downloaded: str
     edits: str
-    path: str
-    sha256: str
 
     def caption(self) -> str:
         return (
@@ -43,13 +49,11 @@ class StandInClip(ConfigModel):
         )
 
 
-class SampleClip(ConfigModel):
+class SampleClip(ClipBase):
     type: Literal["SAMPLE"]
     dataset: str
     source_title: str
     """The dataset's own name for the clip, for example ``V_DRONE_040``."""
-    path: str
-    sha256: str
 
     def caption(self) -> str:
         return f"Sample clip from {self.dataset} - not footage of this track"
@@ -58,9 +62,20 @@ class SampleClip(ConfigModel):
 Clip = Annotated[StandInClip | SampleClip, Field(discriminator="type")]
 
 
+def _as_list(value: object) -> object:
+    return [value] if isinstance(value, str) else value
+
+
+Parts = Annotated[list[str], BeforeValidator(_as_list)]
+"""One clip, or several played in turn with a crossfade."""
+
+
 class DisplayListing(ConfigModel):
     clips: dict[str, Clip]
-    scenarios: dict[str, dict[Camera, str]]
+    scenarios: dict[str, dict[Camera, Parts]]
+    zoom_only: tuple[str, ...] = ()
+    """Scenarios whose panel shows no video until a zoom camera is on the track, and then
+    only the Zoom tab."""
 
 
 class ShownClip(ConfigModel):
@@ -69,12 +84,15 @@ class ShownClip(ConfigModel):
     type: Literal["STAND-IN", "SAMPLE"]
     caption: str
     url: str
+    start_s: float = 0.0
+    end_s: float | None = None
 
 
 class DisplayClips(ConfigModel):
     clips: dict[str, ShownClip]
-    scenarios: dict[str, dict[Camera, str]]
+    scenarios: dict[str, dict[Camera, list[str]]]
     """Only clips this machine has, as recorded; a scenario listed has no Thermal tab."""
+    zoom_only: tuple[str, ...] = ()
 
 
 def load_display(
@@ -94,16 +112,27 @@ def load_display(
     }
     shown = {
         name: ShownClip(
-            type=clip.type, caption=clip.caption(), url=f"/api/display/clip/{name}"
+            type=clip.type,
+            caption=clip.caption(),
+            url=f"/api/display/clip/{name}",
+            start_s=clip.start_s,
+            end_s=clip.end_s,
         )
         for name, clip in listing.clips.items()
         if name in files
     }
     scenarios = {
-        scenario: {camera: name for camera, name in tabs.items() if name in shown}
+        scenario: {
+            camera: kept
+            for camera, names in tabs.items()
+            if (kept := [n for n in names if n in shown])
+        }
         for scenario, tabs in listing.scenarios.items()
     }
-    return DisplayClips(clips=shown, scenarios=scenarios), files
+    display = DisplayClips(
+        clips=shown, scenarios=scenarios, zoom_only=listing.zoom_only
+    )
+    return display, files
 
 
 def _as_recorded(path: Path, sha256: str) -> bool:

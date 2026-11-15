@@ -46,7 +46,8 @@ def _setup(tmp_path: Path, files: dict[str, bytes]) -> tuple[Path, Path]:
     sha = hashlib.sha256(CLIP).hexdigest()
     listing = {
         "clips": {"far": STAND_IN | {"sha256": sha}, "near": SAMPLE | {"sha256": sha}},
-        "scenarios": {"s1": {"wide": "far", "zoom": "near"}},
+        "scenarios": {"s1": {"wide": "far", "zoom": ["near", "far"]}},
+        "zoom_only": ["s1"],
     }
     (config / DISPLAY_NAME).write_text(yaml.safe_dump(listing), encoding="utf-8")
     return config, data
@@ -65,7 +66,12 @@ def test_committed_clips_are_honestly_sourced_and_mapped() -> None:
             assert manifest[clip["path"]].label == "drone"
     for tabs in listing["scenarios"].values():
         assert set(tabs) <= {"wide", "zoom"}
-        assert all(name in listing["clips"] for name in tabs.values())
+        for names in tabs.values():
+            names = [names] if isinstance(names, str) else names
+            assert all(name in listing["clips"] for name in names)
+            assert (
+                len({listing["clips"][n]["type"] for n in names}) == 1
+            )  # one tag per tab
 
 
 def test_captions_and_urls(tmp_path: Path) -> None:
@@ -79,7 +85,8 @@ def test_captions_and_urls(tmp_path: Path) -> None:
     )
     assert shown.clips["near"].type == "SAMPLE"
     assert shown.clips["far"].url == "/api/display/clip/far"
-    assert shown.scenarios == {"s1": {"wide": "far", "zoom": "near"}}
+    assert shown.scenarios == {"s1": {"wide": ["far"], "zoom": ["near", "far"]}}
+    assert shown.zoom_only == ("s1",)
     assert files["near"] == data / "svanstrom" / "b.mp4"
 
 
@@ -101,14 +108,19 @@ def test_server_serves_clips_and_never_lets_a_page_go_stale(
     app = create_app(Hub(launcher), display=load_display(config, data))
     with TestClient(app) as client:
         listing = client.get("/api/display").json()
-        assert listing["scenarios"]["s1"] == {"wide": "far", "zoom": "near"}
+        assert listing["scenarios"]["s1"] == {"wide": ["far"], "zoom": ["near", "far"]}
+        assert listing["zoom_only"] == ["s1"]
         clip = client.get("/api/display/clip/far")
         assert clip.content == CLIP and clip.headers["content-type"] == "video/mp4"
         assert client.get("/api/display/clip/nothing").status_code == 404
         for path in ("/", "/app.js", "/text.js", "/app.css", "/api/display"):
             assert client.get(path).headers["cache-control"] == "no-cache", path
     with TestClient(create_app(Hub(launcher), app_dir=tmp_path)) as client:
-        assert client.get("/api/display").json() == {"clips": {}, "scenarios": {}}
+        assert client.get("/api/display").json() == {
+            "clips": {},
+            "scenarios": {},
+            "zoom_only": [],
+        }
 
 
 def _profile(pid: str, *ids: str) -> SiteProfile:
@@ -138,6 +150,11 @@ def test_site_demo_is_s1_then_s2_and_the_rest_stay(site: SiteConfig) -> None:
         ("s1", "Large attack drone - processing plant"),
         ("s2", "Small drone - stadium"),
     ]
+    zoom_only = _committed()["zoom_only"]
+    assert set(zoom_only) == {"s1", "s2"}  # Option B in both demo scenarios
+    assert all(
+        set(_committed()["scenarios"][s]) == {"zoom"} for s in zoom_only
+    )  # no Wide tab
     for hidden in ("s3", "s4", "s5"):  # hidden, not removed
         assert any((ROOT / "config" / "scenarios").glob(f"{hidden}_*.yaml"))
 
@@ -149,9 +166,10 @@ def test_page_wording_tags_and_tabs() -> None:
     assert "standinTag" not in page + text + script  # the stray literal is gone
     assert '<span id="standin-tag" class="clip-tag"></span>' in page
     assert '<span id="clip-tag" class="clip-tag" hidden></span>' in page
+    assert '<video id="standin" muted playsinline></video>' in page  # no audio
     assert (
-        '<video id="standin" muted loop playsinline></video>' in page
-    )  # no audio, loops
+        '<video id="standin-b" muted playsinline></video>' in page
+    )  # for the crossfade
     assert 'displayWideTab: "{station} Wide RGB ({kind})"' in text
     assert 'displayZoomTab: "{station} Zoom ({kind})"' in text
     assert '$("standin-tag").textContent = clip.type;' in script
@@ -159,6 +177,20 @@ def test_page_wording_tags_and_tabs() -> None:
     # A scenario with display clips has no Thermal tab; the simulated view only without a clip.
     assert 'looks.filter((l) => !l.source.endsWith(".thermal"))' in script
     assert "if (view && !clip && !state.collapsed) drawSimView" in script
+    # Option B: no video before a zoom camera is on the track, then only the Zoom tab.
+    assert 'zoomTab: "ZOOM camera ({kind})"' in text
+    assert (
+        'wideSlewing: "Wide camera detection at {t} by {station} - zoom slewing to target"'
+        in text
+    )
+    assert '$("looks").replaceChildren(...(zoom ? [tab] : []));' in script
+    assert 'overlay.classList.toggle("viewing", Boolean(zoom));' in script
+    zoom_only = script[
+        script.index("function zoomSubject") : script.index("function zoomOnTrack")
+    ]
+    assert (
+        "state.selected =" not in zoom_only
+    )  # opening by itself never selects an alert
     # Nothing is ever drawn over a clip: both are plain <video> elements.
     assert "getContext" not in script
 
