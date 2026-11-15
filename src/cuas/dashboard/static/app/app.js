@@ -5,6 +5,8 @@
 const state = {
   profiles: [], run: null, frame: null, models: null, frameWall: 0, basemap: null, display: null, trackSeen: new Map(), seenRun: null, ttis: new Map(), inside: new Set(),
   selected: null, lastCard: null, cue: null, cueTabs: new Map(), simShown: false, looks: [], source: null, sounds: [], results: new Map(), collapsed: false,
+  videoTrack: null,
+  summary: null, summaryRequest: null,
 };
 const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 const STATIONARY_MPS = 0.5;  // below this ground speed a course means nothing
@@ -657,6 +659,14 @@ function zoomNote(subject, zoom) {
   return t("wideSlewing", { t: clock(state.trackSeen.get(card.track_id) ?? state.frame.t), station });
 }
 
+const handoff = { key: null, shown: false };
+
+function cameraHandoff(key, zoomVisible, rgbCurrent) {
+  if (handoff.key !== key) { handoff.key = key; handoff.shown = false; }
+  if (zoomVisible) { handoff.shown = true; return "zoom"; }
+  return handoff.shown ? (rgbCurrent ? "wide" : "out") : "opening";
+}
+
 function renderZoomOnly() {
   const overlay = $("video-overlay");
   const subject = zoomSubject();
@@ -664,6 +674,7 @@ function renderZoomOnly() {
   overlay.classList.add("sim");  // the look clip and its tabs stay hidden
   overlay.classList.remove("empty");
   if (!subject) {
+    handoff.key = null;
     overlay.classList.remove("viewing", "standin");
     $("looks").replaceChildren();
     $("cue-note").textContent = "";
@@ -673,6 +684,24 @@ function renderZoomOnly() {
   }
   overlay.hidden = false;
   const zoom = subjectZoom(subject);
+  state.videoTrack = zoom ? (subject.card?.track_id || subject.cue?.track_id) : null;
+  if (state.run.scenario_id === "s1") {
+    const key = `${state.frame.run_id}:${state.selected || subject.cue?.cue_id}:${subject.cue?.track_id}`;
+    const mode = cameraHandoff(key, Boolean(zoom?.view && !simTargetOutside(zoom.view)), subject.cue?.current_rgb_t != null);
+    if (mode !== "zoom") {
+      const wide = mode === "wide";
+      const clip = wide && displayClip("wide");
+      overlay.classList.toggle("viewing", Boolean(clip));
+      overlay.classList.toggle("standin", Boolean(clip));
+      $("looks").replaceChildren();
+      $("clip-note").textContent = wide
+        ? `Wide RGB${zoom ? " · Zoom repositioning" : ""}${clip ? "" : " · No Wide RGB clip available."}`
+        : mode === "out" ? "Target out of camera view" : zoomNote(subject, null);
+      $("cue-note").textContent = subject.auto ? t("autoFollow") : "";
+      if (clip) showParts(clip, false); else pauseParts();
+      return;
+    }
+  }
   const clip = zoom && displayClip("zoom");
   const tab = el("button", "on zoom-tab", clip ? t("zoomTab", { kind: t(`displayKind.${clip.type}`) }) : t("zoomTabSim"));
   tab.setAttribute("role", "tab");
@@ -695,7 +724,7 @@ function noteTracks(frame) {  // when this page first saw each track, per run
 // --- the clip player: plays a tab's clips in turn, looping, crossfading between them ---
 
 const FADE_S = 0.6;
-const player = { parts: [], key: "", i: 0, front: null, fading: false };
+const player = { parts: [], key: "", i: 0, front: null, fading: false, ended: false, once: false, generation: 0 };
 const playerVideos = () => [$("standin"), $("standin-b")];
 
 // A zoom camera still slewing (target outside its field of view) dims the clip and says so.
@@ -703,9 +732,12 @@ function showParts(clip, slewing) {
   $("standin-tag").textContent = clip.type;
   $("standin-note").textContent = clip.caption;
   $("standin-box").classList.toggle("slewing", slewing);
-  const key = clip.parts.map((p) => `${p.url}@${p.start}-${p.end}`).join();
+  const once = state.run?.scenario_id === "s2";
+  const key = (once ? `${state.run.run_id}:` : "") + clip.parts.map((p) => `${p.url}@${p.start}-${p.end}`).join();
   if (player.key !== key) startParts(clip.parts, key);
-  if (slewing || state.collapsed) pauseParts();
+  player.once = once;
+  renderSampleEnd();
+  if (slewing || state.collapsed || player.ended) pauseParts();
   else player.front.play().catch(() => {});
 }
 
@@ -715,7 +747,7 @@ function loadPart(video, part) {  // from the part's start; a media fragment see
 
 function startParts(parts, key) {
   const [a, b] = playerVideos();
-  Object.assign(player, { parts, key, i: 0, front: a, fading: false });
+  Object.assign(player, { parts, key, i: 0, front: a, fading: false, ended: false, generation: player.generation + 1 });
   loadPart(a, parts[0]);
   a.style.opacity = 1;
   b.removeAttribute("src");
@@ -730,6 +762,13 @@ function nextPart(event) {  // near the end of the front clip, fade the next one
   const v = event.target;
   if (v !== player.front || player.fading || !v.duration) return;
   const end = Math.min(player.parts[player.i].end ?? v.duration, v.duration);
+  if (player.once && player.i === player.parts.length - 1) {
+    if (event.type !== "ended" && v.currentTime < end) return;
+    v.pause();
+    player.ended = true;
+    renderSampleEnd();
+    return;
+  }
   if (event.type === "timeupdate" && end - v.currentTime > FADE_S) return;
   player.fading = true;
   player.i = (player.i + 1) % player.parts.length;
@@ -739,7 +778,19 @@ function nextPart(event) {  // near the end of the front clip, fade the next one
   next.style.opacity = 1;
   v.style.opacity = 0;
   player.front = next;
-  setTimeout(() => { v.pause(); player.fading = false; }, FADE_S * 1000);
+  const generation = player.generation;
+  setTimeout(() => { if (generation === player.generation) { v.pause(); player.fading = false; } }, FADE_S * 1000);
+}
+
+function renderSampleEnd() {
+  $("sample-end").hidden = !(player.once && player.ended);
+}
+
+function replaySample() {
+  if (!player.once || !player.ended) return;
+  startParts(player.parts, player.key);
+  renderSampleEnd();
+  if (!state.collapsed) player.front.play().catch(() => {});
 }
 
 for (const v of playerVideos()) {
@@ -749,8 +800,89 @@ for (const v of playerVideos()) {
 
 // --- drawing ---
 
+function heardTrackId() {
+  return state.selected ? selectedCard()?.track_id : state.videoTrack;
+}
+
+async function loadRunSummary() {
+  const id = state.run.run_id;
+  if (state.summaryRequest === id) return;
+  state.summaryRequest = id;
+  try {
+    const response = await fetch(`/api/run/summary?run_id=${encodeURIComponent(id)}`);
+    if (!response.ok) {
+      const body = await response.text();
+      const recovery = response.status === 404 ? " Restart the dashboard server to load the summary API, then start a new run." : " Retry the summary request.";
+      throw new Error(`Run summary unavailable (HTTP ${response.status}: ${body}).${recovery}`);
+    }
+    const summary = await response.json();
+    if (state.run?.run_id !== id || summary.run_id !== id) return;
+    state.summary = summary;
+  } catch (error) {
+    if (state.run?.run_id === id) state.summary = {run_id:id, error:String(error)};
+  }
+  render();
+}
+
+function renderRunSummary() {
+  const root = $("run-summary");
+  root.hidden = false;
+  $("queue-panel").hidden = true;
+  $("details-panel").hidden = true;
+  $("video-overlay").hidden = true;
+  $("clip-note").textContent = "";
+  $("cue-note").textContent = "";
+  pauseParts();
+  $("clip").pause();
+  stopAudio();
+  const s = state.summary;
+  const status = state.run.ended_reason === "stopped" ? "Run stopped" : state.run.ended_reason === "failed" ? "Run failed" : "Run complete";
+  root.replaceChildren(el("h2", "", status), el("p", "", scenarioTitle(state.run)));
+  if (!s) root.append(el("p", "", "Loading run summary…"));
+  else if (s.error) {
+    root.append(el("p", "", s.error));
+    const retry = el("button", "", "Retry summary");
+    retry.onclick = () => { state.summary = null; state.summaryRequest = null; loadRunSummary(); render(); };
+    root.append(retry);
+  }
+  else {
+    root.append(el("p", "", `Elapsed simulation time: ${clock(s.elapsed_s)}`),
+      el("p", "", s.active_alerts ? `Active alerts at end: ${s.active_alerts}` : "No active alerts at end"),
+      el("p", "", `Unique tracks that raised alerts: ${s.unique_alert_tracks}`),
+      el("p", "", `Evidence records: ${s.evidence_records}`));
+    const d = s.latest_detection, missing = "Unavailable";
+    if (!d) root.append(el("p", "", "No detections recorded"));
+    else {
+      const p = d.position;
+      root.append(el("h3", "", "Most recent recorded detection"),
+        el("p", "", `Detection time: ${clock(d.t)} · Sensor/station: ${d.sensor || missing}`),
+        el("p", "", `Track: ${d.track_id || missing} · Classification: ${d.classification || missing} · Peak alert level: ${d.peak_level || missing}`),
+        el("p", "", p ? `Last estimated position: (${p.x}, ${p.y}, ${p.z}) m ENU · ${clock(p.t)} · Historical` : `Last estimated position: ${missing} · Position time: ${missing}`));
+    }
+    if (!d?.position && s.last_position) {
+      const p = s.last_position;
+      root.append(el("p", "", `Last known track estimate (association to latest detection unavailable): ${p.track_id} · (${p.x}, ${p.y}, ${p.z}) m ENU · ${clock(p.t)} · Historical`));
+    }
+    const button = el("button", "", "Export run summary");
+    button.onclick = () => {
+      const url = URL.createObjectURL(new Blob([JSON.stringify(s, null, 2)], {type:"application/json"}));
+      const link = el("a"); link.href = url; link.download = `${s.run_id}-summary.json`; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    root.append(button);
+  }
+  drawMap($("map"), {run:state.run, frame:null, basemap:state.basemap, historical:s?.latest_detection?.position || s?.last_position,
+    closeUp:false, rays:false, sectors:false, avoid:null});
+}
+
 function render() {
   renderTopBar();
+  if (state.summary && state.summary.run_id !== state.run?.run_id) state.summary = null;
+  if (state.run?.state === "ended") { loadRunSummary(); renderRunSummary(); return; }
+  state.summary = null; state.summaryRequest = null;
+  $("run-summary").hidden = true;
+  $("queue-panel").hidden = false;
+  state.videoTrack = null;
   if (zoomOnly()) renderZoomOnly();  // before the queue, so badges know which cue the panel shows
   else renderCue();
   renderQueue();
@@ -761,6 +893,7 @@ function render() {
   const o = $("video-overlay").getBoundingClientRect(), m = $("map").getBoundingClientRect();
   const avoid = $("video-overlay").hidden ? null : { x: o.left - m.left, y: o.top - m.top, w: o.width, h: o.height };
   drawMap($("map"), { run: state.run, frame: state.frame, basemap: state.basemap, selectedTrack: card && card.track_id,
+    heardTrack: heardTrackId(),
     rays: $("rays").checked, sectors: $("sectors").checked, closeUp: $("close-up").checked, avoid });
 }
 
@@ -775,6 +908,7 @@ document.title = t("title");
 $("profile").addEventListener("change", pickProfile);
 $("scenario").addEventListener("change", followScenario);
 $("go").addEventListener("click", startRun);
+$("sample-replay").addEventListener("click", replaySample);
 $("rays").addEventListener("change", render);
 $("sectors").addEventListener("change", render);
 $("close-up").addEventListener("change", render);

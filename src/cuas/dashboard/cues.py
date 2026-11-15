@@ -75,6 +75,9 @@ class CueTracker:
         self._newest: dict[str, BearingDetection] = {}
         """Each station's newest camera bearing."""
         self._notes: list[CameraDetection] = []
+        self._rgb: list[BearingDetection] = []
+        self._rgb_age_s = site.station_ai.look.period_s + site.tracker.batch_window_s
+        self._rgb_gate = site.tracker.gate_sigmas
 
     def ingest(self, message: Message) -> None:
         if isinstance(message, PicketAlert):
@@ -138,6 +141,9 @@ class CueTracker:
         )
 
     def _ray(self, ray: BearingDetection) -> None:
+        if ray.sensor == "rgb":
+            self._rgb = [r for r in self._rgb if r.t >= ray.t - self._rgb_age_s]
+            self._rgb.append(ray)
         self._newest[ray.station_id] = ray
         followed = [e for e in self._engagements.values() if self._same_target(ray, e)]
         for e in followed:  # the same target, moved on: follow it
@@ -249,6 +255,36 @@ class CueTracker:
             alert_id=None if threat is None else threat.alert_id,
             views=views,
         )
+
+    def current_rgb(
+        self, track_id: str | None, tracks: Mapping[str, Track], t: float
+    ) -> float | None:
+        """Conservative display association: reject bearings compatible with multiple tracks."""
+        matched = []
+        for ray in self._rgb:
+            if not 0 <= t - ray.t <= self._rgb_age_s:
+                continue
+            candidates = []
+            for track in tracks.values():
+                if track.status == "lost":
+                    continue
+                dt = ray.t - track.t
+                position = tuple(
+                    p + v * dt
+                    for p, v in zip(
+                        track.position_enu_m, track.velocity_mps, strict=True
+                    )
+                )
+                az, el, _ = bearing_to(self._stations[ray.station_id], position)
+                gate = self._rgb_gate * ray.sigma_deg
+                if (
+                    abs(angle_difference_deg(ray.azimuth_deg, az)) <= gate
+                    and abs(ray.elevation_deg - el) <= gate
+                ):
+                    candidates.append(track.track_id)
+            if candidates == [track_id]:
+                matched.append(ray.t)
+        return max(matched, default=None)
 
     def _wide(
         self,

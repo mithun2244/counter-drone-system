@@ -72,6 +72,13 @@ function drawMap(canvas, scene) {
     drawBackground(ctx, view, basemap, bounds, { width, height, ratio });
     if (run) drawSite(ctx, view, run.site, frame, scene, { width, height, ratio, avoid: scene.avoid });
     drawScaleAndNorth(ctx, view, width, height);
+    if (scene.historical) {
+      const p = scene.historical, [x, y] = view.at(p.x, p.y);
+      ctx.save(); ctx.strokeStyle = "#ffd84a"; ctx.fillStyle = "#ffd84a";
+      ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.arc(x, y, 9, 0, 2 * Math.PI); ctx.stroke();
+      ctx.font = "12px system-ui, sans-serif";
+      ctx.fillText(`Historical · ${clock(p.t)}`, x + 13, y - 12); ctx.restore();
+    }
   }
   drawNotice(ctx, basemap, width, height);
 }
@@ -168,9 +175,9 @@ function drawSite(ctx, view, site, frame, scene, size) {
   if (!frame) { drawSensors(ctx, view, site, null); return; }
   if (frame.coverage && frame.coverage.warning) drawCoverageLoss(ctx, view, site, frame.coverage, size);
   if (scene.sectors) for (const wedge of frame.pre_alerts) drawWedge(ctx, view, wedge);  // this frame's only
-  const selected = frame.tracks.find((track) => track.track_id === scene.selectedTrack);
+  const selected = frame.tracks.find((track) => track.track_id === (scene.heardTrack ?? scene.selectedTrack));
   // Only the backend's match; a server started before `heard` existed sends none.
-  const heard = (selected && selected.status === "confirmed" && selected.heard) || [];
+  const heard = (scene.sectors && selected && selected.status === "confirmed" && selected.heard) || [];
   for (const wedge of heard) drawWedge(ctx, view, wedge, true);
   drawSensors(ctx, view, site, frame);
   if (scene.rays) drawRays(ctx, view, site, frame.rays);

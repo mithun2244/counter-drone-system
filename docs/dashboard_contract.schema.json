@@ -443,6 +443,18 @@
       "title": "Cue Station Id",
       "type": "string"
      },
+     "current_rgb_t": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Current Rgb T"
+     },
      "detected_by": {
       "anyOf": [
        {

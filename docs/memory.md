@@ -5,7 +5,7 @@
 
 ## Current status
 
-- **Current phase:** Phase 5 — Dashboard and evidence. The backend was merged to `main` as `f3610a2` (PR #1) before acceptance; the operator dashboard is on `phase-5-operator-dashboard`, cut from `f3610a2`, not pushed
+- **Current phase:** Phase 5 — Dashboard and evidence. The backend was merged to `main` as `f3610a2` (PR #1) before acceptance; the operator dashboard review branch is `phase-5-operator-dashboard`, cut from `f3610a2`. Current demo publication is user-approved; see the latest session entry and `demo_review_handoff.md`.
 - **Last session:** 2026-11-15
 - **Pre-demo work (client demo on Monday 2026-11-16):** done for the demo and tagged `demo-final-2026-11-15`, then `demo-final-2026-11-15b` with the big-drone video sequence (rollback: `pre-bigdrone-video`), then `demo-final-2026-11-15c` with the stand-in clip in the Zoom tab and the zoom slewing fix (rollback: `pre-standin-clip`), then `demo-final-2026-11-15d`: two demo scenarios (S1, S2) and real video in the Wide and Zoom tabs (rollback: `pre-two-scenarios`), then `demo-final-2026-11-15e`: Option B, zoom video only, longer clips (rollback: `pre-option-b`). Stage 0 backup, Stage 1 (tag `stage1-2026-11-14`, without the slower-than-real-time notice), then the user's deadline plan A (honesty fixes), B (`docs/demo_run_order.md`, `client_results_sheet.md`, `known_issues.md`, `licences.md`) and C (checks, tag). The original Stages 2 to 6 not covered by A and B (lab location, aircraft S6, audit trail, bird fix, fault injection, projected S7, response panel) are open; `docs/known_issues.md` lists them as next sprint. Stage 5 (response panel) still needs the user's approval first
 - **Blocked on:** the user's review of the Phase 5 acceptance report and the dashboard revisions (session log below). Two checks need the user: the offline start with the network disconnected, and hearing the audio in a real browser
@@ -344,3 +344,33 @@ Approved by the user on 2026-11-07, for the Phase 2 demo. The plan's CPU time re
 - Issues / mocks added:
 - Next step:
 -->
+
+### 2026-11-15 — S1 automatic Zoom/Wide RGB handoff
+- Validation: 111 dashboard tests passed; repository lint/format, JavaScript syntax and diff whitespace checks passed. Existing Starlette/httpx deprecation warning only.
+- Implemented fresh, unique RGB-to-estimated-track display association (0.7 s), S1 opening preservation, automatic handoff/reacquisition, out-of-view status, alert/run reset and source-key playback stability. No pipeline detection changes.
+- Wide RGB reuses the local distant DVIDS approach cut as STAND-IN, with source credit; S2 media config unchanged. Updated contract schema and generated S1/S5 samples.
+- Live 2×/5× runs s1_seed1001_064/_065 both have current RGB at 84.8 and 85.2 s, return to Zoom at 85.6 s; details and rehearsal in docs/handoff_verification.md.
+- Browser tool access host unavailable: visual playback/decoding and live S2 playback remain unverified. S2 endpoints serve all three MP4s. Next: local browser rehearsal using the verification doc; review the uncommitted diff.
+
+### 2026-11-15 — S2 automatic acoustic focus and once-only sample
+- Automatic video focus now supplies the backend-associated track's yellow Last heard from wedge; manual selection takes priority and Acoustic sectors controls both wedge types. No detector or association changes.
+- S2 sample sequence plays once, holds its last frame and offers Replay; dashboard updates and alert changes preserve playback state. Local S1 Zoom/Wide RGB handoff preserved.
+- Inspected all 17 local held-out RGB drone clip durations/opening frames and six frames from V_DRONE_102. Added that distinct blue-sky test shot: source sequence is 31.4 s, about 29.6 s after crossfades, still SAMPLE with Svanström attribution.
+- Validation: 112 dashboard tests passed; ruff lint/format, JS syntax and diff whitespace checks passed. Browser access host remains unavailable, so visual S2/S1 checks remain unverified. Next: restart dashboard to reload display config, hard refresh and follow docs/s2_dashboard_verification.md; review local diff before committing.
+
+### 2026-11-15 — Post-run operator summary
+- Added server-side accepted-event history and GET /api/run/summary. Natural completion replaces the queue with Run complete; manual stop says Run stopped. Camera status/playback clears, last known estimate is pinned as Historical, summary persists until a new run and can be downloaded as JSON. Closed evidence exports are unchanged.
+- Latest raw detection timestamp/sensor, backend-linked identity when available, classification, peak alert and exact track estimate timestamp are retained. Missing fields say Unavailable; an unassociated latest detection never borrows another track's identity. Unique alerted-track count and evidence count are separate.
+- Default simulator-only S1: 120 s, zero active alerts at end, 3 alerted tracks / 10 evidence records; latest detection st1.thermal at 109.8 s. S2: 120 s, zero active alerts, 1 track / 2 records; latest st1.rgb at 114.8 s. Exact event/chain comparisons and rehearsal are in docs/run_summary_verification.md.
+- Validation: 128 dashboard/live-run tests passed, including existing S1/S2 regressions and summary no-detection/manual-stop/reset tests. Lint/format/JS syntax/diff whitespace checks passed. Chrome access host unavailable: visual checks and recorded-media S2 summary rehearsal remain unverified. Next: restart server, hard-refresh Chrome and follow the summary verification doc; changes remain uncommitted for review.
+
+### 2026-11-15 — Summary 404 on the running Windows server
+- Reproduced recorded-media S1 at 5× as s1_seed1001_070: ended at 120 s, evidence head 10, GET /api/run/summary returned 404 {"detail":"Not Found"}, twice. Confirmed stale Python PID 12532 (started 14:42:44) predating the summary backend; new static JS was served against old handlers. Not a generation race. Old access logs were suppressed, so no old 404 request line is available.
+- Restarted that ended process with current code on port 8021, unbuffered stdout/stderr captured in runs/summary-server.*.log. Added run-ID query/409 guard, HTTP access logs, detailed frontend HTTP errors/restart guidance and explicit Retry summary.
+- Live recorded-media 5× checks: S1 _071 returned 200 immediately/repeatedly (3 alerted tracks, 10 evidence records); S2 _058 returned 200 (1/2, linked trk-2/drone/red); manual stop S1 _072 returned 200 at 0.2 s (0/0, no detections). Exact responses, matching successful server log and reproduction steps: docs/run_summary_failure.md. JSON export handler and historical-pin data tested against actual response payloads.
+- Validation: 128 dashboard/live-run tests and lint/format/JS/diff checks passed. Browser access host unavailable: actual Chrome layout/pin/download interaction still needs visual checking. Existing uncommitted S1/S2 changes preserved. Next: hard-refresh the already restarted port 8021 page, run the desired scenario, review the local diff.
+
+### 2026-11-15 — Approved demo publication
+- User approved committing and pushing all current demo work to origin/phase-5-operator-dashboard. Reviewed project code, tests, scripts, contract fixtures and affected docs under GITHUB.md; README and review handoff now describe current playback/summary behavior and exact verification limits. CLAUDE.md and workflow commands were reviewed; no dependency or phase-acceptance change.
+- No live browser checks completed in this batch: tools unavailable. Live S1/S2/manual-stop HTTP checks and Node rendering/download logic passed as recorded in docs/demo_review_handoff.md. Generated run captures/logs, raw datasets and weights remain excluded; no new binary media is staged.
+- Next: review the published branch and complete the pending Chrome/audio/offline checks before accepting Phase 5. Phase 6 remains unstarted.

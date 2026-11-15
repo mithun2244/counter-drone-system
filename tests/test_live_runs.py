@@ -143,6 +143,64 @@ def until_ended(ws) -> list[dict]:
     return received
 
 
+@pytest.mark.parametrize(
+    ("scenario", "profile"),
+    [("s1", "fictional-processing-plant"), ("s2", "fictional-stadium")],
+)
+def test_completed_summary_matches_run_bus_messages(
+    live, tmp_path, monkeypatch, scenario, profile
+):
+    from cuas.schemas import BearingDetection, PicketAlert, ThreatAssessment, Track
+
+    original = live.feed
+    batches = []
+
+    async def collect(*args, **kwargs):
+        messages = await original(*args, **kwargs)
+        batches.extend(messages)
+        return messages
+
+    monkeypatch.setattr(live, "feed", collect)
+    hub = Hub(launcher(live, tmp_path))
+    with TestClient(create_app(hub)) as client, client.websocket_connect("/ws") as ws:
+        ws.receive_json()
+        client.post(
+            "/api/runs", json={"profile_id": profile, "scenario_id": scenario}
+        ).raise_for_status()
+        until_ended(ws)
+        summary = client.get("/api/run/summary").json()
+        detections = [
+            m for m in batches if isinstance(m, BearingDetection | PicketAlert)
+        ]
+        alerted = {
+            m.track_id
+            for m in batches
+            if isinstance(m, ThreatAssessment) and m.alert_id
+        }
+        positions = [m for m in batches if isinstance(m, Track)]
+        assert summary["ended_reason"] == "completed"
+        assert summary["latest_detection"]["t"] == max(m.t for m in detections)
+        assert summary["unique_alert_tracks"] == len(alerted)
+        assert summary["last_position"]["t"] == max(m.t for m in positions)
+        chain = tmp_path / summary["run_id"] / "evidence" / "chain.jsonl"
+        assert summary["evidence_records"] == len(chain.read_text().splitlines())
+        assert client.get("/api/run/summary").json() == summary
+        print(
+            scenario,
+            {
+                k: summary[k]
+                for k in (
+                    "elapsed_s",
+                    "active_alerts",
+                    "unique_alert_tracks",
+                    "evidence_records",
+                    "latest_detection",
+                    "last_position",
+                )
+            },
+        )
+
+
 def test_a_live_run_stopped_while_paused_keeps_valid_evidence_and_frees_the_server(
     live: ModuleType, tmp_path: Path
 ) -> None:
@@ -158,6 +216,9 @@ def test_a_live_run_stopped_while_paused_keeps_valid_evidence_and_frees_the_serv
         client.post("/api/run/control", json={"action": "pause"})
         stopped = client.post("/api/run/stop").json()
         assert (stopped["state"], stopped["ended_reason"]) == ("ended", "stopped")
+        summary = client.get("/api/run/summary").json()
+        assert summary["ended_reason"] == "stopped"
+        assert summary["elapsed_s"] < 30
         frames = [m for m in until_ended(ws) if m["type"] == "frame"]
         assert not frames or frames[-1]["t"] < 30.0  # far short of the 120 s scenario
         report = verify_chain(tmp_path / "s2_seed7_001")

@@ -25,3 +25,7 @@ Use the private `mithun2244/counter-drone-system` repository. `main` contains ac
 | Phase progress, tests, or decisions | [Phase plan](docs/phases.md) and [project memory](docs/memory.md) |
 
 Include updates to the affected docs on the same branch or pull request as the change. See [Git rules](docs/rules.md#8-git).
+
+The current demo review package and the exact split between completed HTTP/Node checks and
+pending browser checks are in [the review handoff](docs/demo_review_handoff.md). The update
+references an additional local held-out S2 clip; it does not add raw dataset video to Git.

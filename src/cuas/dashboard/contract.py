@@ -327,6 +327,8 @@ class CameraCue(ContractModel):
     track_id: str | None
     alert_id: str | None
     views: list[SimCameraView]
+    current_rgb_t: float | None = None
+    """Fresh RGB bearing uniquely linked by geometry to this track; never thermal."""
     """The wide view once detected, then the zoom view once a zoom camera is assigned."""
 
 

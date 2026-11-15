@@ -338,3 +338,30 @@ Content-Type: application/json
 - **Labels and exports need a live run.** Once a run ends its evidence is closed, and a replay keeps none: both answer `409`.
 - **The committed samples carry no evidence:** `evidence_head` is null and `evidence_records` 0. `edge_states.jsonl` (MOCK) shows a labelled alert and an evidence event.
 - **Evidence can lose its newest records unnoticed.** Removing the newest record together with the file it lists leaves a valid, shorter chain, and `cuas verify` passes. See `design.md` A11.
+
+## Post-run summary (2026-11-15)
+
+`GET /api/run/summary` supplies run ID, scenario, state/reason, elapsed simulation seconds,
+active alerts at end, unique alerted-track count, evidence record count, latest detection and
+last known estimated position. Live runs retain accepted sensor events and exact track-message
+times on the server; replay-only launchers summarize available cue/sector/heard frames. Missing
+associations remain null/absent and display as Unavailable. The operator page hides live camera
+status and queue at end, shows a historical pin, and offers a local summary JSON download.
+The summary resets with a new run ID. See `run_summary_verification.md` for details and limits.
+The optional `run_id` query parameter returns 409 when the requested run is no longer current.
+The operator supplies this ID for request correlation and offers explicit retry on HTTP errors.
+Uvicorn access logging is enabled so the request URL and status can be matched to a run.
+
+## S2 playback and linked acoustic focus (2026-11-15)
+
+The operator page uses the automatic video subject's track ID for the dashed yellow acoustic
+wedge unless an alert is manually selected. It reads that TrackView's backend-associated
+`heard` bearings only, preserving station and timestamp. Acoustic sectors controls the yellow
+wedge as well as the separate solid amber pre-alert wedges. No message changes are needed.
+S2 sample clips play once per run, hold the final frame and show “Sample clip ended” / Replay.
+Updates and alert changes preserve playback, including its ended state. S1 keeps looping.
+The final S2 display cut is held-out V_DRONE_102; see `s2_dashboard_verification.md`.
+
+## S1 automatic camera handoff (2026-11-15)
+
+S1 overrides the older Option B description: Zoom starts only when the simulated target is in view. After first acquisition, a fresh RGB observation permits Wide RGB fallback; reacquisition returns to Zoom. CameraCue.current_rgb_t is nullable and uses simulation time. A bearing must be RGB, no older than station_ai.look.period_s + tracker.batch_window_s (0.7 s), and uniquely match this live track in azimuth and elevation within tracker.gate_sigmas times the bearing sigma. Ambiguous, future, stale and thermal observations are rejected. This conservative display association uses only accepted bus messages and estimated tracks; it does not change pipeline association. Historical cue views and LookRef recordings do not establish current visibility. S2 retains its existing Option B behavior. See handoff_verification.md for measured times and browser verification limits.

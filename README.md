@@ -20,9 +20,30 @@ Open [the operator dashboard](http://127.0.0.1:8000/). It works offline and load
 5. With **Recorded media** ticked before starting (Fictional Stadium, S2), the selected alert's video plays over the upper right of the map. Pick a camera with its tab, and collapse or expand it with **−** / **+**. Under **Evidence**, **Recorded audio** plays each station's clean source audio.
 6. On a card, **Confirm** or **Dismiss** saves a label in the evidence chain, and **Export hand-off JSON** saves a mock hand-off package and shows its path and SHA-256 on the card and in the evidence section.
 7. After the run, check its evidence with `uv run cuas verify runs/<run_id>`. The run folder is shown in **System status**.
-8. For the acoustic-first demo, choose **Fictional Processing Plant** and **S5** (fog, calm air; a simulator demonstration, not a performance claim). From about 01:06 a station microphone's solid wedge reads "Acoustic warning · Camera unconfirmed" while no camera has seen the drone; the cameras confirm it later and its alert shows the dashed **Last heard from** cues. `uv run python scripts/acoustic_lead.py s5` prints the order and the lead; `uv run python scripts/run_demo.py --dashboard --replay docs/samples/s5_seed5005.jsonl` replays it.
+8. S5 remains an optional acoustic-first replay, outside the two-scenario demo dropdown: `uv run python scripts/run_demo.py --dashboard --replay docs/samples/s5_seed5005.jsonl`. `uv run python scripts/acoustic_lead.py s5` prints its detection order. This is a simulator demonstration, not a performance claim.
 
 The processed basemap `data/basemap/portsmouth.json` is committed, so a fresh clone draws the map offline; `scripts/fetch_basemap.py` rebuilds it, and without it the map draws a local grid. For recorded-media runs, prepare the local recordings and model weights as described in the [dashboard contract](docs/dashboard_contract.md) and [data source notes](data/README.md). The [reference page](http://127.0.0.1:8000/reference/) is a minimal independent check of the same contract. See [phase status and acceptance checks](docs/phases.md) for Phase 5 acceptance and the Phase 6 plan.
+
+The current demo lists **S1 and S2**; S3–S5 remain available through the CLI or replay files.
+S1 preserves acoustic warning → wide-camera detection text → Zoom acquisition, then switches
+to Wide RGB when a fresh observation uniquely matches the same track and Zoom loses it.
+Wide footage is explicitly **STAND-IN**, credited to DVIDS. S2 automatically shows the linked
+yellow microphone wedge for the video subject, with manual selection taking priority. Acoustic
+sectors controls both the yellow linked wedge and separate solid amber unconfirmed sectors.
+Its four held-out **SAMPLE** cuts play once, hold the final frame and offer **Replay**; source
+duration is 31.4 s, approximately 29.6 s after crossfades.
+
+At run end, the queue becomes **Run complete** or **Run stopped**, with last detection details,
+a historical estimate on the map, separate alerted-track/evidence counts and **Export run
+summary** (local JSON). Missing associations are shown explicitly. Restart the server after
+Python backend changes, then hard-refresh the page: refreshing alone can serve new JavaScript
+against old API handlers. [Summary failure diagnosis](docs/run_summary_failure.md) documents
+the reproduced stale-server 404 and successful recorded-media HTTP checks after restart.
+
+Validation for this update: 128 dashboard/live-run tests and lint/format checks passed.
+**No live browser checks were completed for this batch:** browser access was unavailable.
+HTTP/WebSocket and Node checks passed; visual playback, wedge/pin appearance and Chrome's
+download interaction remain pending. See the [review handoff](docs/demo_review_handoff.md).
 
 ## Client demo documents
 

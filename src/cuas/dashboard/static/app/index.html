@@ -64,6 +64,7 @@
               <div class="slew-note" data-text="simSlewing"></div>
             </div>
             <div id="standin-note" class="note"></div>
+            <div id="sample-end" class="note" hidden role="status">Sample clip ended <button id="sample-replay" type="button">Replay</button></div>
           </div>
           <div id="clip-note" class="note"></div>
           <div id="cue-note" class="note"></div>
@@ -71,6 +72,7 @@
       </div>
     </section>
     <section id="side">
+      <section id="run-summary" hidden aria-live="polite"></section>
       <div id="queue-panel">
         <h2 data-text="alertQueue"></h2>
         <ol id="alerts"></ol>

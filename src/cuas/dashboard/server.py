@@ -48,6 +48,7 @@ from cuas.dashboard.contract import (
     contract_schema,
 )
 from cuas.dashboard.display import DisplayClips, demo_profiles
+from cuas.dashboard.summary import RunSummary
 from cuas.schemas import EvidenceRecord, ExportRequest, Message, OperatorLabel
 from cuas.schemas.topics import EVIDENCE_RECORD, EXPORT_REQUEST, OPERATOR_LABEL
 
@@ -76,6 +77,7 @@ class Started:
     done: asyncio.Task[None]
     run_dir: Path | None = None
     evidence: Bus | None = None
+    summary: RunSummary | None = None
     """The evidence bus, for labels and exports. ``None`` when the run keeps no evidence."""
 
 
@@ -146,6 +148,7 @@ class Hub:
         self._alert_ids: set[str] = set()
         self._pending: dict[str, asyncio.Future[EvidenceRecord]] = {}
         self._request_numbers = count(1)
+        self.summary = RunSummary()
 
     @property
     def active(self) -> bool:
@@ -303,9 +306,14 @@ class Hub:
 
     def publish(self, message: Outgoing) -> None:
         if isinstance(message, RunInfo):
+            if self.run is None or self.run.run_id != message.run_id:
+                self.summary = RunSummary()
             self.run = message
         elif isinstance(message, Frame):
             self.frame = message
+            self.summary.frame(message)
+        elif isinstance(message, EvidenceEvent):
+            self.summary.evidence(message)
         elif isinstance(message, ModelStatus):
             self.models = message
         text = message.model_dump_json()
@@ -365,6 +373,35 @@ def create_app(
     @app.get("/api/profiles")
     def get_profiles() -> list[SiteProfile]:
         return hub.profiles
+
+    @app.get("/api/run/summary")
+    def get_summary(run_id: str | None = None) -> dict:
+        if hub.run is None:
+            raise HTTPException(status_code=404, detail="No run")
+        if run_id is not None and run_id != hub.run.run_id:
+            raise HTTPException(
+                status_code=409, detail="Requested run is no longer current"
+            )
+        result = hub.summary.result()
+        if hub._started and hub._started.summary:
+            raw = hub._started.summary.result()
+            latest = raw["latest_detection"]
+            if latest:
+                latest = {**hub.summary.tracks.get(latest["track_id"], {}), **latest}
+            result.update(
+                latest_detection=latest,
+                last_position=raw["last_position"],
+                unique_alert_tracks=raw["unique_alert_tracks"],
+                elapsed_s=hub._started.clock.now,
+            )
+        return {
+            "run_id": hub.run.run_id,
+            "scenario": hub.run.title,
+            "scenario_id": hub.run.scenario_id,
+            "state": hub.run.state,
+            "ended_reason": hub.run.ended_reason,
+            **result,
+        }
 
     @app.post("/api/runs")
     async def start_run(request: StartRun) -> RunInfo:
@@ -495,5 +532,5 @@ async def _send(websocket: WebSocket, client: _Client, hello: Hello) -> None:
 
 async def serve(app: FastAPI, host: str, port: int) -> None:
     """Serve until stopped, in the caller's event loop."""
-    config = uvicorn.Config(app, host=host, port=port, log_level="warning")
+    config = uvicorn.Config(app, host=host, port=port, log_level="info")
     await uvicorn.Server(config).serve()

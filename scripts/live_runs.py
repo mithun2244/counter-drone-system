@@ -33,6 +33,7 @@ from cuas.dashboard.contract import (
 )
 from cuas.dashboard.frames import FrameBuilder, profiles, run_info
 from cuas.dashboard.server import Publish, Started
+from cuas.dashboard.summary import RunSummary
 from cuas.evidence.keeper import EvidenceKeeper, start_keeper
 from cuas.evidence.store import EvidenceStore, fresh_run_dir
 from cuas.media_manifest import dataset_names, load_manifest
@@ -183,11 +184,14 @@ class LiveLauncher:
         clock = SimClock(site.simulation.tick_s, pace=self._pace)
         print(f"run {run.run_id} started, folder {run_dir}")
         evidence = InProcessBus()
+        summary = RunSummary()
         done = asyncio.create_task(
-            self._run(run, scenario, site, media, clock, publish, evidence, run_dir)
+            self._run(
+                run, scenario, site, media, clock, publish, evidence, run_dir, summary
+            )
         )
         clips = run_dir if media is not None else None
-        return Started(run, clock, self._pace, clips, done, run_dir, evidence)
+        return Started(run, clock, self._pace, clips, done, run_dir, evidence, summary)
 
     def _scenario(self, request: StartRun) -> Scenario:
         profile = next(
@@ -240,6 +244,7 @@ class LiveLauncher:
         publish: Publish,
         evidence: InProcessBus,
         run_dir: Path,
+        summary: RunSummary | None = None,
     ) -> None:
         sensor, ingest, control = InProcessBus(), InProcessBus(), InProcessBus()
         labels = scenario.metadata.zone_labels
@@ -247,6 +252,8 @@ class LiveLauncher:
             {} if media is None else dataset_names(load_manifest(self._config_dir))
         )
         builder = FrameBuilder(run.run_id, site, labels, datasets)
+        if summary is not None:
+            builder.summary = summary
         store = EvidenceStore(run_dir)
         keeper = start_keeper(
             EvidenceKeeper(store, run.run_id, labels), control, evidence

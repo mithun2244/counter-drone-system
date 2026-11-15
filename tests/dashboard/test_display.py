@@ -152,9 +152,8 @@ def test_site_demo_is_s1_then_s2_and_the_rest_stay(site: SiteConfig) -> None:
     ]
     zoom_only = _committed()["zoom_only"]
     assert set(zoom_only) == {"s1", "s2"}  # Option B in both demo scenarios
-    assert all(
-        set(_committed()["scenarios"][s]) == {"zoom"} for s in zoom_only
-    )  # no Wide tab
+    assert set(_committed()["scenarios"]["s1"]) == {"wide", "zoom"}
+    assert set(_committed()["scenarios"]["s2"]) == {"zoom"}
     for hidden in ("s3", "s4", "s5"):  # hidden, not removed
         assert any((ROOT / "config" / "scenarios").glob(f"{hidden}_*.yaml"))
 

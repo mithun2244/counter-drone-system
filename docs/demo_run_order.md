@@ -6,6 +6,11 @@ Two rules:
 - **Use the ■ Stop button between runs.** Do not restart the server. Stop ends the run cleanly, keeps its evidence and frees the dashboard for the next run.
 - **Picking a scenario picks its site**: the Site profile follows the Scenario dropdown by itself.
 
+At natural run end, the queue becomes **Run complete**, with the scenario, simulation duration,
+last recorded detection, historical position and separate track/evidence counts. **Export run
+summary** saves local JSON. Stop displays **Run stopped**. Starting another run clears it.
+See `run_summary_verification.md` for measured simulator-only summaries and rehearsal steps.
+
 ## Before the meeting (10 minutes)
 
 1. Use this laptop: the recordings and models are only here (and in the private backup zip). Plug in the charger.
@@ -21,11 +26,16 @@ Two rules:
 
 The dashboard needs no internet. Wi-Fi can be off.
 
+After editing dashboard Python code, restart the server once the current run has ended, then
+hard-refresh Chrome. The page can otherwise serve newer JavaScript against older in-memory
+API handlers. A summary HTTP 404 says to restart and start a fresh run; see
+`run_summary_failure.md` for the reproduced case and captured responses.
+
 ## 1. S1: large attack drones, processing plant (about 2 minutes)
 
 **Clicks:** Scenario **S1: Large attack drone - processing plant** (already selected) → leave **Recorded media unticked** → **Start monitoring** → **2×** until 01:10, then **5×**. **Do not click a card before 01:16**: with nothing selected, the video panel follows the highest-priority detection by itself. Tick **Close-up** once tracks appear.
 
-**No video until a zoom camera is on the track.** Before that the panel shows text only, so it never shows a picture the system does not have. Once the zoom camera is assigned, the panel plays about 19 s of **real video of a fixed-wing drone**, a US Army RQ-7B Shadow (public domain, DVIDS; three in-flight shots crossfaded and looped), under a single tab **ZOOM camera (stand-in clip)**, tagged **STAND-IN** and captioned "Stand-in clip: RQ-7B Shadow fixed-wing drone - DVIDS, Tech. Sgt. Michael McGhee, public domain - not footage of this track". There is no Wide or Thermal tab. No box or label is drawn on the video. Pause at each step if you want more time to talk.
+**S1 camera handoff:** acoustic warning, then wide-camera detection text, then Zoom once the target enters its simulated field of view. After that, a fresh RGB bearing uniquely linked to the same track permits automatic Wide RGB fallback. Status: "Wide RGB · Zoom repositioning" while Zoom remains assigned. Reacquisition returns to Zoom without changing the selected alert. With neither camera seeing it: "Target out of camera view"; the estimated map track follows its normal lifetime. Wide RGB reuses the local distant-approach DVIDS cut as an illustration: STAND-IN, DVIDS / Tech. Sgt. Michael McGhee, public domain, not footage of this track. Missing asset: "No Wide RGB clip available." S2 retains its existing Zoom/sample playback.
 
 | Clock | What appears | What to say |
 | --- | --- | --- |
@@ -36,7 +46,7 @@ The dashboard needs no internet. Wi-Fi can be off.
 | 01:16 | Three **RED** cards ranked by time to impact. Cards whose camera view is not on screen carry a yellow **Camera detected** badge | "Several targets at once, ranked by which one arrives first. The panel follows the top one; the badge says the others have been seen by a camera too." |
 | after 01:16 | Click any card: the panel follows that drone: its text, or its zoom video once a zoom camera is on it | "The operator chooses what to look at; the system never takes the panel away from a chosen alert." |
 | 01:38 | **INSIDE ZONE** on the first card | |
-| about 01:51 | The Zoom clip dims and reads "Zoom slewing to target" | "The drone is passing 250 m from the mast, faster than the zoom camera turns, so for a moment it has nothing in view and we show that." |
+| around 01:25 | Zoom and Wide RGB hand off as the target crosses the Zoom field boundary | "Wide RGB still sees this track while Zoom repositions. Both videos are illustrative." |
 
 **■ Stop** when the point is made, or let it end (2 minutes simulated).
 
@@ -48,7 +58,7 @@ If asked "is that a real camera?": no. The clips are real footage, but of anothe
 
 Use 2×, not 5×: the first recorded-media run fell up to 1.4 s behind real time at 2× on this laptop and caught up; nothing on screen warns of lag yet.
 
-As in S1, **no video until the zoom camera is on the track**; then the panel **opens by itself** (unless you have already selected another alert) and plays about 21 s of **sample clips of a real drone** (an F450 quadcopter) under a single tab **ZOOM camera (sample clip)**, tagged **SAMPLE** and captioned "Sample clip from Svanström Drone Detection Dataset - not footage of this track". They are three **held-out test clips**, never used for training, all under the same overcast sky (V_DRONE_027, then the clear parts of V_DRONE_033 and V_DRONE_032), crossfaded and looped. There is no Wide or Thermal tab. On this seed the zoom camera is on the track as the alert appears, so the panel opens at 00:16 with the card.
+S2 opens Zoom sample video automatically for the highest-ranked alert with an assigned Zoom camera; manual selection takes priority. When a linked microphone bearing arrives, that same track gets the dashed yellow Last heard from wedge with station and timestamp. Acoustic sectors hides both this wedge and the separate solid amber unconfirmed sectors. The local held-out sample sequence is V_DRONE_027, the existing clear portions of V_DRONE_033 and V_DRONE_032, then the visibly different blue-sky V_DRONE_102. Source duration: 31.4 s, about 29.6 s with crossfades. It plays once, holds its last frame and displays Sample clip ended with Replay. SAMPLE and the Svanström source caption stay visible. Routine updates do not restart it. See s2_dashboard_verification.md for the rehearsal and browser verification limits.
 
 | Clock | What appears | What to say |
 | --- | --- | --- |

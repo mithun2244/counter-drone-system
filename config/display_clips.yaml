@@ -64,11 +64,19 @@ clips:
     start_s: 2.0
     end_s: 9.0
 
+  f450_102:  # S2 final shot: held-out test group V_DRONE_102, visibly different blue sky
+    type: SAMPLE
+    dataset: Svanström Drone Detection Dataset
+    source_title: V_DRONE_102
+    path: svanstrom/Data/Video_V/V_DRONE_102.mp4
+    sha256: b74e8a26e5bf4c2a8f7ac7306ea4a5d26f99e06b9f71a92c8172a4682c2082b9
+
 # Which clips each camera tab plays, per scenario, in turn with a crossfade. A scenario listed
 # here has no Thermal tab; a tab with no clip keeps the simulated view.
 scenarios:
-  s1: {zoom: [shadow_contrails, shadow_lowpass, shadow_near]}  # about 19 s
-  s2: {zoom: [f450_027, f450_033, f450_032]}  # about 21 s, all under the same overcast sky
+  # Illustrative Wide RGB reuses the distant approach cut, explicitly STAND-IN / DVIDS.
+  s1: {wide: shadow_contrails, zoom: [shadow_contrails, shadow_lowpass, shadow_near]}  # about 19 s
+  s2: {zoom: [f450_027, f450_033, f450_032, f450_102]}  # 31.4 s source, once then Replay
   s5: {zoom: shadow_near}  # hidden from the demo; kept as it was
 
 # Option B: no video until a zoom camera is on the track (text before that), then only the

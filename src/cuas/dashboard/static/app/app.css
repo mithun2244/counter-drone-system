@@ -131,3 +131,6 @@ ol, ul { list-style: none; padding: 0; margin: 0; }
 #acoustic li.placed { color: var(--text); }
 #status-panel h2 + ul, #status-panel div + h2 { margin-top: 0.9em; }
 .copy { user-select: all; word-break: break-all; font-variant-numeric: tabular-nums; }
+#run-summary { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0.7em 1em; }
+#run-summary[hidden] { display: none; }
+#run-summary p { overflow-wrap: anywhere; }
