@@ -16,7 +16,7 @@ import asyncio
 import json
 import logging
 import re
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from itertools import count
 from pathlib import Path
@@ -25,11 +25,12 @@ from typing import Protocol
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from cuas.bus import Bus
 from cuas.clock import SimClock
+from cuas.config import DemoScenario
 from cuas.dashboard.basemap import Basemap
 from cuas.dashboard.contract import (
     EvidenceEvent,
@@ -46,7 +47,7 @@ from cuas.dashboard.contract import (
     StartRun,
     contract_schema,
 )
-from cuas.dashboard.standin import StandIn
+from cuas.dashboard.display import DisplayClips, demo_profiles
 from cuas.schemas import EvidenceRecord, ExportRequest, Message, OperatorLabel
 from cuas.schemas.topics import EVIDENCE_RECORD, EXPORT_REQUEST, OPERATOR_LABEL
 
@@ -124,13 +125,16 @@ class _Client:
 
 class Hub:
     def __init__(
-        self, launcher: Launcher, request_timeout_s: float | None = None
+        self,
+        launcher: Launcher,
+        request_timeout_s: float | None = None,
+        demo_scenarios: Sequence[DemoScenario] = (),
     ) -> None:
         """``request_timeout_s``: how long a label or export waits for the evidence keeper;
-        ``None`` waits until the run ends."""
+        ``None`` waits until the run ends. ``demo_scenarios``: the only scenarios listed."""
         self._launcher = launcher
         self._request_timeout_s = request_timeout_s
-        self.profiles = launcher.profiles()
+        self.profiles = demo_profiles(launcher.profiles(), demo_scenarios)
         self.run: RunInfo | None = None
         self.frame: Frame | None = None
         self.models: ModelStatus | None = None
@@ -344,10 +348,11 @@ def create_app(
     hub: Hub,
     app_dir: Path = APP_DIR,
     basemap: Basemap | None = None,
-    standin: tuple[StandIn, Path] | None = None,
+    display: tuple[DisplayClips, dict[str, Path]] | None = None,
 ) -> FastAPI:
     """``basemap`` is drawn under the site; without one, frontends draw the local grid.
-    ``standin`` is the Zoom tab's stand-in clip; without one, the simulated view stays."""
+    ``display``: real clips for the camera tabs; without them, the simulated view stays."""
+    shown, files = display or (DisplayClips(clips={}, scenarios={}), {})
     app = FastAPI(
         title="C-UAS dashboard", docs_url=None, redoc_url=None, openapi_url=None
     )
@@ -424,20 +429,25 @@ def create_app(
             )
         return basemap
 
-    @app.get("/api/standin")
-    def get_standin() -> StandIn:
-        if standin is None:
-            raise HTTPException(
-                status_code=404,
-                detail="no stand-in clip on this machine: draw the simulated view",
-            )
-        return standin[0]
+    @app.middleware("http")
+    async def always_revalidate(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        """A plain reload always gets the current page and scripts: the browser may keep a
+        copy but must ask first (an unchanged file costs a 304)."""
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
-    @app.get("/api/standin/clip")
-    def get_standin_clip() -> FileResponse:
-        if standin is None:
-            raise HTTPException(status_code=404, detail="no stand-in clip")
-        return FileResponse(standin[1], media_type=CLIP_TYPES[standin[1].suffix])
+    @app.get("/api/display")
+    def get_display() -> DisplayClips:
+        return shown
+
+    @app.get("/api/display/clip/{name}")
+    def get_display_clip(name: str) -> FileResponse:
+        if name not in files:
+            raise HTTPException(status_code=404, detail="no such display clip")
+        return FileResponse(files[name], media_type=CLIP_TYPES[files[name].suffix])
 
     @app.get("/api/contract")
     def get_contract() -> dict:

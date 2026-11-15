@@ -322,6 +322,13 @@ class CameraCueSettings(ConfigModel):
     target_span_m: Positive
 
 
+class DemoScenario(ConfigModel):
+    """A scenario the demo lists in the Scenario dropdown, under this title."""
+
+    id: str
+    title: str
+
+
 class DashboardSettings(ConfigModel):
     """What the dashboard stream carries (docs/dashboard_contract.md)."""
 
@@ -341,6 +348,9 @@ class DashboardSettings(ConfigModel):
     """Local only: the demo has no authentication and makes no outside connections."""
     port: Annotated[int, Field(ge=1024, le=65535)]
     basemap: BasemapSettings
+    demo_scenarios: tuple[DemoScenario, ...] = ()
+    """Only these appear in the dashboard's Scenario dropdown, in this order; empty lists
+    every scenario. The others are hidden, not removed."""
 
 
 class CoverageSettings(ConfigModel):

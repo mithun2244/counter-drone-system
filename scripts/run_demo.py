@@ -382,9 +382,9 @@ async def serve_dashboard(args: argparse.Namespace, site: SiteConfig) -> None:
     from live_runs import LiveLauncher
 
     from cuas.dashboard.basemap import StaleBasemap, load_basemap
+    from cuas.dashboard.display import load_display
     from cuas.dashboard.replay import ReplayLauncher
     from cuas.dashboard.server import Hub, Launcher, create_app, serve
-    from cuas.dashboard.standin import load_standin
 
     launcher: Launcher
     if args.replay is None:
@@ -402,13 +402,13 @@ async def serve_dashboard(args: argparse.Namespace, site: SiteConfig) -> None:
         if basemap
         else "basemap: none (scripts/fetch_basemap.py); the local grid is drawn"
     )
-    hub = Hub(launcher, site.dashboard.request_timeout_s)
+    hub = Hub(launcher, site.dashboard.request_timeout_s, site.dashboard.demo_scenarios)
     loading = None
     if isinstance(launcher, LiveLauncher):  # off the event loop: the page never freezes
         loading = asyncio.create_task(launcher.load_models(hub.publish))
-    standin = load_standin(CONFIG_DIR, DATA_DIR)
-    print(f"stand-in clip: {standin[0].title}" if standin else "stand-in clip: none")
-    await serve(create_app(hub, basemap=basemap, standin=standin), host, port)
+    display = load_display(CONFIG_DIR, DATA_DIR)
+    print(f"display clips: {', '.join(display[1]) or 'none'}")
+    await serve(create_app(hub, basemap=basemap, display=display), host, port)
     if loading is not None:
         loading.cancel()
 

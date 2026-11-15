@@ -1,0 +1,25 @@
+# Real video for the operator dashboard's camera tabs (docs/dashboard_contract.md, /api/display).
+# Display only: never footage of the simulated track, never training, evaluation or evidence,
+# which is why this is kept apart from media_manifest.yaml (whose hash is recorded with the
+# trained weights). Each clip is captioned from its entry as "not footage of this track".
+# Files live under data/; the DVIDS cuts are committed (rules.md §5 exception).
+clips:
+  shadow_near:  # the Zoom tab on S1's attack drones
+    type: STAND-IN
+    title: RQ-7B Shadow fixed-wing drone
+    source: DVIDS
+    author: Tech. Sgt. Michael McGhee
+    licence: public domain
+    source_title: RQ-7B Shadow Flight Demonstration
+    source_url: https://www.dvidshub.net/video/493473/rq-7b-shadow-flight-demonstration
+    downloaded: "2026-11-15"
+    edits: "02:28.0 to 02:35.0 of the source, cropped to 640x360 at (192, 90), audio removed"
+    path: standin/rq7b_shadow_dvids_493473.mp4
+    sha256: 4fb1eca4e6985819b8d2a593739c5fcedf8f6ddcb3810f87abc3eb68862d1eed
+
+# Which clip each camera tab plays, per scenario. A scenario listed here has no Thermal tab,
+# and its Wide and Zoom tabs play these clips instead of the simulated camera view (S1) or the
+# look clip the detector ran on (S2); a tab with no clip keeps the simulated view.
+scenarios:
+  s1: {zoom: shadow_near}
+  s5: {zoom: shadow_near}

@@ -162,6 +162,9 @@ dashboard:  # docs/dashboard_contract.md
     same_target_deg: 2.0  # a ray this close to one already followed, same station, is that target
     link_reach_factor: 1.5  # a confirmed track within this many hearing radii of the picket links to it
     target_span_m: 2.5  # size of the drawn fixed-wing target (client brief: 2.5 m one-way attack drone)
+  demo_scenarios:  # the Scenario dropdown lists only these, first is the default; S3-S5 are hidden, not removed
+    - {id: s1, title: Large attack drone - processing plant}
+    - {id: s2, title: Small drone - stadium}
   host: 127.0.0.1  # local only: no authentication, no outside connections
   port: 8000
   basemap:  # docs/mapping.md: a real basemap under the fictional site, for display only

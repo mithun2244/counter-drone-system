@@ -69,7 +69,13 @@ canvas { display: block; width: 100%; height: 100%; }
 #video-overlay.sim.viewing #simview { display: block; }
 #standin-box { display: none; position: relative; margin-top: 0.4em; }
 #standin { display: block; width: 100%; max-height: 32vh; background: #000; border-radius: 3px; transition: opacity 0.3s; }
-.standin-tag { position: absolute; top: 6px; left: 6px; font-size: 0.7em; font-weight: 700; letter-spacing: 0.05em; color: #111; background: var(--amber); border-radius: 3px; padding: 0.1em 0.4em; }
+#video-overlay .overlay-body { position: relative; }
+#clip-tag { top: calc(0.4em + 6px); }
+#video-overlay.sim #clip-tag, #video-overlay.empty #clip-tag { display: none; }
+.slew-note { display: none; position: absolute; inset: 0; align-items: center; justify-content: center; font-weight: 700; color: #d7e3ef; }
+#standin-box.slewing .slew-note { display: flex; }
+#standin-box.slewing #standin { opacity: 0.15 !important; }
+.clip-tag { position: absolute; top: 6px; left: 6px; font-size: 0.7em; font-weight: 700; letter-spacing: 0.05em; color: #111; background: var(--amber); border-radius: 3px; padding: 0.1em 0.4em; }
 #video-overlay.sim.viewing.standin #simview { display: none; }
 #video-overlay.sim.viewing.standin #standin-box { display: block; }
 #video-overlay.sim:not(.viewing) #clip-note { color: var(--amber); font-weight: 600; font-size: 0.95em; }

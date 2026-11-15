@@ -3,7 +3,7 @@
 "use strict";
 
 const state = {
-  profiles: [], run: null, frame: null, models: null, frameWall: 0, basemap: null, standin: null, ttis: new Map(), inside: new Set(),
+  profiles: [], run: null, frame: null, models: null, frameWall: 0, basemap: null, display: null, ttis: new Map(), inside: new Set(),
   selected: null, lastCard: null, cue: null, cueTabs: new Map(), simShown: false, looks: [], source: null, sounds: [], results: new Map(), collapsed: false,
 };
 const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
@@ -68,10 +68,30 @@ function fillProfiles() {
   fillScenarios();
 }
 
+// The Scenario dropdown lists every scenario the server offers (site.yaml demo_scenarios), across
+// venues; the site profile follows the scenario chosen, and choosing a profile picks its first.
 function fillScenarios() {
-  const profile = state.profiles.find((p) => p.profile_id === $("profile").value);
-  $("scenario").replaceChildren(...(profile ? profile.scenarios : [])
+  const keep = $("scenario").value;
+  const choices = state.profiles.flatMap((p) => p.scenarios);
+  $("scenario").replaceChildren(...choices
     .map((s) => new Option(`${s.scenario_id.toUpperCase()}: ${s.title}`, s.scenario_id)));
+  if (choices.some((s) => s.scenario_id === keep)) $("scenario").value = keep;
+  followScenario();
+}
+
+function followScenario() {
+  const owner = state.profiles.find((p) => p.scenarios.some((s) => s.scenario_id === $("scenario").value));
+  if (owner) $("profile").value = owner.profile_id;
+}
+
+function pickProfile() {
+  const profile = state.profiles.find((p) => p.profile_id === $("profile").value);
+  if (profile) $("scenario").value = profile.scenarios[0].scenario_id;
+}
+
+function scenarioTitle(run) {
+  const choice = state.profiles.flatMap((p) => p.scenarios).find((s) => s.scenario_id === run.scenario_id);
+  return choice ? choice.title : run.title;
 }
 
 async function post(path, body) {
@@ -125,7 +145,7 @@ function renderTopBar() {
   $("running").hidden = !run;
   if (!run) return;
   const ended = run.state === "ended" && run.ended_reason;
-  $("run-title").textContent = `${run.title} · ${run.venue} · ${ended ? t(`endedReason.${run.ended_reason}`) : t(`runState.${run.state}`)}`;
+  $("run-title").textContent = `${scenarioTitle(run)} · ${run.venue} · ${ended ? t(`endedReason.${run.ended_reason}`) : t(`runState.${run.state}`)}`;
   $("run-title").classList.toggle("failed", run.ended_reason === "failed");
   $("stop").hidden = !live || !$("stop-confirm").hidden;
   if (!live) $("stop-confirm").hidden = true;
@@ -356,14 +376,40 @@ function refreshMedia() {
   if ($("audio").paused && urls(card.sounds) !== urls(state.sounds)) showSounds(card.sounds);
 }
 
+// --- real video for the camera tabs (config/display_clips.yaml, GET /api/display) ---
+
+const LOOK_CAMERA = { rgb: "wide", zoom: "zoom" };
+
+function displayTabs() {  // this run's scenario's clips; a scenario listed there has no Thermal tab
+  return state.display && state.run ? state.display.scenarios[state.run.scenario_id] || null : null;
+}
+
+function displayClip(camera) {  // "wide" or "zoom"; null keeps the simulated view or the look clip
+  const tabs = displayTabs();
+  return tabs && tabs[camera] ? state.display.clips[tabs[camera]] : null;
+}
+
+function displayTabName(camera, station, clip) {
+  return t(camera === "zoom" ? "displayZoomTab" : "displayWideTab", { station, kind: t(`displayKind.${clip.type}`) });
+}
+
+async function loadDisplay() {
+  const response = await fetch("/api/display");
+  state.display = response.ok ? await response.json() : null;
+  render();
+}
+
 function lookName(look) {
   const [station, kind] = look.source.split(".");
+  const clip = displayClip(LOOK_CAMERA[kind]);
+  if (clip) return displayTabName(LOOK_CAMERA[kind], station, clip);
   const name = t(`lookKind.${kind}`);
   return `${station} ${name === `lookKind.${kind}` ? kind : name}`;
 }
 
 function refreshTabs(looks) {  // keyed by source; zoom first
-  state.looks = [...looks].sort((a, b) => b.source.endsWith(".zoom") - a.source.endsWith(".zoom"));
+  const shown = displayTabs() ? looks.filter((l) => !l.source.endsWith(".thermal")) : looks;
+  state.looks = [...shown].sort((a, b) => b.source.endsWith(".zoom") - a.source.endsWith(".zoom"));
   const names = state.looks.map((l) => l.source).join();
   if (names !== [...$("looks").children].map((b) => b.dataset.source).join()) {
     $("looks").replaceChildren(...state.looks.map((look) => {
@@ -379,6 +425,7 @@ function refreshTabs(looks) {  // keyed by source; zoom first
     b.setAttribute("aria-selected", String(on));
   }
   $("video-overlay").classList.toggle("empty", !state.source);
+  $("clip-tag").hidden = !state.source;
   const none = state.run && state.run.recorded_media ? "noClipRecorded" : "noClip";
   if (!state.source) $("clip-note").textContent = state.looks.length ? "" : t(none);
 }
@@ -387,8 +434,11 @@ function loadSource(source, autoplay) {  // the RGB / thermal / zoom tabs
   const look = state.looks.find((l) => l.source === source);
   if (!look) return;
   state.source = source;
-  $("clip").src = `${look.clip_url}#t=${look.at_s}`;  // media fragment: start near the look
-  $("clip-note").textContent = t("clipAt", { dataset: look.dataset || t("someDataset") });
+  const clip = displayClip(LOOK_CAMERA[source.split(".")[1]]);
+  $("clip").loop = Boolean(clip);
+  $("clip").src = clip ? clip.url : `${look.clip_url}#t=${look.at_s}`;  // media fragment: start near the look
+  $("clip-note").textContent = clip ? clip.caption : t("clipAt", { dataset: look.dataset || t("someDataset") });
+  $("clip-tag").textContent = clip ? clip.type : "SAMPLE";
   refreshTabs(state.looks);
   if (autoplay) $("clip").play().catch(() => {});  // a blocked autoplay leaves the controls
 }
@@ -531,8 +581,10 @@ function renderCue() {
   const chosen = state.cueTabs.get(cue.cue_id);  // the operator's tab, else zoom once assigned
   const view = cue.views.find((v) => v.camera === chosen) || cue.views.find((v) => v.camera === "zoom") || cue.views[0];
   $("looks").replaceChildren(...cue.views.map((v) => {
-    const tab = v.camera !== "zoom" ? "simWideTab" : state.standin ? "simZoomStandinTab" : "simZoomTab";
-    const button = el("button", v === view ? "on" : "", t(tab, { station: v.station_id }));
+    const clip = displayClip(v.camera);
+    const name = clip ? displayTabName(v.camera, v.station_id, clip)
+      : t(v.camera === "zoom" ? "simZoomTab" : "simWideTab", { station: v.station_id });
+    const button = el("button", v === view ? "on" : "", name);
     button.dataset.cam = v.camera;
     button.setAttribute("role", "tab");
     button.setAttribute("aria-selected", String(v === view));
@@ -544,21 +596,24 @@ function renderCue() {
     ? t("cameraDetection", { t: clock(cue.detected_t), station: cue.detected_by })
     : t("acousticOnly", { deg: Math.round(cue.cue_bearing_deg) });
   $("cue-note").textContent = pick.auto ? t("autoFollow") : "";
-  // Zoom tab: real stand-in footage while the zoom is on the track, never a detection box on it.
-  // Still slewing (target outside its view), or no clip on this machine: the simulated view.
-  const standin = Boolean(view && view.camera === "zoom" && state.standin && !simTargetOutside(view));
-  overlay.classList.toggle("standin", standin);
-  if (standin && !state.collapsed) $("standin").play().catch(() => {});
+  // A real clip for this tab, if the scenario has one: never a detection box on it. Otherwise,
+  // or with no clip on this machine, the simulated view.
+  const clip = view && displayClip(view.camera);
+  overlay.classList.toggle("standin", Boolean(clip));
+  if (clip) showDisplayClip(clip, view.camera === "zoom" && simTargetOutside(view));
   else $("standin").pause();
-  if (view && !standin && !state.collapsed) drawSimView($("simview"), view);
+  if (view && !clip && !state.collapsed) drawSimView($("simview"), view);
 }
 
-async function loadStandin() {  // 404: no stand-in clip on this machine, the simulated zoom view stays
-  const response = await fetch("/api/standin");
-  if (!response.ok) return;
-  state.standin = await response.json();
-  $("standin").src = "/api/standin/clip";
-  $("standin-note").textContent = t("standinCaption", state.standin);
+// A zoom camera still slewing (target outside its field of view) dims the clip and says so.
+function showDisplayClip(clip, slewing) {
+  const video = $("standin");
+  if (video.dataset.url !== clip.url) { video.dataset.url = clip.url; video.src = clip.url; }
+  $("standin-tag").textContent = clip.type;
+  $("standin-note").textContent = clip.caption;
+  $("standin-box").classList.toggle("slewing", slewing);
+  if (slewing || state.collapsed) video.pause();
+  else video.play().catch(() => {});
 }
 
 // The clip loops; a short fade hides the jump from its last frame back to its first.
@@ -590,7 +645,8 @@ async function loadBasemap() {
 
 for (const node of document.querySelectorAll("[data-text]")) node.textContent = t(node.dataset.text);
 document.title = t("title");
-$("profile").addEventListener("change", fillScenarios);
+$("profile").addEventListener("change", pickProfile);
+$("scenario").addEventListener("change", followScenario);
 $("go").addEventListener("click", startRun);
 $("rays").addEventListener("change", render);
 $("sectors").addEventListener("change", render);
@@ -643,5 +699,5 @@ for (const b of document.querySelectorAll("[data-speed]")) {
 new ResizeObserver(render).observe($("map"));
 setInterval(tickTti, 100);
 loadBasemap();
-loadStandin();
+loadDisplay();
 connect();
