@@ -174,6 +174,7 @@ Errors return `{"detail": "..."}`, always a string: `404` for an unknown alert, 
 | `POST /api/alerts/{alert_id}/export` | — | `alert_id`, `path`, `sha256`, and the hand-off `package` (`docs/handoff.schema.json`). Every alert is also exported when the run ends |
 | `GET /api/clips/{station}/{clip}` | — | The recording: H.264 MP4 (`video/mp4`) for a `looks` entry, for a `<video>` element, seeking to `at_s`; WAV (`audio/wav`) for a `sounds` entry, for an `<audio>` element |
 | `GET /api/contract` | — | This contract's JSON Schema |
+| `GET /api/standin` | — | The stand-in clip's listing from `config/standin_media.yaml` (`type` "STAND-IN", `title`, `source`, `author`, `licence`, `source_url`, ...), or `404` when this machine lacks the file: keep the simulated zoom view then. The clip is at `GET /api/standin/clip` (`video/mp4`, no audio). Play it, looping, only in a cue's zoom view and only while the target is inside that view's `fov_deg`; caption it from the listing as not footage of the track, tag it STAND-IN, and draw nothing over it. Added after version 1 without changing any message |
 | `GET /api/basemap` | — | The display basemap in site metres (`docs/basemap.schema.json`), or `404` when this machine has none: draw the local grid then. Added after version 1 without changing any message |
 
 ## The map: basemap, one transform, fallback

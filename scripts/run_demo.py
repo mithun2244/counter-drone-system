@@ -384,6 +384,7 @@ async def serve_dashboard(args: argparse.Namespace, site: SiteConfig) -> None:
     from cuas.dashboard.basemap import StaleBasemap, load_basemap
     from cuas.dashboard.replay import ReplayLauncher
     from cuas.dashboard.server import Hub, Launcher, create_app, serve
+    from cuas.dashboard.standin import load_standin
 
     launcher: Launcher
     if args.replay is None:
@@ -405,7 +406,9 @@ async def serve_dashboard(args: argparse.Namespace, site: SiteConfig) -> None:
     loading = None
     if isinstance(launcher, LiveLauncher):  # off the event loop: the page never freezes
         loading = asyncio.create_task(launcher.load_models(hub.publish))
-    await serve(create_app(hub, basemap=basemap), host, port)
+    standin = load_standin(CONFIG_DIR, DATA_DIR)
+    print(f"stand-in clip: {standin[0].title}" if standin else "stand-in clip: none")
+    await serve(create_app(hub, basemap=basemap, standin=standin), host, port)
     if loading is not None:
         loading.cancel()
 

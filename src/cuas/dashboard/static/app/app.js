@@ -3,7 +3,7 @@
 "use strict";
 
 const state = {
-  profiles: [], run: null, frame: null, models: null, frameWall: 0, basemap: null, ttis: new Map(), inside: new Set(),
+  profiles: [], run: null, frame: null, models: null, frameWall: 0, basemap: null, standin: null, ttis: new Map(), inside: new Set(),
   selected: null, lastCard: null, cue: null, cueTabs: new Map(), simShown: false, looks: [], source: null, sounds: [], results: new Map(), collapsed: false,
 };
 const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
@@ -517,7 +517,8 @@ function renderCue() {
   state.cue = pick ? pick.cue : null;
   overlay.classList.toggle("sim", Boolean(pick));
   if (!pick) {
-    overlay.classList.remove("viewing");
+    overlay.classList.remove("viewing", "standin");
+    $("standin").pause();
     $("cue-note").textContent = "";
     if (state.simShown) { state.simShown = false; refreshTabs(state.looks); }
     overlay.hidden = !state.selected;
@@ -530,7 +531,8 @@ function renderCue() {
   const chosen = state.cueTabs.get(cue.cue_id);  // the operator's tab, else zoom once assigned
   const view = cue.views.find((v) => v.camera === chosen) || cue.views.find((v) => v.camera === "zoom") || cue.views[0];
   $("looks").replaceChildren(...cue.views.map((v) => {
-    const button = el("button", v === view ? "on" : "", t(v.camera === "zoom" ? "simZoomTab" : "simWideTab", { station: v.station_id }));
+    const tab = v.camera !== "zoom" ? "simWideTab" : state.standin ? "simZoomStandinTab" : "simZoomTab";
+    const button = el("button", v === view ? "on" : "", t(tab, { station: v.station_id }));
     button.dataset.cam = v.camera;
     button.setAttribute("role", "tab");
     button.setAttribute("aria-selected", String(v === view));
@@ -542,8 +544,27 @@ function renderCue() {
     ? t("cameraDetection", { t: clock(cue.detected_t), station: cue.detected_by })
     : t("acousticOnly", { deg: Math.round(cue.cue_bearing_deg) });
   $("cue-note").textContent = pick.auto ? t("autoFollow") : "";
-  if (view && !state.collapsed) drawSimView($("simview"), view);
+  // Zoom tab: real stand-in footage while the zoom is on the track, never a detection box on it.
+  // Still slewing (target outside its view), or no clip on this machine: the simulated view.
+  const standin = Boolean(view && view.camera === "zoom" && state.standin && !simTargetOutside(view));
+  overlay.classList.toggle("standin", standin);
+  if (standin && !state.collapsed) $("standin").play().catch(() => {});
+  else $("standin").pause();
+  if (view && !standin && !state.collapsed) drawSimView($("simview"), view);
 }
+
+async function loadStandin() {  // 404: no stand-in clip on this machine, the simulated zoom view stays
+  const response = await fetch("/api/standin");
+  if (!response.ok) return;
+  state.standin = await response.json();
+  $("standin").src = "/api/standin/clip";
+  $("standin-note").textContent = t("standinCaption", state.standin);
+}
+
+// The clip loops; a short fade hides the jump from its last frame back to its first.
+$("standin").addEventListener("timeupdate", ({ target: v }) => {
+  v.style.opacity = v.currentTime < 0.2 || v.duration - v.currentTime < 0.4 ? 0 : 1;
+});
 
 // --- drawing ---
 
@@ -622,4 +643,5 @@ for (const b of document.querySelectorAll("[data-speed]")) {
 new ResizeObserver(render).observe($("map"));
 setInterval(tickTti, 100);
 loadBasemap();
+loadStandin();
 connect();

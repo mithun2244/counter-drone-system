@@ -1,0 +1,16 @@
+# Stand-in footage for the operator dashboard's Zoom tab on big-drone cues (S1, S5).
+# Real footage of a fixed-wing drone, never of the simulated track. Kept apart from
+# media_manifest.yaml: that file's hash is recorded with the trained weights and its clips
+# are training and evaluation data. The file itself stays in data/ (gitignored).
+standin:
+  type: STAND-IN
+  title: RQ-7B Shadow fixed-wing drone
+  source: DVIDS
+  author: Tech. Sgt. Michael McGhee
+  licence: public domain
+  source_title: RQ-7B Shadow Flight Demonstration
+  source_url: https://www.dvidshub.net/video/493473/rq-7b-shadow-flight-demonstration
+  downloaded: "2026-11-15"
+  edits: "02:28.0 to 02:35.0 of the source, cropped to 640x360 at (192, 90), audio removed"
+  path: standin/rq7b_shadow_dvids_493473.mp4
+  sha256: 4fb1eca4e6985819b8d2a593739c5fcedf8f6ddcb3810f87abc3eb68862d1eed

@@ -24,6 +24,12 @@ function angleOff(a, b) {  // smallest signed turn from b to a, degrees
   return ((a - b + 540) % 360) - 180;
 }
 
+// Beyond the camera's field of view (the frame's aspect for elevation): a zoom camera still slewing.
+function simTargetOutside(view) {
+  return Math.abs(angleOff(view.seen_azimuth_deg, view.pointing_azimuth_deg)) > view.fov_deg / 2
+    || Math.abs(view.seen_elevation_deg - view.pointing_elevation_deg) > (view.fov_deg * SIMVIEW.aspect) / 2;
+}
+
 function sizeSimCanvas(canvas) {
   const width = canvas.clientWidth || 400;
   const height = Math.min(width * SIMVIEW.aspect, (window.innerHeight * SIMVIEW.maxHeightVh) / 100);

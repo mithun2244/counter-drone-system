@@ -8,7 +8,7 @@ Summary of `REVIEW.md` (Licences) and `data/README.md`. Not legal advice: counse
 
 | Item | Licence | Allowed today | Before delivery |
 | --- | --- | --- | --- |
-| PyAV 18.1.0 (video decoding) | BSD-3-Clause, but the Windows wheel bundles FFmpeg (LGPL) and the **GPL-2.0+ codecs `libx264` and `libx265`** | Internal demo, decoding only | Check whether shipping the wheel triggers GPL terms; or use an LGPL-only FFmpeg build |
+| PyAV 18.1.0 (video decoding) | BSD-3-Clause, but the Windows wheel bundles FFmpeg (LGPL) and the **GPL-2.0+ codecs `libx264` and `libx265`** | Internal demo, decoding only; `libx264` was also used once, on this laptop, to cut the stand-in clip | Check whether shipping the wheel triggers GPL terms; or use an LGPL-only FFmpeg build |
 | SSDLite starting weights (COCO) and our fine-tuned `look_rgb.pt`, `look_thermal.pt` | Code BSD-3-Clause; **the weights have no stated licence**; COCO images are under Flickr terms | Internal demo | Counsel review of the weights; or retrain from weights with a clear licence |
 | Svanström Drone Detection Dataset (all video, drone and background audio; `sound.pt`) | **Sources disagree**: CC0-1.0 in the repository, "Other (Open)" on Zenodo, CC BY 4.0 on the article | Internal demo, with citation | Ask the authors which applies (contact in `data/README.md`). 49 YouTube clips and all helicopter audio are already excluded |
 | FSD50K `Engine` clips (engine sound proxy) | Dataset CC BY; per-clip licences; only CC0 clips used. **"Commercial use requires contacting the authors"** | Internal demo | Contact the FSD50K authors |
@@ -34,4 +34,12 @@ Summary of `REVIEW.md` (Licences) and `data/README.md`. Not legal advice: counse
 
 ## Media used on screen
 
-Every clip comes from one of two public datasets, listed clip by clip in `config/media_manifest.yaml` (path, SHA-256, label, split). The dashboard names the dataset in every caption: "Sample clip from Svanström Drone Detection Dataset - not footage of this track", "Sample recording from FSD50K". No client or site footage is used.
+Every detector clip comes from one of two public datasets, listed clip by clip in `config/media_manifest.yaml` (path, SHA-256, label, split). The dashboard names the dataset in every caption: "Sample clip from Svanström Drone Detection Dataset - not footage of this track", "Sample recording from FSD50K". No client or site footage is used.
+
+### Stand-in clip (Zoom tab on attack-drone tracks)
+
+| Item | Source | Licence | Credit shown on screen |
+| --- | --- | --- | --- |
+| "RQ-7B Shadow Flight Demonstration", 7 s cut (02:28.0 to 02:35.0), cropped, audio removed | DVIDS, https://www.dvidshub.net/video/493473/rq-7b-shadow-flight-demonstration, downloaded 2026-11-15 | Public domain (work of the US government) | "Stand-in clip: RQ-7B Shadow fixed-wing drone - DVIDS, Tech. Sgt. Michael McGhee, public domain - not footage of this track" |
+
+DVIDS media is public domain, but its use **implies no endorsement by the US Department of Defense** or any of its components; do not present it as such (https://www.dvidshub.net/about/copyright). The clip shows a training flight demonstration in Iowa, not an attack. It is display only: no detector ran on it and it is not evidence. Recorded in `config/standin_media.yaml`; the file is kept out of git in `data/standin/`.

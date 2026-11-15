@@ -46,6 +46,7 @@ from cuas.dashboard.contract import (
     StartRun,
     contract_schema,
 )
+from cuas.dashboard.standin import StandIn
 from cuas.schemas import EvidenceRecord, ExportRequest, Message, OperatorLabel
 from cuas.schemas.topics import EVIDENCE_RECORD, EXPORT_REQUEST, OPERATOR_LABEL
 
@@ -340,9 +341,13 @@ class Hub:
 
 
 def create_app(
-    hub: Hub, app_dir: Path = APP_DIR, basemap: Basemap | None = None
+    hub: Hub,
+    app_dir: Path = APP_DIR,
+    basemap: Basemap | None = None,
+    standin: tuple[StandIn, Path] | None = None,
 ) -> FastAPI:
-    """``basemap`` is drawn under the site; without one, frontends draw the local grid."""
+    """``basemap`` is drawn under the site; without one, frontends draw the local grid.
+    ``standin`` is the Zoom tab's stand-in clip; without one, the simulated view stays."""
     app = FastAPI(
         title="C-UAS dashboard", docs_url=None, redoc_url=None, openapi_url=None
     )
@@ -418,6 +423,21 @@ def create_app(
                 detail="no basemap on this machine: draw the local grid",
             )
         return basemap
+
+    @app.get("/api/standin")
+    def get_standin() -> StandIn:
+        if standin is None:
+            raise HTTPException(
+                status_code=404,
+                detail="no stand-in clip on this machine: draw the simulated view",
+            )
+        return standin[0]
+
+    @app.get("/api/standin/clip")
+    def get_standin_clip() -> FileResponse:
+        if standin is None:
+            raise HTTPException(status_code=404, detail="no stand-in clip")
+        return FileResponse(standin[1], media_type=CLIP_TYPES[standin[1].suffix])
 
     @app.get("/api/contract")
     def get_contract() -> dict:

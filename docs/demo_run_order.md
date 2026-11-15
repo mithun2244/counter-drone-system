@@ -44,21 +44,22 @@ Export and Confirm work only while the run is live: do them before Stop.
 
 **Clicks:** Site profile **Fictional Processing Plant** → **S1: Processing plant watch** → leave **Recorded media unticked** → **Start monitoring** → **2×** until 01:10, then **5×**. **Do not click a card before 01:16**: with nothing selected, the video panel follows the highest-priority detection by itself. Tick **Close-up** once tracks appear.
 
-The video panel shows a **SIMULATED camera view** drawn by the dashboard: no footage exists for fixed-wing drones. It is labelled "SIMULATED CAMERA VIEW - not real footage" on every frame. Pause at each step if you want more time to talk.
+The wide camera tab shows a **SIMULATED camera view** drawn by the dashboard, labelled "SIMULATED CAMERA VIEW - not real footage" on every frame: the public datasets contain no fixed-wing drone footage. The **Zoom** tab plays a **stand-in clip**: real footage of a fixed-wing drone (a US Army RQ-7B Shadow, public domain, from DVIDS), tagged **STAND-IN** and captioned "not footage of this track". Pause at each step if you want more time to talk.
 
 | Clock | What appears | What to say |
 | --- | --- | --- |
 | 00:19 | Amber wedges at the outer pickets: "pk4 · Engine heard … · Unconfirmed" | "Acoustic pickets 3 km out hear a piston engine long before any camera. A picket gives a direction only, so we show a wedge, not a dot." |
 | 00:23 | **Step 1.** The video panel opens by itself with no picture: "Acoustic detection only - camera cued to bearing 137°, searching" | "The system points the nearest camera at the picket that heard it. Nothing is seen yet, so we say so: there is no picture to show." |
 | 00:39 | **Step 2.** The panel shows the simulated camera view: a bright dot off-centre, "range unknown (one bearing)", and "Camera detection at 00:38.6 by st2". The evidence head under System status moves to record 1 | "A camera has found it, about 20 degrees from where the picket pointed us. One camera gives a direction but no range. The detection is written to the evidence chain at that moment." |
-| 01:06 | **Step 3.** The panel switches to the **Zoom** tab: a larger dot near the crosshair, FOV 2°, range about 1.4 km | "A second mast also sees it, so it has a position and a range. The zoom camera is assigned and takes over: narrower field, larger target." |
+| 01:06 | **Step 3.** The panel switches to the **Zoom (stand-in clip)** tab: a looping clip of a fixed-wing drone against the sky, with a **STAND-IN** tag and the caption "Stand-in clip: RQ-7B Shadow fixed-wing drone - DVIDS, Tech. Sgt. Michael McGhee, public domain - not footage of this track" | "A second mast also sees it, so it has a position and a range, and the zoom camera is assigned. We have no camera on a real attack drone, so this tab plays a stand-in: real, public-domain footage of a fixed-wing drone of similar size, to show what a zoom camera would give the operator. It is not this track, it is not a detection, and the screen says so. The wide camera tab stays the simulated view, which follows the track's geometry." |
 | 01:16 | Three **RED** cards ranked by time to impact. Cards whose camera view is not on screen carry a yellow **Camera detected** badge | "Several targets at once, ranked by which one arrives first. The panel follows the top one; the badge says the others have been seen by a camera too." |
 | after 01:16 | Click any card: the panel shows that drone's own view | "The operator chooses what to look at; the system never takes the panel away from a chosen alert." |
 | 01:38 | **INSIDE ZONE** on the first card | |
+| about 01:51 | The Zoom tab can change to the simulated frame reading "Zoom slewing to target" | "The drone is passing 250 m from the mast, faster than the zoom camera turns, so for a moment it has nothing in view and we show that." |
 
 **■ Stop** when the point is made, or let it end (2 minutes simulated).
 
-If asked "is that a real camera?": no. It is a drawing of what the camera reported: the direction from the simulated camera bearing or the estimated track, sized for a 2.5 m drone at the estimated range. The public datasets contain no fixed-wing drone footage.
+If asked "is that a real camera?": no. The wide view is a drawing of what the camera reported: the direction from the simulated camera bearing or the estimated track, sized for a 2.5 m drone at the estimated range. The Zoom clip is real footage, but of another aircraft on another day: a US Army RQ-7B Shadow at a 2016 flight demonstration in Iowa, published by DVIDS as public domain. No detector ran on it and no box is drawn on it. Its use implies no endorsement by the US Department of Defense. If the stand-in clip is missing on the machine, the Zoom tab falls back to the simulated view.
 
 ## 3. S3 on the simulator only: birds and one drone (about 1 minute)
 

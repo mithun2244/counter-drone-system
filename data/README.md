@@ -39,6 +39,13 @@ This records published terms and is not legal advice. Have counsel review before
 - **Weights licence:** none stated separately. [torchvision warns](https://docs.pytorch.org/vision/stable/models.html) that weights "may have their own licenses" derived from their training data, and that permission is the user's responsibility.
 - **Data behind the weights:** COCO. A [secondary source](https://huggingface.co/datasets/shunk031/MSCOCO) gives annotations as CC BY 4.0 and images as subject to Flickr terms; [COCO's own page](https://cocodataset.org/#termsofuse) did not render when checked. Whether its training recipe used ImageNet weights is unverified.
 
+### DVIDS stand-in clip (RQ-7B Shadow)
+
+- **URL:** https://www.dvidshub.net/video/493473/rq-7b-shadow-flight-demonstration ("RQ-7B Shadow Flight Demonstration", video by Tech. Sgt. Michael McGhee, Joint Force Headquarters, Iowa National Guard, taken 2016-11-09). Downloaded 2026-11-15 as the page's 1024x576 MP4.
+- **Licence:** public domain, as marked on the page. DVIDS asks for a credit and bars any implied endorsement by the US Department of Defense (https://www.dvidshub.net/about/copyright).
+- **Kept:** `data/standin/rq7b_shadow_dvids_493473.mp4` only: 02:28.0 to 02:35.0 of the source, cropped to 640x360 at (192, 90), audio removed, H.264. The cut shows the aircraft against the sky: no people, vehicles or ground. Its SHA-256 and these details are in `config/standin_media.yaml`. The source file was not kept, and `download_data.py` does not fetch this clip.
+- **Used for:** display only, in the operator dashboard's Zoom tab on big-drone cues, tagged STAND-IN. Never training, evaluation or evidence, which is why it is not in `config/media_manifest.yaml`.
+
 ### OpenStreetMap (display basemap of Portsmouth, UK)
 
 - **URL:** fetched with one request to the Overpass API, https://overpass-api.de/api/interpreter (the endpoint used is recorded in the file's `source`), by `uv run python scripts/fetch_basemap.py`. The query is in the script and saved with the raw response.
