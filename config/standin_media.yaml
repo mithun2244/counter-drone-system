@@ -1,7 +1,7 @@
 # Stand-in footage for the operator dashboard's Zoom tab on big-drone cues (S1, S5).
 # Real footage of a fixed-wing drone, never of the simulated track. Kept apart from
 # media_manifest.yaml: that file's hash is recorded with the trained weights and its clips
-# are training and evaluation data. The file itself stays in data/ (gitignored).
+# are training and evaluation data. The file itself is committed (rules.md §5 exception).
 standin:
   type: STAND-IN
   title: RQ-7B Shadow fixed-wing drone

@@ -40,6 +40,7 @@
 - Check each licence before use. Some (for example Drone-vs-Bird) are non-commercial only.
 - Never commit `data/`, `models/` or `runs/`.
 - Exception: the processed OpenStreetMap display basemap `data/basemap/portsmouth.json` (ODbL, attribution shown on screen) is committed.
+- Exception: the stand-in clip `data/standin/rq7b_shadow_dvids_493473.mp4` (public domain, DVIDS, 248 KB, credit shown on screen) is committed.
 - Never put client footage or Saudi site data in this repo. The real system keeps such data in the Kingdom.
 - No secrets, keys or passwords in code or config. Use environment variables.
 
