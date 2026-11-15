@@ -137,6 +137,7 @@ const TEXT = {
     simRange: "range {km} km",
     simRangeUnknown: "range unknown (one bearing)",
     simOutside: "target outside view",
+    simSlewing: "Zoom slewing to target",
     simLabel: "SIMULATED CAMERA VIEW - not real footage",
     autoFollow: "Opened automatically: highest-priority detection",
     cameraDetected: "Camera detected",

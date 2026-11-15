@@ -59,6 +59,9 @@ function drawSimTarget(ctx, w, h, view, pxPerDeg) {
   let x = w / 2 + dx, y = h / 2 + dy;
   const m = SIMVIEW.edgeMarginPx;
   const outside = x < m || x > w - m || y < m || y > h - m;
+  // A zoom camera still slewing has no target in frame: draw nothing. Clamping the dot to the
+  // edge drew a close target (wide in a 2-degree view) as a large blob in the corner.
+  if (outside && view.camera === "zoom") return true;
   x = Math.min(w - m, Math.max(m, x));
   y = Math.min(h - m, Math.max(m, y));
   const spanDeg = view.range_m ? (view.drawn_span_m / view.range_m) * (180 / Math.PI) : 0;
@@ -91,8 +94,9 @@ function drawSimText(ctx, w, h, view, outside) {
   ctx.fillText(`${view.station_id} ${camera} · ${Math.round(view.pointing_azimuth_deg)}° · FOV ${view.fov_deg.toFixed(view.fov_deg < 10 ? 1 : 0)}°`, 8, 8);
   const range = view.range_m ? t("simRange", { km: (view.range_m / 1000).toFixed(2) }) : t("simRangeUnknown");
   ctx.fillText(range, 8, 26);  // its own line: never overlaps the camera line in a narrow panel
-  if (outside) ctx.fillText(t("simOutside"), 8, 44);
+  if (outside && view.camera !== "zoom") ctx.fillText(t("simOutside"), 8, 44);
   ctx.textAlign = "center";
+  if (outside && view.camera === "zoom") ctx.fillText(t("simSlewing"), w / 2, h / 2 + 34);
   ctx.fillStyle = "rgba(0,0,0,0.65)";
   ctx.fillRect(0, h - 24, w, 24);
   ctx.fillStyle = SIMVIEW.label;

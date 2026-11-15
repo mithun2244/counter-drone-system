@@ -5,6 +5,8 @@ import asyncio
 import hashlib
 import json
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -576,3 +578,61 @@ def test_big_drone_video_panel_wording_and_simulated_view() -> None:
     pick = script[script.index("function pickCue") : script.index("function showBadge")]
     assert "state.selected =" not in pick  # picking a cue never selects an alert
     assert 'cue.views.find((v) => v.camera === "zoom")' in script  # zoom once assigned
+
+
+_SIMVIEW_HARNESS = """
+const fs = require("fs");
+const calls = { arcs: 0, text: [] };
+const ctx = new Proxy({}, { get: (_, k) => {
+  if (k === "arc") return () => { calls.arcs += 1; };
+  if (k === "fillText") return (s) => { calls.text.push(s); };
+  if (k === "createLinearGradient" || k === "createRadialGradient") return () => ({ addColorStop() {} });
+  return () => {};
+}, set: () => true });
+globalThis.window = { innerHeight: 768, devicePixelRatio: 1 };
+globalThis.t = (key) => key;
+const canvas = { clientWidth: 400, style: {}, getContext: () => ctx };
+new Function("canvas", "view", fs.readFileSync(process.argv[2], "utf8") + "; drawSimView(canvas, view);")(
+  canvas, JSON.parse(process.argv[3]));
+console.log(JSON.stringify(calls));
+"""
+
+
+@pytest.mark.parametrize(
+    ("camera", "off_deg", "arcs", "said"),
+    [
+        (
+            "zoom",
+            -6.12,
+            0,
+            "simSlewing",
+        ),  # S1 seed 1001 at 01:51.2: 6 degrees outside a 2-degree view
+        ("zoom", 0.3, 2, None),
+        ("wide", -40.0, 2, "simOutside"),
+    ],
+)
+def test_zoom_view_outside_its_field_of_view_says_slewing_and_draws_no_target(
+    camera: str, off_deg: float, arcs: int, said: str | None
+) -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+    view = {
+        "camera": camera, "station_id": "st1", "fov_deg": 2.0 if camera == "zoom" else 60.0,
+        "pointing_azimuth_deg": 100.0, "pointing_elevation_deg": 5.0,
+        "seen_azimuth_deg": 100.0 + off_deg, "seen_elevation_deg": 5.0,
+        "range_m": 268.1, "drawn_span_m": 2.5,
+    }  # fmt: skip
+    out = subprocess.run(
+        [node, "-", str(STATIC / "app" / "simview.js"), json.dumps(view)],
+        input=_SIMVIEW_HARNESS,
+        capture_output=True, text=True, check=True,
+    )  # fmt: skip
+    calls = json.loads(out.stdout)
+    assert calls["arcs"] == arcs
+    assert [s for s in calls["text"] if s in ("simSlewing", "simOutside")] == (
+        [said] if said else []
+    )
+    assert 'simSlewing: "Zoom slewing to target"' in (
+        STATIC / "app" / "text.js"
+    ).read_text("utf-8")
