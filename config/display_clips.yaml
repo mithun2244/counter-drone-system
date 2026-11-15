@@ -1,10 +1,10 @@
 # Real video for the operator dashboard's camera tabs (docs/dashboard_contract.md, /api/display).
-# Display only: never footage of the simulated track, never training, evaluation or evidence,
-# which is why this is kept apart from media_manifest.yaml (whose hash is recorded with the
-# trained weights). Each clip is captioned from its entry as "not footage of this track".
-# Files live under data/; the DVIDS cuts are committed (rules.md §5 exception).
+# Display only: never footage of the simulated track, never training data and never evidence.
+# Kept apart from media_manifest.yaml, whose hash is recorded with the trained weights; a
+# SAMPLE entry repeats that file's hash for a held-out (test split) clip. Each clip is captioned from its entry as "not footage of this track".
+# The DVIDS cuts are committed (rules.md §5 exception); the Svanström clips are not.
 clips:
-  shadow_near:  # the Zoom tab on S1's attack drones
+  shadow_near:  # S1 Zoom: the Shadow flying away, never under about 37 px wingspan on screen
     type: STAND-IN
     title: RQ-7B Shadow fixed-wing drone
     source: DVIDS
@@ -16,10 +16,35 @@ clips:
     edits: "02:28.0 to 02:35.0 of the source, cropped to 640x360 at (192, 90), audio removed"
     path: standin/rq7b_shadow_dvids_493473.mp4
     sha256: 4fb1eca4e6985819b8d2a593739c5fcedf8f6ddcb3810f87abc3eb68862d1eed
+  shadow_far:  # S1 Wide: always smaller than in shadow_near (about 18 to 26 px wingspan on screen)
+    type: STAND-IN
+    title: RQ-7B Shadow fixed-wing drone
+    source: DVIDS
+    author: Tech. Sgt. Michael McGhee
+    licence: public domain
+    source_title: RQ-7B Shadow Flight Demonstration
+    source_url: https://www.dvidshub.net/video/493473/rq-7b-shadow-flight-demonstration
+    downloaded: "2026-11-15"
+    edits: "02:05.4 to 02:08.0 of the source (2.6 s, looped), whole frame scaled to 640x360, audio removed"
+    path: standin/rq7b_shadow_dvids_493473_far.mp4
+    sha256: 4493ab81fc677d52d121f27e3cff6c7ae31bde440a5bf1ff698090f030322d67
+  f450_distant:  # S2 Wide: held-out (test split); the detector ran on it at st1 in S2 seed 2002
+    type: SAMPLE
+    dataset: Svanström Drone Detection Dataset
+    source_title: V_DRONE_031
+    path: svanstrom/Data/Video_V/V_DRONE_031.mp4
+    sha256: b350e2417d4940a4bfdaf8391a5c3de16a4ade286b2c9f03083e4f1743a19e84
+  f450_close:  # S2 Zoom: held-out (test split, close bin); evaluated in the held-out RGB report
+    type: SAMPLE
+    dataset: Svanström Drone Detection Dataset
+    source_title: V_DRONE_027
+    path: svanstrom/Data/Video_V/V_DRONE_027.mp4
+    sha256: ae0e55cc59c9f7be52fb3108d622af6ff2b8a3119ac986f4c14d8dc44fce0806
 
 # Which clip each camera tab plays, per scenario. A scenario listed here has no Thermal tab,
 # and its Wide and Zoom tabs play these clips instead of the simulated camera view (S1) or the
 # look clip the detector ran on (S2); a tab with no clip keeps the simulated view.
 scenarios:
-  s1: {zoom: shadow_near}
-  s5: {zoom: shadow_near}
+  s1: {wide: shadow_far, zoom: shadow_near}
+  s2: {wide: f450_distant, zoom: f450_close}
+  s5: {zoom: shadow_near}  # hidden from the demo; kept as it was

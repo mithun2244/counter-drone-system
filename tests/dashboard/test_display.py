@@ -54,13 +54,15 @@ def _setup(tmp_path: Path, files: dict[str, bytes]) -> tuple[Path, Path]:
 
 def test_committed_clips_are_honestly_sourced_and_mapped() -> None:
     listing = _committed()
-    manifest = {c.path: c.sha256 for c in load_manifest(ROOT / "config").clips}
+    manifest = {c.path: c for c in load_manifest(ROOT / "config").clips}
     for clip in listing["clips"].values():
         if clip["type"] == "STAND-IN":
             assert clip["licence"] == "public domain"
             assert clip["source_url"].startswith("https://www.dvidshub.net/video/")
-        else:  # a dataset clip: the same file the manifest records
-            assert manifest[clip["path"]] == clip["sha256"]
+        else:  # a held-out dataset clip: the same file the manifest records, never trained on
+            assert manifest[clip["path"]].sha256 == clip["sha256"]
+            assert manifest[clip["path"]].split == "test"
+            assert manifest[clip["path"]].label == "drone"
     for tabs in listing["scenarios"].values():
         assert set(tabs) <= {"wide", "zoom"}
         assert all(name in listing["clips"] for name in tabs.values())
